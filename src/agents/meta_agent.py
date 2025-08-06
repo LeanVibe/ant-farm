@@ -9,19 +9,32 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass
 from enum import Enum
+import sys
 import structlog
 
-from .base_agent import BaseAgent, TaskResult, ToolResult
-from ..core.config import settings
-from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-from ..core.message_broker import message_broker, MessageType
-from ..core.models import get_database_manager, Agent as AgentModel
+# Handle both module and direct execution imports
+try:
+    from .base_agent import BaseAgent, TaskResult, ToolResult
+    from ..core.config import settings
+    from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
+    from ..core.message_broker import message_broker, MessageType
+    from ..core.models import get_database_manager, Agent as AgentModel
+except ImportError:
+    # Direct execution - add src to path
+    src_path = Path(__file__).parent.parent
+    sys.path.insert(0, str(src_path))
+    from agents.base_agent import BaseAgent, TaskResult, ToolResult
+    from core.config import settings
+    from core.task_queue import task_queue, Task, TaskStatus, TaskPriority
+    from core.message_broker import message_broker, MessageType
+    from core.models import get_database_manager, Agent as AgentModel
 
 logger = structlog.get_logger()
 
 
 class ImprovementType(Enum):
     """Types of system improvements."""
+
     BUG_FIX = "bug_fix"
     FEATURE_ENHANCEMENT = "feature_enhancement"
     PERFORMANCE_OPTIMIZATION = "performance_optimization"
@@ -34,6 +47,7 @@ class ImprovementType(Enum):
 @dataclass
 class ImprovementProposal:
     """A proposed improvement to the system."""
+
     id: str
     type: ImprovementType
     title: str
@@ -50,6 +64,7 @@ class ImprovementProposal:
 @dataclass
 class SystemAnalysis:
     """Analysis of current system state."""
+
     health_score: float
     performance_metrics: Dict[str, float]
     agent_efficiency: Dict[str, float]
@@ -61,82 +76,84 @@ class SystemAnalysis:
 
 class MetaAgent(BaseAgent):
     """Meta-Agent responsible for self-improvement and system coordination."""
-    
+
     def __init__(self, name: str = "meta-agent"):
         super().__init__(name, "meta", "system_coordinator")
-        
+
         # Meta-agent specific state
         self.improvement_proposals: Dict[str, ImprovementProposal] = {}
         self.active_improvements: Set[str] = set()
         self.completed_improvements: Set[str] = set()
         self.failed_improvements: Set[str] = set()
-        
+
         # Analysis state
         self.last_system_analysis: Optional[SystemAnalysis] = None
         self.analysis_interval = 300  # 5 minutes
         self.last_analysis_time = 0.0
-        
+
         # Self-modification safety
         self.modification_enabled = settings.enable_self_modification
         self.max_concurrent_improvements = 3
         self.backup_created = False
-        
-        logger.info("Meta-Agent initialized", 
-                   name=self.name,
-                   modification_enabled=self.modification_enabled)
-    
+
+        logger.info(
+            "Meta-Agent initialized",
+            name=self.name,
+            modification_enabled=self.modification_enabled,
+        )
+
     async def run(self) -> None:
         """Main meta-agent execution loop."""
         logger.info("Meta-Agent starting main loop", agent=self.name)
-        
+
         while self.status == "active":
             try:
                 # Periodic system analysis
                 if time.time() - self.last_analysis_time > self.analysis_interval:
                     await self._perform_system_analysis()
                     self.last_analysis_time = time.time()
-                
+
                 # Process any assigned tasks
                 await self._process_pending_tasks()
-                
+
                 # Review and execute improvement proposals
                 await self._execute_improvements()
-                
+
                 # Coordinate with other agents
                 await self._coordinate_agents()
-                
+
                 # Brief pause before next iteration
                 await asyncio.sleep(10)
-                
+
             except Exception as e:
-                logger.error("Meta-agent error in main loop", 
-                           agent=self.name, 
-                           error=str(e))
+                logger.error(
+                    "Meta-agent error in main loop", agent=self.name, error=str(e)
+                )
                 await asyncio.sleep(30)  # Longer pause on error
-    
+
     async def _perform_system_analysis(self) -> SystemAnalysis:
         """Perform comprehensive system analysis."""
         logger.info("Performing system analysis", agent=self.name)
-        
+
         # Analyze system health
         health_score = await self._calculate_system_health()
-        
+
         # Get performance metrics
         performance_metrics = await self._gather_performance_metrics()
-        
+
         # Analyze agent efficiency
         agent_efficiency = await self._analyze_agent_efficiency()
-        
+
         # Analyze code quality
         code_quality_score = await self._analyze_code_quality()
-        
+
         # Identify issues and opportunities
         issues = await self._identify_system_issues()
         opportunities = await self._identify_improvement_opportunities()
-        
+
         # Resource utilization
         resource_utilization = await self._analyze_resource_utilization()
-        
+
         analysis = SystemAnalysis(
             health_score=health_score,
             performance_metrics=performance_metrics,
@@ -144,24 +161,24 @@ class MetaAgent(BaseAgent):
             code_quality_score=code_quality_score,
             identified_issues=issues,
             improvement_opportunities=opportunities,
-            resource_utilization=resource_utilization
+            resource_utilization=resource_utilization,
         )
-        
+
         self.last_system_analysis = analysis
-        
+
         # Store analysis in context
         await self.store_context(
             content=f"System Analysis Results:\nHealth: {health_score:.2f}\nIssues: {len(issues)}\nOpportunities: {len(opportunities)}",
             importance_score=0.9,
             category="system_analysis",
-            metadata=analysis.__dict__
+            metadata=analysis.__dict__,
         )
-        
+
         # Generate improvement proposals based on analysis
         await self._generate_improvement_proposals(analysis)
-        
+
         return analysis
-    
+
     async def _calculate_system_health(self) -> float:
         """Calculate overall system health score."""
         try:
@@ -169,85 +186,89 @@ class MetaAgent(BaseAgent):
             db_session = self.db_manager.get_session()
             agents = db_session.query(AgentModel).filter_by(status="active").all()
             db_session.close()
-            
+
             if not agents:
                 return 0.0
-            
+
             # Calculate health score based on various factors
             healthy_agents = 0
             total_agents = len(agents)
-            
+
             for agent in agents:
                 # Check if agent is responsive (simplified)
                 if agent.last_heartbeat and (time.time() - agent.last_heartbeat) < 300:
                     healthy_agents += 1
-            
+
             agent_health = healthy_agents / total_agents if total_agents > 0 else 0.0
-            
+
             # Check infrastructure health
             infrastructure_health = 1.0  # Simplified - would check Redis, DB, etc.
-            
+
             # Overall health score
-            return (agent_health * 0.7 + infrastructure_health * 0.3)
-            
+            return agent_health * 0.7 + infrastructure_health * 0.3
+
         except Exception as e:
             logger.error("Failed to calculate system health", error=str(e))
             return 0.0
-    
+
     async def _gather_performance_metrics(self) -> Dict[str, float]:
         """Gather system performance metrics."""
         metrics = {}
-        
+
         try:
             # Task completion rate
             total_tasks = await task_queue.get_total_tasks()
             completed_tasks = await task_queue.get_completed_tasks()
-            
+
             if total_tasks > 0:
                 metrics["task_completion_rate"] = completed_tasks / total_tasks
             else:
                 metrics["task_completion_rate"] = 0.0
-            
+
             # Average task execution time
             metrics["avg_task_execution_time"] = await self._get_avg_execution_time()
-            
+
             # Agent utilization
             metrics["agent_utilization"] = await self._calculate_agent_utilization()
-            
+
             # Queue depth
             metrics["queue_depth"] = await task_queue.get_queue_depth()
-            
+
         except Exception as e:
             logger.error("Failed to gather performance metrics", error=str(e))
-        
+
         return metrics
-    
+
     async def _analyze_agent_efficiency(self) -> Dict[str, float]:
         """Analyze individual agent efficiency."""
         efficiency = {}
-        
+
         try:
             db_session = self.db_manager.get_session()
             agents = db_session.query(AgentModel).filter_by(status="active").all()
-            
+
             for agent in agents:
                 # Calculate efficiency based on task completion ratio
                 # This is simplified - would use more sophisticated metrics
-                if hasattr(agent, 'tasks_completed') and hasattr(agent, 'tasks_assigned'):
+                if hasattr(agent, "tasks_completed") and hasattr(
+                    agent, "tasks_assigned"
+                ):
                     if agent.tasks_assigned > 0:
-                        efficiency[agent.name] = agent.tasks_completed / agent.tasks_assigned
+                        efficiency[agent.name] = (
+                            agent.tasks_completed / agent.tasks_assigned
+                        )
                     else:
                         efficiency[agent.name] = 0.0
                 else:
                     efficiency[agent.name] = 0.5  # Default efficiency
-            
+
             db_session.close()
-            
+
         except Exception as e:
             logger.error("Failed to analyze agent efficiency", error=str(e))
-        
+
         return efficiency
-    
+
     async def _analyze_code_quality(self) -> float:
         """Analyze overall code quality."""
         try:
@@ -262,67 +283,68 @@ class MetaAgent(BaseAgent):
             
             Provide a score from 0.0 to 1.0 for overall code quality.
             """
-            
+
             result = await self.execute_with_cli_tool(prompt)
-            
+
             if result.success:
                 # Extract quality score from output (simplified)
                 # In practice, would parse structured output
                 score = 0.7  # Default score
-                
+
                 # Store code quality analysis
                 await self.store_context(
                     content=f"Code Quality Analysis:\n{result.output}",
                     importance_score=0.8,
                     category="code_quality",
-                    metadata={"quality_score": score}
+                    metadata={"quality_score": score},
                 )
-                
+
                 return score
             else:
                 return 0.5  # Default score on analysis failure
-                
+
         except Exception as e:
             logger.error("Failed to analyze code quality", error=str(e))
             return 0.5
-    
+
     async def _identify_system_issues(self) -> List[str]:
         """Identify current system issues."""
         issues = []
-        
+
         try:
             # Check for failed tasks
             failed_tasks = await task_queue.get_failed_tasks()
             if failed_tasks:
                 issues.append(f"Failed tasks detected: {len(failed_tasks)}")
-            
+
             # Check for unresponsive agents
             db_session = self.db_manager.get_session()
             agents = db_session.query(AgentModel).filter_by(status="active").all()
             unresponsive_agents = [
-                agent.name for agent in agents
+                agent.name
+                for agent in agents
                 if agent.last_heartbeat and (time.time() - agent.last_heartbeat) > 300
             ]
             db_session.close()
-            
+
             if unresponsive_agents:
                 issues.append(f"Unresponsive agents: {', '.join(unresponsive_agents)}")
-            
+
             # Check queue depth
             queue_depth = await task_queue.get_queue_depth()
             if queue_depth > 100:
                 issues.append(f"High queue depth: {queue_depth}")
-            
+
         except Exception as e:
             logger.error("Failed to identify system issues", error=str(e))
             issues.append(f"Analysis error: {str(e)}")
-        
+
         return issues
-    
+
     async def _identify_improvement_opportunities(self) -> List[str]:
         """Identify opportunities for system improvement."""
         opportunities = []
-        
+
         try:
             # Analyze task patterns for optimization opportunities
             prompt = """
@@ -335,70 +357,83 @@ class MetaAgent(BaseAgent):
             
             List the top 5 improvement opportunities.
             """
-            
+
             result = await self.execute_with_cli_tool(prompt)
-            
+
             if result.success:
                 # Parse opportunities from output (simplified)
-                lines = result.output.split('\n')
+                lines = result.output.split("\n")
                 for line in lines:
-                    if line.strip() and (line.startswith('-') or line.startswith('*')):
+                    if line.strip() and (line.startswith("-") or line.startswith("*")):
                         opportunities.append(line.strip())
-            
+
             # Add some built-in opportunities based on metrics
             if self.last_system_analysis:
                 if self.last_system_analysis.health_score < 0.8:
-                    opportunities.append("Improve system reliability and health monitoring")
-                
-                if any(eff < 0.6 for eff in self.last_system_analysis.agent_efficiency.values()):
+                    opportunities.append(
+                        "Improve system reliability and health monitoring"
+                    )
+
+                if any(
+                    eff < 0.6
+                    for eff in self.last_system_analysis.agent_efficiency.values()
+                ):
                     opportunities.append("Optimize low-performing agents")
-        
+
         except Exception as e:
             logger.error("Failed to identify improvement opportunities", error=str(e))
-        
+
         return opportunities
-    
+
     async def _analyze_resource_utilization(self) -> Dict[str, float]:
         """Analyze system resource utilization."""
         utilization = {}
-        
+
         try:
             # Get basic resource metrics (simplified)
             utilization["cpu_usage"] = 0.5  # Would get actual CPU usage
             utilization["memory_usage"] = 0.6  # Would get actual memory usage
             utilization["agent_capacity"] = await self._calculate_agent_capacity()
-            utilization["queue_utilization"] = min(1.0, (await task_queue.get_queue_depth()) / 1000)
-            
+            utilization["queue_utilization"] = min(
+                1.0, (await task_queue.get_queue_depth()) / 1000
+            )
+
         except Exception as e:
             logger.error("Failed to analyze resource utilization", error=str(e))
-        
+
         return utilization
-    
+
     async def _generate_improvement_proposals(self, analysis: SystemAnalysis) -> None:
         """Generate improvement proposals based on system analysis."""
-        
+
         # Generate proposals for identified issues
         for issue in analysis.identified_issues:
             proposal = await self._create_improvement_proposal_for_issue(issue)
             if proposal:
                 self.improvement_proposals[proposal.id] = proposal
-        
+
         # Generate proposals for opportunities
         for opportunity in analysis.improvement_opportunities:
-            proposal = await self._create_improvement_proposal_for_opportunity(opportunity)
+            proposal = await self._create_improvement_proposal_for_opportunity(
+                opportunity
+            )
             if proposal:
                 self.improvement_proposals[proposal.id] = proposal
-        
+
         # Generate performance-based proposals
         if analysis.health_score < 0.7:
             proposal = self._create_health_improvement_proposal(analysis)
             self.improvement_proposals[proposal.id] = proposal
-        
-        logger.info("Generated improvement proposals", 
-                   agent=self.name,
-                   proposal_count=len(self.improvement_proposals))
-    
-    async def _create_improvement_proposal_for_issue(self, issue: str) -> Optional[ImprovementProposal]:
+
+        logger.info(
+            "Generated improvement proposals",
+            agent=self.name,
+            proposal_count=len(self.improvement_proposals),
+        )
+
+    async def _create_improvement_proposal_for_issue(
+        self, issue: str
+    ) -> Optional[ImprovementProposal]:
         """Create improvement proposal to address a specific issue."""
         try:
             prompt = f"""
@@ -416,9 +451,9 @@ class MetaAgent(BaseAgent):
             
             Format as JSON.
             """
-            
+
             result = await self.execute_with_cli_tool(prompt)
-            
+
             if result.success:
                 # Parse the proposal (simplified - would use proper JSON parsing)
                 return ImprovementProposal(
@@ -430,18 +465,27 @@ class MetaAgent(BaseAgent):
                     complexity_score=0.5,
                     risk_score=0.3,
                     affected_components=["system"],
-                    implementation_steps=["Analyze issue", "Implement fix", "Test solution"],
+                    implementation_steps=[
+                        "Analyze issue",
+                        "Implement fix",
+                        "Test solution",
+                    ],
                     success_metrics=["Issue resolved", "No regression"],
-                    created_at=time.time()
+                    created_at=time.time(),
                 )
-        
+
         except Exception as e:
-            logger.error("Failed to create improvement proposal for issue", 
-                        issue=issue, error=str(e))
-        
+            logger.error(
+                "Failed to create improvement proposal for issue",
+                issue=issue,
+                error=str(e),
+            )
+
         return None
-    
-    async def _create_improvement_proposal_for_opportunity(self, opportunity: str) -> Optional[ImprovementProposal]:
+
+    async def _create_improvement_proposal_for_opportunity(
+        self, opportunity: str
+    ) -> Optional[ImprovementProposal]:
         """Create improvement proposal for an identified opportunity."""
         try:
             return ImprovementProposal(
@@ -453,18 +497,28 @@ class MetaAgent(BaseAgent):
                 complexity_score=0.6,
                 risk_score=0.4,
                 affected_components=["system"],
-                implementation_steps=["Design enhancement", "Implement", "Test", "Deploy"],
+                implementation_steps=[
+                    "Design enhancement",
+                    "Implement",
+                    "Test",
+                    "Deploy",
+                ],
                 success_metrics=["Feature implemented", "Performance improved"],
-                created_at=time.time()
+                created_at=time.time(),
             )
-        
+
         except Exception as e:
-            logger.error("Failed to create improvement proposal for opportunity", 
-                        opportunity=opportunity, error=str(e))
-        
+            logger.error(
+                "Failed to create improvement proposal for opportunity",
+                opportunity=opportunity,
+                error=str(e),
+            )
+
         return None
-    
-    def _create_health_improvement_proposal(self, analysis: SystemAnalysis) -> ImprovementProposal:
+
+    def _create_health_improvement_proposal(
+        self, analysis: SystemAnalysis
+    ) -> ImprovementProposal:
         """Create proposal to improve system health."""
         return ImprovementProposal(
             id=str(uuid.uuid4()),
@@ -479,16 +533,16 @@ class MetaAgent(BaseAgent):
                 "Improve health monitoring",
                 "Add agent recovery mechanisms",
                 "Enhance error handling",
-                "Implement redundancy"
+                "Implement redundancy",
             ],
             success_metrics=[
                 "Health score > 0.8",
                 "Reduced downtime",
-                "Faster error recovery"
+                "Faster error recovery",
             ],
-            created_at=time.time()
+            created_at=time.time(),
         )
-    
+
     async def _process_pending_tasks(self) -> None:
         """Process any tasks assigned to the meta-agent."""
         try:
@@ -496,78 +550,93 @@ class MetaAgent(BaseAgent):
             if task:
                 await self.process_task(task)
         except Exception as e:
-            logger.error("Failed to process pending tasks", agent=self.name, error=str(e))
-    
+            logger.error(
+                "Failed to process pending tasks", agent=self.name, error=str(e)
+            )
+
     async def _execute_improvements(self) -> None:
         """Execute approved improvement proposals."""
         if not self.modification_enabled:
             return
-        
+
         # Limit concurrent improvements
         if len(self.active_improvements) >= self.max_concurrent_improvements:
             return
-        
+
         # Select highest impact, lowest risk proposals
         available_proposals = [
-            p for p in self.improvement_proposals.values()
-            if p.id not in self.active_improvements and p.id not in self.completed_improvements
+            p
+            for p in self.improvement_proposals.values()
+            if p.id not in self.active_improvements
+            and p.id not in self.completed_improvements
         ]
-        
+
         if not available_proposals:
             return
-        
+
         # Sort by impact/risk ratio
         available_proposals.sort(
-            key=lambda p: p.impact_score / max(p.risk_score, 0.1),
-            reverse=True
+            key=lambda p: p.impact_score / max(p.risk_score, 0.1), reverse=True
         )
-        
+
         # Execute top proposal
         proposal = available_proposals[0]
         await self._execute_improvement_proposal(proposal)
-    
-    async def _execute_improvement_proposal(self, proposal: ImprovementProposal) -> None:
+
+    async def _execute_improvement_proposal(
+        self, proposal: ImprovementProposal
+    ) -> None:
         """Execute a specific improvement proposal."""
-        logger.info("Executing improvement proposal", 
-                   agent=self.name,
-                   proposal_id=proposal.id,
-                   title=proposal.title)
-        
+        logger.info(
+            "Executing improvement proposal",
+            agent=self.name,
+            proposal_id=proposal.id,
+            title=proposal.title,
+        )
+
         self.active_improvements.add(proposal.id)
-        
+
         try:
             # Create backup if not already done
             if not self.backup_created:
                 await self._create_system_backup()
                 self.backup_created = True
-            
+
             # Execute implementation steps
             for step in proposal.implementation_steps:
                 await self._execute_implementation_step(proposal, step)
-            
+
             # Validate success metrics
             success = await self._validate_improvement_success(proposal)
-            
+
             if success:
                 self.completed_improvements.add(proposal.id)
-                logger.info("Improvement proposal completed successfully", 
-                           proposal_id=proposal.id)
+                logger.info(
+                    "Improvement proposal completed successfully",
+                    proposal_id=proposal.id,
+                )
             else:
                 self.failed_improvements.add(proposal.id)
                 await self._rollback_improvement(proposal)
-                logger.warning("Improvement proposal failed validation", 
-                              proposal_id=proposal.id)
-        
+                logger.warning(
+                    "Improvement proposal failed validation", proposal_id=proposal.id
+                )
+
         except Exception as e:
             self.failed_improvements.add(proposal.id)
-            logger.error("Improvement proposal execution failed", 
-                        proposal_id=proposal.id, error=str(e))
+            logger.error(
+                "Improvement proposal execution failed",
+                proposal_id=proposal.id,
+                error=str(e),
+            )
             await self._rollback_improvement(proposal)
-        
+
         finally:
             self.active_improvements.discard(proposal.id)
-    
-    async def _execute_implementation_step(self, proposal: ImprovementProposal, step: str) -> None:
+
+    async def _execute_implementation_step(
+        self, proposal: ImprovementProposal, step: str
+    ) -> None:
         """Execute a single implementation step."""
         prompt = f"""
         Execute this implementation step for the improvement proposal:
@@ -576,7 +645,7 @@ class MetaAgent(BaseAgent):
         Description: {proposal.description}
         Step: {step}
         
-        Affected Components: {', '.join(proposal.affected_components)}
+        Affected Components: {", ".join(proposal.affected_components)}
         
         Please implement this step carefully, ensuring:
         1. Code quality and testing
@@ -586,12 +655,12 @@ class MetaAgent(BaseAgent):
         
         Make the necessary changes to the codebase.
         """
-        
+
         result = await self.execute_with_cli_tool(prompt)
-        
+
         if not result.success:
             raise Exception(f"Implementation step failed: {result.error}")
-        
+
         # Store implementation context
         await self.store_context(
             content=f"Implemented step: {step}\nResult: {result.output[:500]}...",
@@ -600,11 +669,13 @@ class MetaAgent(BaseAgent):
             metadata={
                 "proposal_id": proposal.id,
                 "step": step,
-                "success": result.success
-            }
+                "success": result.success,
+            },
         )
-    
-    async def _validate_improvement_success(self, proposal: ImprovementProposal) -> bool:
+
+    async def _validate_improvement_success(
+        self, proposal: ImprovementProposal
+    ) -> bool:
         """Validate that improvement proposal succeeded."""
         try:
             # Run validation for each success metric
@@ -617,23 +688,26 @@ class MetaAgent(BaseAgent):
                 
                 Check if this metric has been achieved and return true/false.
                 """
-                
+
                 result = await self.execute_with_cli_tool(prompt)
-                
+
                 if result.success and "true" not in result.output.lower():
                     return False
-            
+
             return True
-            
+
         except Exception as e:
-            logger.error("Failed to validate improvement success", 
-                        proposal_id=proposal.id, error=str(e))
+            logger.error(
+                "Failed to validate improvement success",
+                proposal_id=proposal.id,
+                error=str(e),
+            )
             return False
-    
+
     async def _rollback_improvement(self, proposal: ImprovementProposal) -> None:
         """Rollback a failed improvement."""
         logger.info("Rolling back improvement proposal", proposal_id=proposal.id)
-        
+
         prompt = f"""
         Rollback the changes made for this improvement proposal:
         
@@ -643,15 +717,18 @@ class MetaAgent(BaseAgent):
         Restore the system to its previous state before this improvement was attempted.
         Use git or other version control mechanisms as appropriate.
         """
-        
+
         result = await self.execute_with_cli_tool(prompt)
-        
+
         if result.success:
             logger.info("Improvement rollback completed", proposal_id=proposal.id)
         else:
-            logger.error("Improvement rollback failed", 
-                        proposal_id=proposal.id, error=result.error)
-    
+            logger.error(
+                "Improvement rollback failed",
+                proposal_id=proposal.id,
+                error=result.error,
+            )
+
     async def _create_system_backup(self) -> None:
         """Create a backup of the current system state."""
         try:
@@ -663,32 +740,32 @@ class MetaAgent(BaseAgent):
             
             This backup will be used for rollback if improvements fail.
             """
-            
+
             result = await self.execute_with_cli_tool(prompt)
-            
+
             if result.success:
                 logger.info("System backup created successfully")
             else:
                 logger.error("Failed to create system backup", error=result.error)
-                
+
         except Exception as e:
             logger.error("Exception creating system backup", error=str(e))
-    
+
     async def _coordinate_agents(self) -> None:
         """Coordinate with other agents in the system."""
         try:
             # Send health check to all agents
             agents = await self._get_active_agents()
-            
+
             for agent_name in agents:
                 if agent_name != self.name:
                     await self.send_message(
                         to_agent=agent_name,
                         topic="health_check",
                         content={"check_time": time.time()},
-                        message_type=MessageType.DIRECT
+                        message_type=MessageType.DIRECT,
                     )
-            
+
             # Broadcast system status
             if self.last_system_analysis:
                 await message_broker.broadcast_message(
@@ -698,13 +775,13 @@ class MetaAgent(BaseAgent):
                         "health_score": self.last_system_analysis.health_score,
                         "active_improvements": len(self.active_improvements),
                         "pending_proposals": len(self.improvement_proposals),
-                        "timestamp": time.time()
-                    }
+                        "timestamp": time.time(),
+                    },
                 )
-        
+
         except Exception as e:
             logger.error("Failed to coordinate with agents", error=str(e))
-    
+
     async def _get_active_agents(self) -> List[str]:
         """Get list of active agent names."""
         try:
@@ -716,17 +793,17 @@ class MetaAgent(BaseAgent):
         except Exception as e:
             logger.error("Failed to get active agents", error=str(e))
             return []
-    
+
     async def _get_avg_execution_time(self) -> float:
         """Get average task execution time."""
         # Simplified implementation
         return 30.0  # Would calculate from actual metrics
-    
+
     async def _calculate_agent_utilization(self) -> float:
         """Calculate overall agent utilization."""
         # Simplified implementation
         return 0.7  # Would calculate from actual metrics
-    
+
     async def _calculate_agent_capacity(self) -> float:
         """Calculate agent capacity utilization."""
         try:
@@ -735,18 +812,18 @@ class MetaAgent(BaseAgent):
             return min(1.0, active_agents / max_agents)
         except Exception:
             return 0.5
-    
+
     async def _process_task_implementation(self, task: Task) -> TaskResult:
         """Process meta-agent specific tasks."""
-        
+
         if task.type == "system_analysis":
             analysis = await self._perform_system_analysis()
             return TaskResult(
                 success=True,
                 data=analysis.__dict__,
-                metrics={"analysis_duration": time.time() - self.last_analysis_time}
+                metrics={"analysis_duration": time.time() - self.last_analysis_time},
             )
-        
+
         elif task.type == "improvement_proposal":
             # Create improvement proposal from task description
             proposal = ImprovementProposal(
@@ -760,25 +837,25 @@ class MetaAgent(BaseAgent):
                 affected_components=["system"],
                 implementation_steps=["Analyze", "Implement", "Test"],
                 success_metrics=["Feature working", "No regressions"],
-                created_at=time.time()
+                created_at=time.time(),
             )
-            
+
             self.improvement_proposals[proposal.id] = proposal
-            
+
             return TaskResult(
                 success=True,
                 data={"proposal_id": proposal.id},
-                metrics={"proposal_count": len(self.improvement_proposals)}
+                metrics={"proposal_count": len(self.improvement_proposals)},
             )
-        
+
         elif task.type == "agent_coordination":
             await self._coordinate_agents()
             return TaskResult(
                 success=True,
                 data={"coordinated_agents": len(await self._get_active_agents())},
-                metrics={"coordination_time": time.time()}
+                metrics={"coordination_time": time.time()},
             )
-        
+
         else:
             # Use base implementation for other task types
             return await super()._process_task_implementation(task)

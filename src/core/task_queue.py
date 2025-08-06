@@ -510,6 +510,34 @@ class TaskQueue:
 
         return count
 
+    async def get_total_tasks(self) -> int:
+        """Get total number of tasks in the system."""
+        count = 0
+        pattern = f"{self.task_prefix}:*"
+        async for task_key in self.redis_client.scan_iter(match=pattern):
+            count += 1
+        return count
+
+    async def get_completed_tasks_count(self) -> int:
+        """Get count of completed tasks."""
+        count = 0
+        pattern = f"{self.task_prefix}:*"
+        async for task_key in self.redis_client.scan_iter(match=pattern):
+            task_data = await self.redis_client.hgetall(task_key)
+            if task_data and task_data.get("status") == TaskStatus.COMPLETED:
+                count += 1
+        return count
+
+    async def get_failed_tasks_count(self) -> int:
+        """Get count of failed tasks."""
+        count = 0
+        pattern = f"{self.task_prefix}:*"
+        async for task_key in self.redis_client.scan_iter(match=pattern):
+            task_data = await self.redis_client.hgetall(task_key)
+            if task_data and task_data.get("status") == TaskStatus.FAILED:
+                count += 1
+        return count
+
 
 # Global task queue instance
 task_queue = TaskQueue()

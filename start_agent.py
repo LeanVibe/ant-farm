@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Entry point for starting the API server with proper module imports."""
+"""Entry point for starting agents with proper module imports."""
 
 import sys
 import asyncio
@@ -9,7 +9,7 @@ from pathlib import Path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-from api.main import start_server
+from agents.runner import main
 
 if __name__ == "__main__":
-    start_server()
+    asyncio.run(main())

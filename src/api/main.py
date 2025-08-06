@@ -6,17 +6,30 @@ import uuid
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
+import sys
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import structlog
 
-from ..core.config import settings
-from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-from ..core.message_broker import message_broker, MessageType
-from ..core.models import get_database_manager, Agent as AgentModel, SystemMetric
-from ..core.orchestrator import get_orchestrator
+# Handle both module and direct execution imports
+try:
+    from ..core.config import settings
+    from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
+    from ..core.message_broker import message_broker, MessageType
+    from ..core.models import get_database_manager, Agent as AgentModel, SystemMetric
+    from ..core.orchestrator import get_orchestrator
+except ImportError:
+    # Direct execution - add src to path
+    src_path = Path(__file__).parent.parent
+    sys.path.insert(0, str(src_path))
+    from core.config import settings
+    from core.task_queue import task_queue, Task, TaskStatus, TaskPriority
+    from core.message_broker import message_broker, MessageType
+    from core.models import get_database_manager, Agent as AgentModel, SystemMetric
+    from core.orchestrator import get_orchestrator
 
 logger = structlog.get_logger()
 
@@ -123,9 +136,9 @@ async def startup_event():
 
         # Initialize orchestrator
         from pathlib import Path
+
         orch = await get_orchestrator(
-            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive",
-            Path(".")
+            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive", Path(".")
         )
         await orch.start()
 
@@ -143,8 +156,7 @@ async def shutdown_event():
 
     try:
         orch = await get_orchestrator(
-            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive",
-            Path(".")
+            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive", Path(".")
         )
         await orch.stop()
         await message_broker.shutdown()
@@ -577,7 +589,12 @@ async def get_metrics():
 startup_time = time.time()
 
 
-if __name__ == "__main__":
+def start_server():
+    """Start the API server."""
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    start_server()
