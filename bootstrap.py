@@ -82,7 +82,7 @@ class BootstrapAgent:
                 "name": "OpenCode",
                 "command": "opencode",
                 "check_cmd": ["opencode", "--version"],
-                "execute_pattern": "opencode {prompt}",
+                "execute_pattern": 'opencode -p "{prompt}"',
                 "install_url": "https://opencode.ai",
             }
 
