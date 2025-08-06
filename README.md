@@ -144,20 +144,28 @@ ant-farm/
 - **Performance Optimization**: Learns which tools work best for specific tasks
 - **Unified Experience**: Same capabilities regardless of underlying tool
 
-## 🎯 Current Status: Phase 2 Complete ✅
+## 🎯 Current Status: Phase 3 Complete ✅
 
 - ✅ **Phase 1: Core Infrastructure** - Task queue, message broker, context engine
 - ✅ **Phase 2: Agent System** - Meta-agent, specialized agents, autonomous development
-- 🚧 **Phase 3: Advanced Features** - Machine learning integration, performance optimization
-- 📋 **Phase 4: Scale & Polish** - Multi-node deployment, advanced monitoring
+- ✅ **Phase 3: Advanced Intelligence** - Self-modification, memory consolidation, predictive optimization
+- 📋 **Phase 4: Scale & Production** - Multi-node deployment, enterprise features
+
+### Phase 3 Advanced Intelligence Capabilities
+- **Advanced Semantic Memory**: Hierarchical memory layers with pattern recognition
+- **Safe Self-Modification**: Git-based code changes with sandbox testing and rollback
+- **Sleep-Wake Cycles**: Memory consolidation and system optimization during downtime
+- **Predictive Optimization**: Machine learning-based performance tuning and resource scaling
+- **Pattern Discovery**: Automated knowledge extraction from system behavior and context
 
 ### Immediate Capabilities
-- Autonomous system analysis and improvement proposal generation
-- Safe self-modification with backup/rollback mechanisms  
-- Intelligent task assignment based on agent capabilities and performance
-- Multi-agent coordination for complex development tasks
-- Continuous monitoring and optimization of system performance
-- Real-time API for system control and status monitoring
+- Intelligent memory management with automatic consolidation and compression
+- Safe autonomous code modification with comprehensive validation and rollback
+- Predictive workload management and proactive resource scaling
+- Sleep-wake cycles for memory optimization and system maintenance
+- Advanced pattern recognition and knowledge discovery
+- Multi-strategy performance optimization with confidence-based selection
+- Comprehensive semantic search across hierarchical memory layers
 
 ## 🛠️ Technology Stack
 
@@ -180,36 +188,61 @@ ant-farm/
 
 ## 📚 Usage Examples
 
-### Basic Operation
+### Advanced Autonomous Operation
 ```bash
-# Start autonomous system
+# Start advanced autonomous system with Phase 3 capabilities
 python autonomous_bootstrap.py autonomous
 
-# Check system status
-curl http://localhost:8000/api/v1/status
-
-# View agents
-curl http://localhost:8000/api/v1/agents
-
-# Create a task
-curl -X POST http://localhost:8000/api/v1/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Optimize performance", "description": "Improve system performance", "type": "optimization"}'
-```
-
-### Monitoring & Control
-```bash
-# System health check
+# Check comprehensive system status
 python autonomous_bootstrap.py status
 
-# View tmux sessions
-tmux ls
+# Monitor memory consolidation and patterns
+python autonomous_bootstrap.py memory
 
-# Attach to meta-agent
-tmux attach -t meta-agent-001
+# Check performance optimization status
+python autonomous_bootstrap.py performance
 
-# View agent logs
-docker-compose logs -f
+# View sleep-wake cycle status
+python autonomous_bootstrap.py sleep
+```
+
+### API Monitoring
+```bash
+# System health with advanced metrics
+curl http://localhost:8000/api/v1/status
+
+# Agent capabilities and performance
+curl http://localhost:8000/api/v1/agents
+
+# Task coordination and intelligent assignment
+curl http://localhost:8000/api/v1/tasks
+
+# Performance metrics and optimization history
+curl http://localhost:8000/api/v1/metrics
+
+# Trigger advanced system analysis
+curl -X POST http://localhost:8000/api/v1/system/analyze
+```
+
+### Advanced Operations
+```bash
+# Create complex task with dependencies
+curl -X POST http://localhost:8000/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Implement machine learning optimization", 
+    "description": "Add ML-based task scheduling",
+    "type": "development",
+    "priority": "HIGH",
+    "dependencies": ["system_analysis_001"],
+    "metadata": {"complexity": "high", "estimated_hours": 8}
+  }'
+
+# Force memory consolidation
+curl -X POST http://localhost:8000/api/v1/system/consolidate
+
+# Trigger performance optimization
+curl -X POST http://localhost:8000/api/v1/system/optimize
 ```
 
 ## 📚 Documentation
