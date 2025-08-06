@@ -6,6 +6,7 @@ This runs on the host machine and:
 2. Spawns other agents in tmux sessions
 3. Coordinates with Docker services (PostgreSQL, Redis)
 """
+
 import asyncio
 import json
 import os
@@ -27,28 +28,27 @@ import typer
 console = Console()
 app = typer.Typer()
 
+
 class BootstrapAgent:
     """Bootstrap agent that runs on host and spawns tmux sessions."""
-    
+
     def __init__(self):
         self.agent_id = "bootstrap-agent"
         self.session_name = f"{self.agent_id}-{uuid.uuid4().hex[:8]}"
         self.workspace = Path.cwd()
         self.redis_client = None
         self.db_conn = None
-        
+
         # Detect available CLI tools
         self.available_tools = self.detect_cli_tools()
         self.preferred_tool = self.select_preferred_tool()
-        
+
     def connect_services(self):
         """Connect to Docker services."""
         # Connect to Redis (in Docker, exposed on localhost)
         try:
             self.redis_client = redis.Redis(
-                host="localhost", 
-                port=6380, 
-                decode_responses=True
+                host="localhost", port=6380, decode_responses=True
             )
             self.redis_client.ping()
             console.print("[green]✓[/green] Redis connected")
@@ -56,7 +56,7 @@ class BootstrapAgent:
             console.print(f"[red]✗[/red] Redis connection failed: {e}")
             console.print("Make sure Docker services are running: docker-compose up -d")
             sys.exit(1)
-            
+
         # Connect to PostgreSQL (in Docker, exposed on localhost)
         try:
             self.db_conn = psycopg2.connect(
@@ -64,187 +64,215 @@ class BootstrapAgent:
                 port=5433,
                 database="leanvibe_hive",
                 user="hive_user",
-                password="hive_pass"
+                password="hive_pass",
             )
             console.print("[green]✓[/green] PostgreSQL connected")
         except Exception as e:
             console.print(f"[red]✗[/red] PostgreSQL connection failed: {e}")
             console.print("Make sure Docker services are running: docker-compose up -d")
             sys.exit(1)
-    
+
     def detect_cli_tools(self) -> Dict[str, Dict[str, Any]]:
         """Detect available CLI agentic coding tools."""
         tools = {}
-        
+
         # Check opencode
         if self.check_opencode():
-            tools['opencode'] = {
-                'name': 'OpenCode',
-                'command': 'opencode',
-                'check_cmd': ['opencode', '--version'],
-                'execute_pattern': 'opencode "{prompt}"',
-                'install_url': 'https://opencode.ai'
+            tools["opencode"] = {
+                "name": "OpenCode",
+                "command": "opencode",
+                "check_cmd": ["opencode", "--version"],
+                "execute_pattern": "opencode {prompt}",
+                "install_url": "https://opencode.ai",
             }
-        
+
         # Check Claude Code CLI
         if self.check_claude_code():
-            tools['claude'] = {
-                'name': 'Claude Code CLI',
-                'command': 'claude',
-                'check_cmd': ['claude', '--version'],
-                'execute_pattern': 'claude --no-interactive "{prompt}"',
-                'install_url': 'https://claude.ai/cli'
+            tools["claude"] = {
+                "name": "Claude Code CLI",
+                "command": "claude",
+                "check_cmd": ["claude", "--version"],
+                "execute_pattern": 'claude --no-interactive "{prompt}"',
+                "install_url": "https://claude.ai/cli",
             }
-        
+
         # Check Gemini CLI
         if self.check_gemini_cli():
-            tools['gemini'] = {
-                'name': 'Gemini CLI',
-                'command': 'gemini',
-                'check_cmd': ['gemini', '--version'],
-                'execute_pattern': 'gemini code "{prompt}"',
-                'install_url': 'https://ai.google.dev/gemini-api/docs/cli'
+            tools["gemini"] = {
+                "name": "Gemini CLI",
+                "command": "gemini",
+                "check_cmd": ["gemini", "--version"],
+                "execute_pattern": 'gemini code "{prompt}"',
+                "install_url": "https://ai.google.dev/gemini-api/docs/cli",
             }
-        
+
         return tools
-    
+
     def select_preferred_tool(self) -> Optional[str]:
         """Select preferred tool based on availability and priority."""
         # Priority order: opencode > claude > gemini
-        priority = ['opencode', 'claude', 'gemini']
-        
+        priority = ["opencode", "claude", "gemini"]
+
         for tool in priority:
             if tool in self.available_tools:
-                console.print(f"[green]Selected preferred tool:[/green] {self.available_tools[tool]['name']}")
+                console.print(
+                    f"[green]Selected preferred tool:[/green] {self.available_tools[tool]['name']}"
+                )
                 return tool
-        
+
         console.print("[yellow]⚠️[/yellow] No CLI agentic coding tools detected")
         return None
-    
+
     def check_opencode(self) -> bool:
         """Check if opencode CLI is installed."""
         try:
             result = subprocess.run(
-                ["opencode", "--version"],
-                capture_output=True,
-                text=True
+                ["opencode", "--version"], capture_output=True, text=True
             )
             if result.returncode == 0:
-                console.print(f"[green]✓[/green] opencode found: {result.stdout.strip()}")
+                console.print(
+                    f"[green]✓[/green] opencode found: {result.stdout.strip()}"
+                )
                 return True
         except FileNotFoundError:
             pass
         return False
-    
+
     def check_claude_code(self) -> bool:
         """Check if Claude Code CLI is installed."""
         try:
             result = subprocess.run(
-                ["claude", "--version"],
-                capture_output=True,
-                text=True
+                ["claude", "--version"], capture_output=True, text=True
             )
             if result.returncode == 0:
-                console.print(f"[green]✓[/green] Claude Code found: {result.stdout.strip()}")
+                console.print(
+                    f"[green]✓[/green] Claude Code found: {result.stdout.strip()}"
+                )
                 return True
         except FileNotFoundError:
             pass
-        
+
         return False
-    
+
     def check_gemini_cli(self) -> bool:
         """Check if Gemini CLI is installed."""
         try:
             # Try gemini command first
             result = subprocess.run(
-                ["gemini", "--version"],
-                capture_output=True,
-                text=True
+                ["gemini", "--version"], capture_output=True, text=True
             )
             if result.returncode == 0:
-                console.print(f"[green]✓[/green] Gemini CLI found: {result.stdout.strip()}")
+                console.print(
+                    f"[green]✓[/green] Gemini CLI found: {result.stdout.strip()}"
+                )
                 return True
         except FileNotFoundError:
             pass
-        
+
         try:
             # Try gcloud ai alternative
             result = subprocess.run(
-                ["gcloud", "ai", "--version"],
-                capture_output=True,
-                text=True
+                ["gcloud", "ai", "--version"], capture_output=True, text=True
             )
             if result.returncode == 0:
-                console.print(f"[green]✓[/green] Google Cloud AI found: {result.stdout.strip()}")
+                console.print(
+                    f"[green]✓[/green] Google Cloud AI found: {result.stdout.strip()}"
+                )
                 return True
         except FileNotFoundError:
             pass
-        
+
         return False
-    
+
     def check_tmux(self) -> bool:
         """Check if tmux is installed."""
         try:
-            result = subprocess.run(
-                ["tmux", "-V"],
-                capture_output=True,
-                text=True
-            )
+            result = subprocess.run(["tmux", "-V"], capture_output=True, text=True)
             if result.returncode == 0:
                 console.print(f"[green]✓[/green] tmux found: {result.stdout.strip()}")
                 return True
         except FileNotFoundError:
             pass
-        
+
         console.print("[red]✗[/red] tmux not found")
         console.print("Please install: brew install tmux")
         return False
-    
+
     def spawn_tmux_session(self, session_name: str, command: str = None) -> bool:
         """Spawn a new tmux session."""
         try:
+            # Check if session already exists
+            if self._session_exists(session_name):
+                console.print(f"[yellow]Session {session_name} already exists[/yellow]")
+                return True
+
             # Create detached tmux session
             subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name],
-                check=True
+                ["tmux", "new-session", "-d", "-s", session_name], check=True
             )
-            
+
             # Send initial command if provided
             if command:
                 subprocess.run(
                     ["tmux", "send-keys", "-t", session_name, command, "Enter"],
-                    check=True
+                    check=True,
                 )
-            
+
             console.print(f"[green]✓[/green] Spawned tmux session: {session_name}")
             return True
         except subprocess.CalledProcessError as e:
             console.print(f"[red]✗[/red] Failed to spawn tmux session: {e}")
             return False
-    
-    def execute_claude_task(self, task: str, session_name: str = None, tool_override: str = None) -> Dict[str, Any]:
+
+    def _session_exists(self, session_name: str) -> bool:
+        """Check if a tmux session exists."""
+        try:
+            result = subprocess.run(
+                ["tmux", "has-session", "-t", session_name],
+                capture_output=True,
+                text=True,
+            )
+            return result.returncode == 0
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            return False
+
+    def execute_claude_task(
+        self, task: str, session_name: str = None, tool_override: str = None
+    ) -> Dict[str, Any]:
         """Execute a task using available CLI tools in a tmux session."""
         if not session_name:
             session_name = self.session_name
-        
+
         # Select tool to use
         tool_name = tool_override or self.preferred_tool
         if not tool_name or tool_name not in self.available_tools:
             console.print(f"[red]✗[/red] No available tool for task execution")
             return {"error": "No available CLI tool"}
-        
+
         tool_config = self.available_tools[tool_name]
-        console.print(f"\n[cyan]Executing with {tool_config['name']} in {session_name}:[/cyan] {task[:100]}...")
-        
-        # Build command using tool's pattern
-        cmd = tool_config['execute_pattern'].format(prompt=task)
-        
-        # Send command to tmux session
-        subprocess.run(
-            ["tmux", "send-keys", "-t", session_name, cmd, "Enter"],
-            check=True
+        console.print(
+            f"\n[cyan]Executing with {tool_config['name']} in {session_name}:[/cyan] {task[:100]}..."
         )
-        
+
+        # Ensure tmux session exists
+        if not self._session_exists(session_name):
+            if not self.spawn_tmux_session(session_name):
+                return {"error": f"Failed to create session {session_name}"}
+
+        # Build command using tool's pattern
+        cmd = tool_config["execute_pattern"].format(prompt=task)
+
+        # Send command to tmux session
+        try:
+            subprocess.run(
+                ["tmux", "send-keys", "-t", session_name, cmd, "Enter"], check=True
+            )
+        except subprocess.CalledProcessError as e:
+            console.print(
+                f"[red]✗[/red] Failed to send command to session {session_name}: {e}"
+            )
+            return {"error": f"Failed to send command: {e}"}
+
         # Store task in Redis
         task_id = str(uuid.uuid4())
         task_data = {
@@ -254,44 +282,48 @@ class BootstrapAgent:
             "task": task,
             "tool_used": tool_name,
             "status": "executing",
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
         }
-        
+
         self.redis_client.hset(f"task:{task_id}", mapping=task_data)
         self.redis_client.lpush(f"agent_tasks:{self.agent_id}", task_id)
-        
+
         return task_data
-    
+
     def spawn_agent(self, agent_type: str, agent_name: str = None) -> str:
         """Spawn a new agent in a tmux session."""
         if not agent_name:
             agent_name = f"{agent_type}-{uuid.uuid4().hex[:8]}"
-        
+
         console.print(f"\n[cyan]Spawning agent:[/cyan] {agent_name}")
-        
+
         # Create tmux session for agent
         session_name = agent_name
         self.spawn_tmux_session(session_name)
-        
+
         # Start agent runner in the session
-        runner_cmd = f"python src/agents/runner.py --type {agent_type} --name {agent_name}"
-        subprocess.run(
-            ["tmux", "send-keys", "-t", session_name, runner_cmd, "Enter"],
-            check=True
+        runner_cmd = (
+            f"python src/agents/runner.py --type {agent_type} --name {agent_name}"
         )
-        
+        subprocess.run(
+            ["tmux", "send-keys", "-t", session_name, runner_cmd, "Enter"], check=True
+        )
+
         # Register agent in database
         with self.db_conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO agents (name, type, role, status, created_at)
                 VALUES (%s, %s, %s, 'active', NOW())
                 ON CONFLICT (name) DO UPDATE SET status = 'active'
-            """, (agent_name, agent_type, agent_type))
+            """,
+                (agent_name, agent_type, agent_type),
+            )
             self.db_conn.commit()
-        
+
         console.print(f"[green]✓[/green] Agent spawned: {agent_name}")
         return session_name
-    
+
     def create_project_structure(self):
         """Create the initial project structure."""
         directories = [
@@ -303,44 +335,67 @@ class BootstrapAgent:
             "tests/integration",
             "scripts",
             "logs",
-            "workspace"
+            "workspace",
         ]
-        
+
         for dir_path in directories:
             Path(dir_path).mkdir(parents=True, exist_ok=True)
-            
+
         # Create __init__.py files
         for dir_path in ["src", "src/core", "src/agents", "src/api"]:
             (Path(dir_path) / "__init__.py").touch()
-            
+
         console.print("[green]✓[/green] Project structure created")
-    
+
     def generate_core_components(self):
         """Generate core system components using Claude Code."""
         components = [
-            ("Task Queue", "Create src/core/task_queue.py - Redis-based task queue with priorities, retries, and dependencies"),
-            ("Agent Orchestrator", "Create src/core/orchestrator.py - Manages agent lifecycle and tmux sessions"),
-            ("Message Broker", "Create src/core/message_broker.py - Inter-agent communication via Redis pub/sub"),
-            ("Database Models", "Create src/core/models.py - SQLAlchemy models for agents, tasks, and contexts"),
-            ("Agent Runner", "Create src/agents/runner.py - Base agent that polls tasks and executes via Claude Code"),
-            ("Meta Agent", "Create src/agents/meta_agent.py - Self-improvement coordinator"),
-            ("API Server", "Create src/api/main.py - FastAPI endpoints for system control"),
+            (
+                "Task Queue",
+                "Create src/core/task_queue.py - Redis-based task queue with priorities, retries, and dependencies",
+            ),
+            (
+                "Agent Orchestrator",
+                "Create src/core/orchestrator.py - Manages agent lifecycle and tmux sessions",
+            ),
+            (
+                "Message Broker",
+                "Create src/core/message_broker.py - Inter-agent communication via Redis pub/sub",
+            ),
+            (
+                "Database Models",
+                "Create src/core/models.py - SQLAlchemy models for agents, tasks, and contexts",
+            ),
+            (
+                "Agent Runner",
+                "Create src/agents/runner.py - Base agent that polls tasks and executes via Claude Code",
+            ),
+            (
+                "Meta Agent",
+                "Create src/agents/meta_agent.py - Self-improvement coordinator",
+            ),
+            (
+                "API Server",
+                "Create src/api/main.py - FastAPI endpoints for system control",
+            ),
         ]
-        
+
         # Execute each component generation in bootstrap session
         for name, task in components:
             console.print(f"\n[bold cyan]Generating {name}...[/bold cyan]")
             self.execute_claude_task(task)
             time.sleep(5)  # Give CLI tool time to work
-    
+
     def bootstrap_system(self):
         """Bootstrap the entire system."""
-        console.print("\n[bold cyan]Starting LeanVibe Agent Hive 2.0 Bootstrap[/bold cyan]\n")
-        
+        console.print(
+            "\n[bold cyan]Starting LeanVibe Agent Hive 2.0 Bootstrap[/bold cyan]\n"
+        )
+
         # Check prerequisites
         if not self.check_tmux():
             return
-        
+
         # Check for available CLI tools
         if not self.available_tools:
             console.print("[red]✗[/red] No CLI agentic coding tools found!")
@@ -349,70 +404,74 @@ class BootstrapAgent:
             console.print("• Claude Code CLI: https://claude.ai/cli")
             console.print("• Gemini CLI: https://ai.google.dev/gemini-api/docs/cli")
             return
-        
-        console.print(f"\n[green]Available tools:[/green] {', '.join(self.available_tools.keys())}")
-        
+
+        console.print(
+            f"\n[green]Available tools:[/green] {', '.join(self.available_tools.keys())}"
+        )
+
         # Connect to services
         self.connect_services()
-        
+
         # Create project structure
         self.create_project_structure()
-        
+
         # Create bootstrap tmux session
         console.print(f"\n[cyan]Creating bootstrap session: {self.session_name}[/cyan]")
         self.spawn_tmux_session(self.session_name)
-        
+
         # Generate core components
         self.generate_core_components()
-        
+
         # Spawn initial agents
         console.print("\n[bold cyan]Spawning initial agents...[/bold cyan]")
         self.spawn_agent("meta", "meta-agent-001")
         self.spawn_agent("developer", "dev-agent-001")
-        
+
         # Submit first improvement task
         console.print("\n[cyan]Submitting first self-improvement task...[/cyan]")
-        self.redis_client.lpush("task_queue:high", json.dumps({
-            "id": str(uuid.uuid4()),
-            "type": "analyze_and_improve",
-            "title": "Analyze system and propose improvements",
-            "assigned_to": "meta-agent-001",
-            "created_at": datetime.now().isoformat()
-        }))
-        
+        self.redis_client.lpush(
+            "task_queue:high",
+            json.dumps(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "analyze_and_improve",
+                    "title": "Analyze system and propose improvements",
+                    "assigned_to": "meta-agent-001",
+                    "created_at": datetime.now().isoformat(),
+                }
+            ),
+        )
+
         console.print("\n[bold green]Bootstrap Complete![/bold green]")
         console.print("\nActive tmux sessions:")
         subprocess.run(["tmux", "ls"])
-        
+
         console.print("\nNext steps:")
         console.print("1. View bootstrap session: tmux attach -t " + self.session_name)
         console.print("2. View meta-agent: tmux attach -t meta-agent-001")
         console.print("3. Check API: curl http://localhost:8000/health")
         console.print("4. View logs: tail -f logs/*.log")
-    
+
     def list_agents(self):
         """List all active agent sessions."""
         console.print("\n[bold]Active Agent Sessions:[/bold]")
-        result = subprocess.run(
-            ["tmux", "ls"],
-            capture_output=True,
-            text=True
-        )
-        
+        result = subprocess.run(["tmux", "ls"], capture_output=True, text=True)
+
         if result.returncode == 0:
-            sessions = result.stdout.strip().split('\n')
-            agent_sessions = [s for s in sessions if 'agent' in s]
+            sessions = result.stdout.strip().split("\n")
+            agent_sessions = [s for s in sessions if "agent" in s]
             for session in agent_sessions:
                 console.print(f"  • {session}")
         else:
             console.print("No active sessions")
-    
+
     def cleanup(self):
         """Clean up resources."""
         if self.db_conn:
             self.db_conn.close()
         if self.redis_client:
             self.redis_client.close()
+
 
 @app.command()
 def bootstrap():
@@ -423,10 +482,11 @@ def bootstrap():
     finally:
         agent.cleanup()
 
+
 @app.command()
 def spawn(
     agent_type: str = typer.Argument(..., help="Type of agent to spawn"),
-    name: Optional[str] = typer.Option(None, help="Agent name")
+    name: Optional[str] = typer.Option(None, help="Agent name"),
 ):
     """Spawn a new agent."""
     agent = BootstrapAgent()
@@ -436,61 +496,74 @@ def spawn(
     finally:
         agent.cleanup()
 
+
 @app.command()
 def list_agents():
     """List all active agents."""
     agent = BootstrapAgent()
     agent.list_agents()
 
+
 @app.command()
 def tools():
     """List available CLI agentic coding tools."""
     agent = BootstrapAgent()
-    
+
     if not agent.available_tools:
         console.print("[red]No CLI agentic coding tools found![/red]")
         console.print("\nInstall options:")
         console.print("• opencode: curl -fsSL https://opencode.ai/install | bash")
-        console.print("• Claude Code CLI: https://claude.ai/cli") 
+        console.print("• Claude Code CLI: https://claude.ai/cli")
         console.print("• Gemini CLI: https://ai.google.dev/gemini-api/docs/cli")
         return
-    
+
     console.print(f"\n[bold]Available CLI Tools ({len(agent.available_tools)}):[/bold]")
     for tool_key, tool_config in agent.available_tools.items():
-        status = "✓ [green]PREFERRED[/green]" if tool_key == agent.preferred_tool else "✓"
+        status = (
+            "✓ [green]PREFERRED[/green]" if tool_key == agent.preferred_tool else "✓"
+        )
         console.print(f"  {status} {tool_config['name']} ({tool_config['command']})")
-    
-    console.print(f"\nPreferred tool: {agent.available_tools[agent.preferred_tool]['name']}" if agent.preferred_tool else "No preferred tool")
+
+    console.print(
+        f"\nPreferred tool: {agent.available_tools[agent.preferred_tool]['name']}"
+        if agent.preferred_tool
+        else "No preferred tool"
+    )
+
 
 @app.command()
 def status():
     """Check system status."""
     agent = BootstrapAgent()
-    
+
     console.print("\n[bold]CLI Agentic Coding Tools:[/bold]")
-    
+
     # Check each tool
     agent.check_opencode()
     agent.check_claude_code()
     agent.check_gemini_cli()
-    
+
     # Check tmux
     agent.check_tmux()
-    
+
     # Check Docker services
     try:
         agent.connect_services()
         console.print("\n[bold green]System is ready![/bold green]")
         if agent.preferred_tool:
-            console.print(f"Preferred tool: {agent.available_tools[agent.preferred_tool]['name']}")
+            console.print(
+                f"Preferred tool: {agent.available_tools[agent.preferred_tool]['name']}"
+            )
     except:
         console.print("\n[bold red]System not ready - start Docker services[/bold red]")
     finally:
         agent.cleanup()
 
+
 def main():
     """Main entry point."""
     app()
+
 
 if __name__ == "__main__":
     main()
