@@ -1,15 +1,16 @@
-"""Context engine for semantic memory and knowledge management."""
+"""Advanced context engine for semantic memory and hierarchical knowledge management."""
 
 import asyncio
 import hashlib
 import json
 import math
 import time
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
+from typing import Dict, List, Optional, Any, Tuple, Set
+from dataclasses import dataclass, field
 from enum import Enum
 import numpy as np
 from sqlalchemy.orm import Session
+from sqlalchemy import func, and_, or_
 import structlog
 
 from .models import Context, Agent, Session as SessionModel, get_database_manager
@@ -24,23 +25,74 @@ class EmbeddingProvider(Enum):
     OLLAMA = "ollama"
 
 
+class MemoryLayer(Enum):
+    """Hierarchical memory layers."""
+    WORKING = "working"      # Current session, active tasks
+    SHORT_TERM = "short_term"    # Recent activities, last 24 hours
+    MEDIUM_TERM = "medium_term"  # Important events, last week
+    LONG_TERM = "long_term"      # Core knowledge, permanent storage
+    SEMANTIC = "semantic"        # Distilled patterns and rules
+
+
+class ContextType(Enum):
+    """Types of context for better organization."""
+    TASK = "task"
+    CONVERSATION = "conversation"
+    CODE = "code"
+    DECISION = "decision"
+    LEARNING = "learning"
+    ERROR = "error"
+    SUCCESS = "success"
+    PATTERN = "pattern"
+    RULE = "rule"
+
+
 @dataclass
 class ContextSearchResult:
     """Result from context search."""
     context: Context
     similarity_score: float
     relevance_score: float
+    layer: MemoryLayer
+    recency_bonus: float = 0.0
 
 
 @dataclass
 class MemoryStats:
-    """Memory statistics."""
+    """Comprehensive memory statistics."""
     total_contexts: int
-    contexts_by_importance: Dict[str, int]  # High, medium, low
+    contexts_by_importance: Dict[str, int]
     contexts_by_category: Dict[str, int]
+    contexts_by_layer: Dict[str, int]
+    contexts_by_type: Dict[str, int]
     storage_size_mb: float
     oldest_context_age_days: float
     most_accessed_context_id: str
+    compression_ratio: float
+    search_performance_ms: float
+
+
+@dataclass
+class ConsolidationRule:
+    """Rules for memory consolidation."""
+    source_layer: MemoryLayer
+    target_layer: MemoryLayer
+    age_threshold_hours: float
+    importance_threshold: float
+    access_count_threshold: int
+    compression_strategy: str  # "summarize", "merge", "distill"
+
+
+@dataclass
+class KnowledgePattern:
+    """Discovered knowledge pattern."""
+    id: str
+    pattern_type: str
+    confidence_score: float
+    supporting_contexts: List[str]
+    pattern_description: str
+    discovered_at: float
+    usage_count: int = 0
 
 
 class EmbeddingService:
