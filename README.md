@@ -1,6 +1,14 @@
 # LeanVibe Agent Hive 2.0
 
-A self-improving, autonomous multi-agent development system that supports multiple CLI agentic coding tools.
+A **fully autonomous** multi-agent development system that builds and improves itself continuously using multiple CLI agentic coding tools.
+
+## ✨ Core Capabilities
+
+🤖 **Autonomous Development**: Continues development 24/7 without human intervention  
+🔄 **Self-Improvement**: Analyzes and enhances its own code automatically  
+🎯 **Intelligent Coordination**: Smart task assignment based on agent capabilities  
+🛡️ **Safe Modifications**: Automatic testing and rollback for all changes  
+📊 **Performance Learning**: Improves efficiency through experience  
 
 ## 🛠️ Supported CLI Tools
 
@@ -27,19 +35,31 @@ The system auto-detects and uses any of these CLI agentic coding tools:
 docker --version  # Docker 20.10+
 
 # Check available CLI tools  
-make tools
+python bootstrap.py tools
 
-# Setup (auto-detects available tools)
-cd leanvibe-hive
-make setup && make quick
+# Start Docker services
+docker-compose up -d
 
-# Access services
-# API: http://localhost:8000
-# Dashboard: http://localhost:3000  
-# pgAdmin: http://localhost:5050
+# Bootstrap the autonomous system
+python bootstrap.py bootstrap
+
+# Or start autonomous mode directly
+python autonomous_bootstrap.py autonomous
+
+# Monitor system status
+python autonomous_bootstrap.py status
+# API: http://localhost:8000/api/v1/status
+# Dashboard: http://localhost:8000/api/docs
 ```
 
 ## 🏗️ Architecture
+
+### Autonomous Agent System
+- **Meta-Agent**: Self-improvement coordinator with system analysis and code modification
+- **Developer Agent**: Code implementation, proactive development, and refactoring
+- **QA Agent**: Testing, validation, and quality assurance  
+- **Architect Agent**: System design, architecture decisions, and planning
+- **Research Agent**: Knowledge acquisition, trend analysis, and improvement research
 
 ### Multi-CLI Support
 - **Tool Detection**: Auto-discovers opencode, Claude CLI, Gemini CLI
@@ -47,109 +67,190 @@ make setup && make quick
 - **Unified Interface**: Same agent code works with any tool
 - **Smart Switching**: Automatic failover if one tool fails
 
-### Core Components
+### Core Infrastructure
 
-1. **Bootstrap Agent** - Initial agent that creates the system
-2. **Agent Orchestrator** - Central coordination and lifecycle management
-3. **Task Queue** - Redis-based priority task distribution
-4. **Message Broker** - Inter-agent communication via pub/sub
-5. **Context Engine** - Vector-based semantic memory with pgvector
-6. **Self-Modifier** - Safe code generation and improvement system
+1. **Task Coordinator** - Intelligent task assignment with capability-based matching
+2. **Self-Bootstrapper** - Autonomous development continuation system
+3. **Agent Orchestrator** - Agent lifecycle management and spawning
+4. **Task Queue** - Redis-based priority task distribution with dependencies
+5. **Message Broker** - Inter-agent communication via pub/sub
+6. **Context Engine** - Vector-based semantic memory with pgvector
+7. **API Server** - RESTful interface for system control and monitoring
 
-### Agent Types
+## 🔄 Self-Improvement Capabilities
 
-- **Meta-Agent**: System self-improvement coordinator
-- **Architect Agent**: System design and technical decisions
-- **Developer Agents**: Specialized for backend/frontend/devops
-- **QA Agent**: Testing and quality assurance
-- **Product Manager Agent**: Task planning and coordination
+### Development Phases
+1. **Analysis** - System health assessment and bottleneck identification
+2. **Planning** - Goal creation and development roadmap updates  
+3. **Implementation** - Autonomous code changes with testing
+4. **Testing** - Automated validation and regression testing
+5. **Deployment** - Safe rollout with rollback capabilities
+6. **Monitoring** - Continuous performance tracking
+
+### System Capabilities
+- **Self-Modification**: Safe code editing with backup/rollback (Target: 90%)
+- **Autonomous Learning**: Experience-based performance improvement (Target: 80%)
+- **System Monitoring**: Comprehensive health and performance tracking (Target: 90%)
+- **Task Optimization**: Intelligent scheduling and agent coordination (Target: 80%)
+- **Code Quality**: Automated standards enforcement and refactoring (Target: 90%)
+- **Security Hardening**: Continuous vulnerability assessment and patching (Target: 80%)
 
 ## 📁 Project Structure
 
 ```
-leanvibe-hive/
-├── bootstrap/           # System bootstrap scripts
-│   └── init_agent.py   # First agent that builds everything
+ant-farm/
+├── bootstrap.py            # Enhanced bootstrap system with multi-CLI support
+├── autonomous_bootstrap.py # Autonomous operation starter
 ├── src/
-│   ├── core/           # Core system components
-│   │   ├── orchestrator.py
-│   │   ├── task_queue.py
-│   │   ├── message_broker.py
-│   │   ├── context_engine.py
-│   │   └── models.py
-│   ├── agents/         # Agent implementations
-│   │   ├── base_agent.py
-│   │   ├── meta_agent.py
-│   │   └── specialized/
-│   ├── api/            # FastAPI endpoints
-│   └── web/            # LitPWA dashboard
-├── tests/              # Test suite (TDD approach)
-├── .claude/            # Claude Code configuration
-│   └── CLAUDE.md       # System context for Claude
-└── pyproject.toml      # UV dependencies
+│   ├── core/              # Core system components
+│   │   ├── orchestrator.py      # Agent lifecycle management  
+│   │   ├── task_queue.py        # Priority task distribution
+│   │   ├── task_coordinator.py  # Intelligent task assignment
+│   │   ├── message_broker.py    # Inter-agent communication
+│   │   ├── context_engine.py    # Semantic memory system
+│   │   ├── self_bootstrap.py    # Autonomous development system
+│   │   ├── config.py           # Multi-CLI configuration
+│   │   └── models.py           # Database models
+│   ├── agents/            # Agent implementations
+│   │   ├── base_agent.py       # Multi-CLI base agent
+│   │   ├── meta_agent.py       # Self-improvement coordinator
+│   │   └── runner.py           # Agent process management
+│   └── api/               # FastAPI server
+│       └── main.py            # REST API endpoints
+├── tests/                 # Comprehensive test suite
+├── docs/                  # Architecture and API documentation
+├── docker-compose.yaml    # Infrastructure services
+├── AGENTS.md             # CLI tool configuration context
+└── requirements.txt      # Python dependencies
 ```
-
-## 🔄 Self-Improvement Loop
-
-1. **Analyze**: Meta-agent analyzes system performance
-2. **Propose**: Generate improvement suggestions
-3. **Test**: Validate changes in sandboxed environment
-4. **Apply**: Deploy improvements with rollback capability
-5. **Learn**: Update prompts and patterns based on outcomes
-
-## 🛠️ Technology Stack
-
-- **Backend**: FastAPI (async Python)
-- **Database**: PostgreSQL 15+ with pgvector
-- **Cache/Queue**: Redis 7.0+
-- **Frontend**: LitPWA (Progressive Web App)
-- **LLM**: Claude 3.5 Sonnet/Haiku
-- **Testing**: pytest with >90% coverage
-- **Deployment**: Docker Compose
 
 ## 📊 Key Features
 
-- **24/7 Autonomous Operation**: Agents work continuously with sleep-wake cycles
-- **Self-Building**: System uses Claude Code to develop itself
-- **Context Persistence**: Semantic memory across sessions
-- **Real-time Monitoring**: WebSocket-based observability
-- **Safe Modifications**: Sandboxed testing with Git-based rollback
-- **Prompt Optimization**: A/B testing for continuous improvement
+### Autonomous Operation
+- **24/7 Development**: Continuous improvement without human intervention
+- **Self-Bootstrapping**: Extends its own capabilities autonomously  
+- **Intelligent Coordination**: Multi-agent task optimization
+- **Performance Learning**: Adapts based on task success patterns
+
+### Safety & Reliability  
+- **Safe Modifications**: Automatic backup before any code changes
+- **Rollback System**: Instant recovery from failed improvements
+- **Testing Integration**: All changes validated automatically
+- **Health Monitoring**: Continuous system status assessment
+
+### Multi-CLI Integration
+- **Tool Flexibility**: Works with any available CLI agentic coding tool
+- **Smart Fallback**: Graceful degradation across tool failures
+- **Performance Optimization**: Learns which tools work best for specific tasks
+- **Unified Experience**: Same capabilities regardless of underlying tool
+
+## 🎯 Current Status: Phase 2 Complete ✅
+
+- ✅ **Phase 1: Core Infrastructure** - Task queue, message broker, context engine
+- ✅ **Phase 2: Agent System** - Meta-agent, specialized agents, autonomous development
+- 🚧 **Phase 3: Advanced Features** - Machine learning integration, performance optimization
+- 📋 **Phase 4: Scale & Polish** - Multi-node deployment, advanced monitoring
+
+### Immediate Capabilities
+- Autonomous system analysis and improvement proposal generation
+- Safe self-modification with backup/rollback mechanisms  
+- Intelligent task assignment based on agent capabilities and performance
+- Multi-agent coordination for complex development tasks
+- Continuous monitoring and optimization of system performance
+- Real-time API for system control and status monitoring
+
+## 🛠️ Technology Stack
+
+- **Backend**: FastAPI (async Python) with multi-CLI integration
+- **Database**: PostgreSQL 15+ with pgvector for semantic search
+- **Cache/Queue**: Redis 7.0+ with task coordination and message broker
+- **CLI Tools**: opencode, Claude CLI, Gemini CLI with smart fallback
+- **Testing**: pytest with automated validation for all changes
+- **Deployment**: Docker Compose with tmux session management
+- **Monitoring**: Real-time metrics and health assessment
 
 ## 🎯 Success Metrics
 
-- System uptime: >99.9%
-- Task completion rate: >85%
-- Self-improvement frequency: >5 iterations/week
-- Token efficiency: 60-80% reduction via context management
-- Agent collaboration: <100ms message latency
+- **Autonomous Operation**: >95% uptime without human intervention
+- **Task Success Rate**: >85% successful task completion
+- **Self-Improvement**: >3 autonomous improvements per week
+- **Response Time**: <100ms for task assignment decisions
+- **Tool Reliability**: <5% fallback rate to secondary CLI tools
+- **Safety**: 0 system crashes from self-modifications
 
-## 📝 Development Principles
+## 📚 Usage Examples
 
-1. **Simplicity First** - Every component should be understandable by an agent
-2. **Test-Driven** - Write tests before implementation
-3. **Self-Documenting** - Code generates its own documentation
-4. **Fail-Safe** - All operations must be reversible
-5. **Incremental** - Small, working releases daily
+### Basic Operation
+```bash
+# Start autonomous system
+python autonomous_bootstrap.py autonomous
 
-## 🚦 Current Status
+# Check system status
+curl http://localhost:8000/api/v1/status
 
-- [ ] Phase 0: Bootstrap Core (Days 1-3)
-- [ ] Phase 1: Core Infrastructure (Days 4-7)
-- [ ] Phase 2: Self-Improvement Loop (Week 2)
-- [ ] Phase 3: Intelligence Layer (Week 3)
-- [ ] Phase 4: Observability & UI (Week 4)
+# View agents
+curl http://localhost:8000/api/v1/agents
+
+# Create a task
+curl -X POST http://localhost:8000/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Optimize performance", "description": "Improve system performance", "type": "optimization"}'
+```
+
+### Monitoring & Control
+```bash
+# System health check
+python autonomous_bootstrap.py status
+
+# View tmux sessions
+tmux ls
+
+# Attach to meta-agent
+tmux attach -t meta-agent-001
+
+# View agent logs
+docker-compose logs -f
+```
 
 ## 📚 Documentation
 
-- [IMPLEMENTATION.md](IMPLEMENTATION.md) - Detailed implementation guide
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture details
-- [API.md](docs/API.md) - API endpoint documentation
-- [AGENTS.md](docs/AGENTS.md) - Agent specifications
+- [AGENTS.md](AGENTS.md) - CLI tool integration and configuration
+- [CLAUDE.md](CLAUDE.md) - Claude-specific setup and context
+- [QUICKSTART.md](QUICKSTART.md) - Step-by-step setup guide
+- [API Documentation](http://localhost:8000/api/docs) - Interactive API explorer (when running)
+
+## 🔮 Roadmap
+
+### Phase 3: Advanced Intelligence (Next)
+- Machine learning integration for pattern recognition
+- Advanced performance optimization algorithms  
+- Predictive task scheduling based on resource patterns
+- Enhanced agent specialization and skill development
+
+### Phase 4: Scale & Production
+- Multi-node deployment with load balancing
+- Advanced monitoring and alerting systems
+- Production-grade security and access controls
+- Enterprise integration capabilities
+
+## 📝 Development Principles
+
+1. **Autonomous First** - Every component designed for self-operation
+2. **Safety by Design** - All operations must be reversible and validated
+3. **Multi-Tool Support** - CLI tool agnostic architecture  
+4. **Self-Documenting** - Code generates its own documentation
+5. **Continuous Learning** - System improves from every interaction
 
 ## 🤝 Contributing
 
-This system builds itself! Contributions happen through the Meta-Agent's self-improvement process.
+This system develops itself autonomously! However, you can:
+
+1. **Submit Issues**: Report bugs or suggest features via GitHub issues
+2. **CLI Tool Support**: Help add support for new agentic coding tools
+3. **Documentation**: Improve setup guides and architectural documentation
+4. **Testing**: Contribute test cases and validation scenarios
+
+The Meta-Agent will analyze contributions and integrate improvements automatically.
 
 ## 📄 License
 
