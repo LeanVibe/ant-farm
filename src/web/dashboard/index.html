@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeanVibe Agent Hive 2.0 Dashboard</title>
+    <meta name="description" content="Autonomous Multi-Agent System Dashboard">
+    <meta name="theme-color" content="#1a1a2e">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/favicon.ico">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/styles/dashboard.css">
+    
+    <!-- Lit Element -->
+    <script type="module" src="https://cdn.skypack.dev/lit@3.0.0"></script>
+    <script type="module" src="https://cdn.skypack.dev/@lit/reactive-element@2.0.0"></script>
+</head>
+<body>
+    <div id="app">
+        <hive-dashboard></hive-dashboard>
+    </div>
+    
+    <!-- Dashboard Components -->
+    <script type="module" src="/components/hive-dashboard.js"></script>
+    <script type="module" src="/components/agent-status.js"></script>
+    <script type="module" src="/components/task-board.js"></script>
+    <script type="module" src="/components/message-flow.js"></script>
+    <script type="module" src="/components/system-metrics.js"></script>
+    <script type="module" src="/components/context-explorer.js"></script>
+    <script type="module" src="/components/log-viewer.js"></script>
+    
+    <!-- Services -->
+    <script type="module" src="/services/websocket-service.js"></script>
+    <script type="module" src="/services/api-service.js"></script>
+    
+    <!-- PWA Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered:', registration))
+                    .catch(error => console.log('SW registration failed:', error));
+            });
+        }
+    </script>
+</body>
+</html>

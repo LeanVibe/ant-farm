@@ -1,0 +1,141 @@
+{
+  "name": "LeanVibe Agent Hive 2.0",
+  "short_name": "Hive 2.0",
+  "description": "Autonomous Multi-Agent Development Platform Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#00d4aa",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "System Status",
+      "short_name": "Status",
+      "description": "View system health and agent status",
+      "url": "/?view=agents",
+      "icons": [
+        {
+          "src": "/icons/shortcut-status.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Task Board",
+      "short_name": "Tasks",
+      "description": "Manage and monitor tasks",
+      "url": "/?view=tasks",
+      "icons": [
+        {
+          "src": "/icons/shortcut-tasks.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "System Metrics",
+      "short_name": "Metrics",
+      "description": "View performance metrics",
+      "url": "/?view=metrics",
+      "icons": [
+        {
+          "src": "/icons/shortcut-metrics.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "categories": ["developer", "productivity", "monitoring"],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-overview.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard Overview"
+    },
+    {
+      "src": "/screenshots/mobile-agents.png",
+      "sizes": "360x640",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Agent Status View"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "protocol_handlers": [
+    {
+      "protocol": "web+hive",
+      "url": "/?action=%s"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "logs",
+          "accept": ["text/plain", ".log", ".txt"]
+        }
+      ]
+    }
+  }
+}
