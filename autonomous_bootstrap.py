@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from bootstrap import BootstrapAgent
+from bootstrap import BootstrapAgent, console
 from src.core.self_bootstrap import self_bootstrapper
 from src.core.task_coordinator import task_coordinator
 from src.core.orchestrator import orchestrator
@@ -16,6 +16,7 @@ class AutonomousBootstrap(BootstrapAgent):
     
     def __init__(self):
         super().__init__()
+        self.console = console
         self.autonomous_mode = False
         self.phase3_enabled = True
     

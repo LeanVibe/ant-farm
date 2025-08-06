@@ -47,7 +47,7 @@ class BootstrapAgent:
         try:
             self.redis_client = redis.Redis(
                 host="localhost", 
-                port=6379, 
+                port=6380, 
                 decode_responses=True
             )
             self.redis_client.ping()
@@ -61,7 +61,7 @@ class BootstrapAgent:
         try:
             self.db_conn = psycopg2.connect(
                 host="localhost",
-                port=5432,
+                port=5433,
                 database="leanvibe_hive",
                 user="hive_user",
                 password="hive_pass"

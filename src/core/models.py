@@ -194,7 +194,7 @@ class Context(Base):
     
     # Metadata
     tags = Column(JSONB, default=[])
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
     source = Column(String(200))  # Where this context came from
     
     # Access tracking
@@ -241,7 +241,7 @@ class Conversation(Base):
     thread_id = Column(UUID(as_uuid=True), index=True)  # Group related messages
     
     # Message metadata
-    metadata = Column(JSONB, default={})
+    msg_metadata = Column(JSONB, default={})
     attachments = Column(JSONB, default=[])  # File attachments, links, etc.
     
     # Message status

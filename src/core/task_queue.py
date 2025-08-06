@@ -92,6 +92,20 @@ class TaskQueue:
         for field in ['created_at', 'started_at', 'completed_at']:
             if task_data.get(field) is not None:
                 task_data[field] = str(task_data[field])
+            else:
+                task_data[field] = ""
+        
+        # Convert complex fields to JSON strings for Redis
+        for field in ['payload', 'dependencies', 'result']:
+            if task_data.get(field) is not None:
+                task_data[field] = json.dumps(task_data[field])
+            else:
+                task_data[field] = ""
+                
+        # Convert None values to empty strings
+        for key, value in task_data.items():
+            if value is None:
+                task_data[key] = ""
         
         await self.redis_client.hset(task_key, mapping=task_data)
         
@@ -414,10 +428,19 @@ class TaskQueue:
         for field in ['created_at', 'started_at', 'completed_at']:
             if task_data.get(field) is not None:
                 task_data[field] = str(task_data[field])
+            else:
+                task_data[field] = ""
         
         for field in ['payload', 'dependencies', 'result']:
             if task_data.get(field) is not None:
                 task_data[field] = json.dumps(task_data[field])
+            else:
+                task_data[field] = ""
+                
+        # Convert None values to empty strings
+        for key, value in task_data.items():
+            if value is None:
+                task_data[key] = ""
         
         await self.redis_client.hset(task_key, mapping=task_data)
     

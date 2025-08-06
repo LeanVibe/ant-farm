@@ -16,7 +16,7 @@ from ..core.config import settings
 from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
 from ..core.message_broker import message_broker, MessageType
 from ..core.models import get_database_manager, Agent as AgentModel, SystemMetric
-from ..core.orchestrator import orchestrator
+from ..core.orchestrator import get_orchestrator
 
 logger = structlog.get_logger()
 
@@ -26,7 +26,7 @@ app = FastAPI(
     description="Multi-agent autonomous development system",
     version="2.0.0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
 )
 
 # CORS middleware
@@ -37,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Pydantic models for API
 class AgentStatus(str, Enum):
@@ -63,7 +64,7 @@ class TaskCreate(BaseModel):
     title: str
     description: str
     type: str
-    priority: TaskPriority = TaskPriority.MEDIUM
+    priority: TaskPriority = TaskPriority.NORMAL
     assigned_to: Optional[str] = None
     dependencies: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -74,7 +75,7 @@ class TaskInfo(BaseModel):
     title: str
     description: str
     type: str
-    status: TaskStatus
+    status: str
     priority: TaskPriority
     assigned_to: Optional[str] = None
     created_at: float
@@ -115,16 +116,21 @@ class APIResponse(BaseModel):
 async def startup_event():
     """Initialize services on startup."""
     logger.info("Starting LeanVibe Agent Hive API server")
-    
+
     try:
         # Initialize message broker
         await message_broker.initialize()
-        
+
         # Initialize orchestrator
-        await orchestrator.initialize()
-        
+        from pathlib import Path
+        orch = await get_orchestrator(
+            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive",
+            Path(".")
+        )
+        await orch.start()
+
         logger.info("API server started successfully")
-        
+
     except Exception as e:
         logger.error("Failed to start API server", error=str(e))
         raise
@@ -134,13 +140,17 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup on shutdown."""
     logger.info("Shutting down LeanVibe Agent Hive API server")
-    
+
     try:
-        await orchestrator.shutdown()
+        orch = await get_orchestrator(
+            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive",
+            Path(".")
+        )
+        await orch.stop()
         await message_broker.shutdown()
-        
+
         logger.info("API server shut down successfully")
-        
+
     except Exception as e:
         logger.error("Error during API server shutdown", error=str(e))
 
@@ -150,8 +160,7 @@ async def shutdown_event():
 async def health_check():
     """Basic health check."""
     return APIResponse(
-        success=True,
-        data={"status": "healthy", "service": "agent-hive-api"}
+        success=True, data={"status": "healthy", "service": "agent-hive-api"}
     )
 
 
@@ -164,16 +173,16 @@ async def get_system_status():
         completed_tasks = await task_queue.get_completed_tasks()
         failed_tasks = await task_queue.get_failed_tasks()
         queue_depth = await task_queue.get_queue_depth()
-        
+
         # Get active agents
         active_agents = await orchestrator.get_active_agent_count()
-        
+
         # Calculate health score (simplified)
         health_score = 1.0
         if total_tasks > 0:
             success_rate = completed_tasks / total_tasks
             health_score = success_rate * 0.8 + (0.2 if active_agents > 0 else 0.0)
-        
+
         status = SystemStatus(
             health_score=health_score,
             active_agents=active_agents,
@@ -182,11 +191,11 @@ async def get_system_status():
             failed_tasks=failed_tasks,
             queue_depth=queue_depth,
             uptime=time.time() - startup_time,
-            last_analysis=None  # Would get from meta-agent
+            last_analysis=None,  # Would get from meta-agent
         )
-        
+
         return APIResponse(success=True, data=status.dict())
-        
+
     except Exception as e:
         logger.error("Failed to get system status", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -199,7 +208,7 @@ async def list_agents():
     try:
         agents = await orchestrator.list_agents()
         agent_info = []
-        
+
         for agent in agents:
             info = AgentInfo(
                 name=agent.name,
@@ -208,12 +217,12 @@ async def list_agents():
                 status=AgentStatus(agent.status),
                 capabilities=agent.capabilities or {},
                 last_heartbeat=agent.last_heartbeat,
-                uptime=time.time() - agent.created_at if agent.created_at else 0.0
+                uptime=time.time() - agent.created_at if agent.created_at else 0.0,
             )
             agent_info.append(info.dict())
-        
+
         return APIResponse(success=True, data=agent_info)
-        
+
     except Exception as e:
         logger.error("Failed to list agents", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -226,7 +235,7 @@ async def get_agent(agent_name: str):
         agent = await orchestrator.get_agent(agent_name)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         info = AgentInfo(
             name=agent.name,
             type=agent.type,
@@ -234,11 +243,11 @@ async def get_agent(agent_name: str):
             status=AgentStatus(agent.status),
             capabilities=agent.capabilities or {},
             last_heartbeat=agent.last_heartbeat,
-            uptime=time.time() - agent.created_at if agent.created_at else 0.0
+            uptime=time.time() - agent.created_at if agent.created_at else 0.0,
         )
-        
+
         return APIResponse(success=True, data=info.dict())
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -247,25 +256,29 @@ async def get_agent(agent_name: str):
 
 
 @app.post("/api/v1/agents", response_model=APIResponse)
-async def spawn_agent(agent_type: str, agent_name: Optional[str] = None, background_tasks: BackgroundTasks = None):
+async def spawn_agent(
+    agent_type: str,
+    agent_name: Optional[str] = None,
+    background_tasks: BackgroundTasks = None,
+):
     """Spawn a new agent."""
     try:
         if not agent_name:
             agent_name = f"{agent_type}-{int(time.time())}"
-        
+
         # Spawn agent asynchronously
         session_name = await orchestrator.spawn_agent(agent_type, agent_name)
-        
+
         return APIResponse(
             success=True,
             data={
                 "agent_name": agent_name,
                 "agent_type": agent_type,
                 "session_name": session_name,
-                "status": "spawning"
-            }
+                "status": "spawning",
+            },
         )
-        
+
     except Exception as e:
         logger.error("Failed to spawn agent", agent_type=agent_type, error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -276,15 +289,14 @@ async def stop_agent(agent_name: str):
     """Stop a specific agent."""
     try:
         success = await orchestrator.stop_agent(agent_name)
-        
+
         if success:
             return APIResponse(
-                success=True,
-                data={"agent_name": agent_name, "status": "stopping"}
+                success=True, data={"agent_name": agent_name, "status": "stopping"}
             )
         else:
             raise HTTPException(status_code=404, detail="Agent not found")
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -302,27 +314,28 @@ async def check_agent_health(agent_name: str):
             to_agent=agent_name,
             topic="health_check",
             payload={"timestamp": time.time()},
-            message_type=MessageType.DIRECT
+            message_type=MessageType.DIRECT,
         )
-        
+
         return APIResponse(
-            success=True,
-            data={"message_id": response, "health_check": "requested"}
+            success=True, data={"message_id": response, "health_check": "requested"}
         )
-        
+
     except Exception as e:
-        logger.error("Failed to check agent health", agent_name=agent_name, error=str(e))
+        logger.error(
+            "Failed to check agent health", agent_name=agent_name, error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # Task management endpoints
 @app.get("/api/v1/tasks", response_model=APIResponse)
-async def list_tasks(status: Optional[TaskStatus] = None, assigned_to: Optional[str] = None):
+async def list_tasks(status: Optional[str] = None, assigned_to: Optional[str] = None):
     """List tasks with optional filtering."""
     try:
         tasks = await task_queue.list_tasks(status=status, assigned_to=assigned_to)
         task_info = []
-        
+
         for task in tasks:
             info = TaskInfo(
                 id=task.id,
@@ -336,12 +349,12 @@ async def list_tasks(status: Optional[TaskStatus] = None, assigned_to: Optional[
                 started_at=task.started_at,
                 completed_at=task.completed_at,
                 result=task.result,
-                error=task.error
+                error=task.error,
             )
             task_info.append(info.dict())
-        
+
         return APIResponse(success=True, data=task_info)
-        
+
     except Exception as e:
         logger.error("Failed to list tasks", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -360,21 +373,17 @@ async def create_task(task_create: TaskCreate):
             assigned_to=task_create.assigned_to,
             dependencies=task_create.dependencies,
             metadata=task_create.metadata,
-            status=TaskStatus.PENDING,
-            created_at=time.time()
+            status="pending",
+            created_at=time.time(),
         )
-        
+
         task_id = await task_queue.add_task(task)
-        
+
         return APIResponse(
             success=True,
-            data={
-                "task_id": task_id,
-                "title": task.title,
-                "status": task.status.value
-            }
+            data={"task_id": task_id, "title": task.title, "status": task.status.value},
         )
-        
+
     except Exception as e:
         logger.error("Failed to create task", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -387,7 +396,7 @@ async def get_task(task_id: str):
         task = await task_queue.get_task(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
-        
+
         info = TaskInfo(
             id=task.id,
             title=task.title,
@@ -400,11 +409,11 @@ async def get_task(task_id: str):
             started_at=task.started_at,
             completed_at=task.completed_at,
             result=task.result,
-            error=task.error
+            error=task.error,
         )
-        
+
         return APIResponse(success=True, data=info.dict())
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -417,15 +426,14 @@ async def cancel_task(task_id: str):
     """Cancel a task."""
     try:
         success = await task_queue.cancel_task(task_id)
-        
+
         if success:
             return APIResponse(
-                success=True,
-                data={"task_id": task_id, "status": "cancelled"}
+                success=True, data={"task_id": task_id, "status": "cancelled"}
             )
         else:
             raise HTTPException(status_code=404, detail="Task not found")
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -443,18 +451,18 @@ async def send_message(message: MessageSend):
             to_agent=message.to_agent,
             topic=message.topic,
             payload=message.content,
-            message_type=message.message_type
+            message_type=message.message_type,
         )
-        
+
         return APIResponse(
             success=True,
             data={
                 "message_id": message_id,
                 "to_agent": message.to_agent,
-                "topic": message.topic
-            }
+                "topic": message.topic,
+            },
         )
-        
+
     except Exception as e:
         logger.error("Failed to send message", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -465,20 +473,14 @@ async def broadcast_message(topic: str, content: Dict[str, Any]):
     """Broadcast a message to all agents."""
     try:
         message_id = await message_broker.broadcast_message(
-            from_agent="api-server",
-            topic=topic,
-            payload=content
+            from_agent="api-server", topic=topic, payload=content
         )
-        
+
         return APIResponse(
             success=True,
-            data={
-                "message_id": message_id,
-                "topic": topic,
-                "type": "broadcast"
-            }
+            data={"message_id": message_id, "topic": topic, "type": "broadcast"},
         )
-        
+
     except Exception as e:
         logger.error("Failed to broadcast message", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -496,20 +498,17 @@ async def trigger_system_analysis():
             type="system_analysis",
             priority=TaskPriority.HIGH,
             assigned_to="meta-agent",
-            status=TaskStatus.PENDING,
-            created_at=time.time()
+            status="pending",
+            created_at=time.time(),
         )
-        
+
         task_id = await task_queue.add_task(task)
-        
+
         return APIResponse(
             success=True,
-            data={
-                "task_id": task_id,
-                "description": "System analysis triggered"
-            }
+            data={"task_id": task_id, "description": "System analysis triggered"},
         )
-        
+
     except Exception as e:
         logger.error("Failed to trigger system analysis", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -523,14 +522,11 @@ async def shutdown_system():
         await message_broker.broadcast_message(
             from_agent="api-server",
             topic="shutdown",
-            payload={"reason": "API shutdown request", "timestamp": time.time()}
+            payload={"reason": "API shutdown request", "timestamp": time.time()},
         )
-        
-        return APIResponse(
-            success=True,
-            data={"status": "shutdown_initiated"}
-        )
-        
+
+        return APIResponse(success=True, data={"status": "shutdown_initiated"})
+
     except Exception as e:
         logger.error("Failed to shutdown system", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -543,30 +539,35 @@ async def get_metrics():
     try:
         db_manager = get_database_manager(settings.database_url)
         db_session = db_manager.get_session()
-        
+
         try:
             # Get recent metrics
-            metrics = db_session.query(SystemMetric).order_by(
-                SystemMetric.timestamp.desc()
-            ).limit(100).all()
-            
+            metrics = (
+                db_session.query(SystemMetric)
+                .order_by(SystemMetric.timestamp.desc())
+                .limit(100)
+                .all()
+            )
+
             metric_data = []
             for metric in metrics:
-                metric_data.append({
-                    "name": metric.metric_name,
-                    "type": metric.metric_type,
-                    "value": metric.value,
-                    "unit": metric.unit,
-                    "agent_id": metric.agent_id,
-                    "timestamp": metric.timestamp,
-                    "labels": metric.labels
-                })
-            
+                metric_data.append(
+                    {
+                        "name": metric.metric_name,
+                        "type": metric.metric_type,
+                        "value": metric.value,
+                        "unit": metric.unit,
+                        "agent_id": metric.agent_id,
+                        "timestamp": metric.timestamp,
+                        "labels": metric.labels,
+                    }
+                )
+
             return APIResponse(success=True, data=metric_data)
-            
+
         finally:
             db_session.close()
-        
+
     except Exception as e:
         logger.error("Failed to get metrics", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -578,4 +579,5 @@ startup_time = time.time()
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
