@@ -35,27 +35,27 @@ The system auto-detects and uses any of these CLI agentic coding tools:
 docker --version  # Docker 20.10+
 
 # Check available CLI tools  
-hive tools
+hive agent tools
 
-# Start Docker services
-docker compose up -d
+# Initialize system (DB, Docker services, migrations)
+hive init
 
-# Initialize database
-hive init-db
+# Start the system
+hive system start
 
-# Bootstrap the system (creates initial structure)
-hive bootstrap
+# Spawn agents
+hive agent spawn meta
+hive agent spawn architect
+hive agent spawn qa
 
-# Start individual agents
-hive run-agent meta
-hive run-agent developer
+# Check system status
+hive system status
 
-# Start API server
-hive start-api
+# Submit tasks
+hive task submit "Implement new feature X"
 
-# Monitor system status
-hive status
-# API: http://localhost:8000/api/v1/status (when implemented)
+# Monitor system
+# API: http://localhost:8000/api/v1/health
 # Dashboard: http://localhost:8000/api/docs (when implemented)
 ```
 
@@ -198,42 +198,47 @@ ant-farm/
 ### Basic Operation (Current)
 ```bash
 # Check available CLI tools
-hive tools
+hive agent tools
 
-# Start system components
-hive init-db
-hive start-api
+# Initialize and start system
+hive init
+hive system start
 
-# Run individual agents
-hive run-agent meta
-hive run-agent developer
+# Spawn agents
+hive agent spawn meta
+hive agent spawn architect
+
+# Submit and monitor tasks
+hive task submit "description"
+hive task list
 
 # Check system status
-hive status
+hive system status
 ```
 
 ### Planned Advanced Operation (Future)
 ```bash
-# Start advanced autonomous system with Phase 3 capabilities
-hive autonomous
+# Start advanced autonomous system
+hive agent bootstrap
 
 # Check comprehensive system status
-hive status --detailed
+hive system status
 
-# Monitor memory consolidation and patterns
-hive memory
+# Populate context engine
+hive context populate
 
-# Check performance optimization status
-hive performance
+# Search system knowledge
+hive context search "query"
 
-# View sleep-wake cycle status
-hive sleep
+# Monitor agents
+hive agent list
+hive agent describe meta-agent
 ```
 
-### API Monitoring (Planned)
+### API Monitoring (Current)
 ```bash
-# System health with basic metrics (when implemented)
-curl http://localhost:8000/api/v1/status
+# System health check
+curl http://localhost:8000/api/v1/health
 
 # Agent information (when implemented)
 curl http://localhost:8000/api/v1/agents
@@ -241,12 +246,16 @@ curl http://localhost:8000/api/v1/agents
 # Task coordination (when implemented)
 curl http://localhost:8000/api/v1/tasks
 
-# Performance metrics (when implemented)
-curl http://localhost:8000/api/v1/metrics
-
-# Trigger system analysis (when implemented)
-curl -X POST http://localhost:8000/api/v1/system/analyze
+# Submit task via API
+curl -X POST http://localhost:8000/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Implement feature X", "priority": "high"}'
 ```
+
+**Note**: System uses non-standard ports for security:
+- **API**: 8000 (instead of 80/443)
+- **PostgreSQL**: 5433 (instead of 5432)  
+- **Redis**: 6381 (instead of 6379)
 
 ### Advanced Operations (Planned)
 ```bash
