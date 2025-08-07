@@ -1,10 +1,11 @@
 """Configuration management for LeanVibe Agent Hive 2.0."""
 
 import os
-from typing import Optional, Dict, Any, List
-from pydantic_settings import BaseSettings
-from pydantic import Field
 from enum import Enum
+from typing import Any
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class EnvironmentType(str, Enum):
@@ -43,15 +44,15 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
     # CLI Tool Configuration
-    preferred_cli_tool: Optional[CLIToolType] = Field(
+    preferred_cli_tool: CLIToolType | None = Field(
         default=None, env="PREFERRED_CLI_TOOL"
     )
     cli_tool_timeout: int = Field(default=300, env="CLI_TOOL_TIMEOUT")
 
     # API Keys (Optional - for fallback)
-    anthropic_api_key: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
-    openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
-    google_ai_api_key: Optional[str] = Field(default=None, env="GOOGLE_AI_API_KEY")
+    anthropic_api_key: str | None = Field(default=None, env="ANTHROPIC_API_KEY")
+    openai_api_key: str | None = Field(default=None, env="OPENAI_API_KEY")
+    google_ai_api_key: str | None = Field(default=None, env="GOOGLE_AI_API_KEY")
 
     # Database Configuration
     database_url: str = Field(
@@ -63,7 +64,7 @@ class Settings(BaseSettings):
 
     # Redis Configuration
     redis_url: str = Field(default="redis://localhost:6380", env="REDIS_URL")
-    redis_password: Optional[str] = Field(default=None, env="REDIS_PASSWORD")
+    redis_password: str | None = Field(default=None, env="REDIS_PASSWORD")
     redis_db: int = Field(default=0, env="REDIS_DB")
 
     # Embedding Configuration
@@ -133,7 +134,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
-    cors_origins: List[str] = Field(default=["*"], env="CORS_ORIGINS")
+    cors_origins: list[str] = Field(default=["*"], env="CORS_ORIGINS")
 
     # Monitoring Configuration
     metrics_enabled: bool = Field(default=True, env="METRICS_ENABLED")
@@ -174,7 +175,7 @@ class Settings(BaseSettings):
         return self.environment == EnvironmentType.PRODUCTION
 
     @property
-    def database_config(self) -> Dict[str, Any]:
+    def database_config(self) -> dict[str, Any]:
         """Get database configuration."""
         return {
             "url": self.database_url,
@@ -184,7 +185,7 @@ class Settings(BaseSettings):
         }
 
     @property
-    def redis_config(self) -> Dict[str, Any]:
+    def redis_config(self) -> dict[str, Any]:
         """Get Redis configuration."""
         config = {"url": self.redis_url, "db": self.redis_db, "decode_responses": True}
         if self.redis_password:
@@ -192,7 +193,7 @@ class Settings(BaseSettings):
         return config
 
     @property
-    def cli_tools_config(self) -> Dict[str, Any]:
+    def cli_tools_config(self) -> dict[str, Any]:
         """Get CLI tools configuration."""
         return {
             "preferred_tool": self.preferred_cli_tool,
@@ -205,7 +206,7 @@ class Settings(BaseSettings):
         }
 
     @property
-    def embedding_config(self) -> Dict[str, Any]:
+    def embedding_config(self) -> dict[str, Any]:
         """Get embedding configuration."""
         return {
             "provider": self.embedding_provider,
@@ -229,7 +230,7 @@ class Settings(BaseSettings):
         os.makedirs(workspace, exist_ok=True)
         return os.path.join(workspace, subpath) if subpath else workspace
 
-    def validate_configuration(self) -> List[str]:
+    def validate_configuration(self) -> list[str]:
         """Validate configuration and return list of issues."""
         issues = []
 
@@ -287,7 +288,7 @@ def get_redis_url() -> str:
     return settings.redis_url
 
 
-def get_cli_tool_preference() -> Optional[CLIToolType]:
+def get_cli_tool_preference() -> CLIToolType | None:
     """Get preferred CLI tool."""
     return settings.preferred_cli_tool
 
@@ -297,7 +298,7 @@ def is_development_mode() -> bool:
     return settings.is_development
 
 
-def get_agent_config() -> Dict[str, Any]:
+def get_agent_config() -> dict[str, Any]:
     """Get agent configuration."""
     return {
         "max_concurrent": settings.max_concurrent_agents,
@@ -307,7 +308,7 @@ def get_agent_config() -> Dict[str, Any]:
     }
 
 
-def get_api_config() -> Dict[str, Any]:
+def get_api_config() -> dict[str, Any]:
     """Get API configuration."""
     return {
         "host": settings.api_host,

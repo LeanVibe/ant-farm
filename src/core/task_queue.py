@@ -4,9 +4,10 @@ import asyncio
 import json
 import time
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import Dict, List, Optional, Any, Set
+from typing import Any
+
 import redis.asyncio as redis
 import structlog
 from pydantic import BaseModel, Field
@@ -42,19 +43,19 @@ class Task(BaseModel):
     title: str
     description: str
     task_type: str
-    payload: Dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
     priority: int = TaskPriority.NORMAL
     status: str = TaskStatus.PENDING
-    agent_id: Optional[str] = None
-    dependencies: List[str] = Field(default_factory=list)
+    agent_id: str | None = None
+    dependencies: list[str] = Field(default_factory=list)
     retry_count: int = 0
     max_retries: int = 3
     timeout_seconds: int = 300
     created_at: float = Field(default_factory=time.time)
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    result: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: dict[str, Any] | None = None
+    error_message: str | None = None
 
 
 @dataclass
@@ -68,7 +69,7 @@ class QueueStats:
     failed_tasks: int
     total_tasks: int
     average_completion_time: float
-    queue_size_by_priority: Dict[int, int]
+    queue_size_by_priority: dict[int, int]
 
 
 class TaskQueue:
@@ -136,8 +137,8 @@ class TaskQueue:
         return task.id
 
     async def get_task(
-        self, agent_id: str, priorities: Optional[List[int]] = None, timeout: int = 60
-    ) -> Optional[Task]:
+        self, agent_id: str, priorities: list[int] | None = None, timeout: int = 60
+    ) -> Task | None:
         """Get next available task for agent with priority ordering."""
         if priorities is None:
             priorities = [1, 3, 5, 7, 9]  # All priorities
@@ -193,7 +194,7 @@ class TaskQueue:
         return True
 
     async def complete_task(
-        self, task_id: str, result: Optional[Dict[str, Any]] = None
+        self, task_id: str, result: dict[str, Any] | None = None
     ) -> bool:
         """Mark task as completed and process dependent tasks."""
         task_key = f"{self.task_prefix}:{task_id}"
@@ -284,7 +285,7 @@ class TaskQueue:
         await self._update_stats("cancelled")
         return True
 
-    async def get_task_status(self, task_id: str) -> Optional[Task]:
+    async def get_task_status(self, task_id: str) -> Task | None:
         """Get current status of a task."""
         task_key = f"{self.task_prefix}:{task_id}"
         task_data = await self.redis_client.hgetall(task_key)
@@ -414,7 +415,7 @@ class TaskQueue:
                             "Task dependencies satisfied, queued", task_id=task_id
                         )
 
-    async def _dict_to_task(self, task_data: Dict[str, str]) -> Task:
+    async def _dict_to_task(self, task_data: dict[str, str]) -> Task:
         """Convert Redis hash data back to Task object."""
         # Convert string fields back to appropriate types
         data = dict(task_data)
@@ -474,7 +475,7 @@ class TaskQueue:
         await self.redis_client.incr(stats_key)
         await self.redis_client.expire(stats_key, 86400)  # 24 hours
 
-    async def get_unassigned_tasks(self) -> List[Task]:
+    async def get_unassigned_tasks(self) -> list[Task]:
         """Get all unassigned tasks for coordination."""
         unassigned_tasks = []
 

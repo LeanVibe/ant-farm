@@ -2,16 +2,16 @@
 
 import asyncio
 import time
-import uuid
-from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
+
 import structlog
 
 from .config import settings
-from .task_queue import task_queue, Task, TaskStatus, TaskPriority
-from .message_broker import message_broker, MessageType
-from .models import get_database_manager, Agent as AgentModel
+from .models import Agent as AgentModel
+from .models import get_database_manager
+from .task_queue import Task, TaskPriority, TaskStatus, task_queue
 
 logger = structlog.get_logger()
 
@@ -67,15 +67,15 @@ class TaskCoordinator:
     """Intelligent task assignment and coordination system."""
 
     def __init__(self):
-        self.agent_capabilities: Dict[str, Dict[str, AgentCapability]] = {}
-        self.agent_workloads: Dict[str, AgentWorkload] = {}
-        self.task_assignments: Dict[str, TaskAssignment] = {}
+        self.agent_capabilities: dict[str, dict[str, AgentCapability]] = {}
+        self.agent_workloads: dict[str, AgentWorkload] = {}
+        self.task_assignments: dict[str, TaskAssignment] = {}
         self.coordination_active = False
 
         # Performance tracking
-        self.assignment_history: List[TaskAssignment] = []
-        self.success_rates: Dict[str, float] = {}
-        self.efficiency_metrics: Dict[str, float] = {}
+        self.assignment_history: list[TaskAssignment] = []
+        self.success_rates: dict[str, float] = {}
+        self.efficiency_metrics: dict[str, float] = {}
 
         # Configuration
         self.max_assignments_per_cycle = 10
@@ -321,7 +321,7 @@ class TaskCoordinator:
         except Exception as e:
             logger.error("Failed to process pending assignments", error=str(e))
 
-    async def _assign_task(self, task: Task) -> Optional[TaskAssignment]:
+    async def _assign_task(self, task: Task) -> TaskAssignment | None:
         """Assign a task to the best available agent."""
 
         # Determine assignment strategy
@@ -377,7 +377,7 @@ class TaskCoordinator:
 
     async def _find_best_agent(
         self, task: Task, strategy: AssignmentStrategy
-    ) -> Optional[str]:
+    ) -> str | None:
         """Find the best agent for a task using the specified strategy."""
 
         available_agents = self._get_available_agents()
@@ -403,7 +403,7 @@ class TaskCoordinator:
         else:
             return available_agents[0] if available_agents else None
 
-    def _get_available_agents(self) -> List[str]:
+    def _get_available_agents(self) -> list[str]:
         """Get list of available agents."""
         available = []
 
@@ -421,8 +421,8 @@ class TaskCoordinator:
         return available
 
     def _find_best_agent_by_capability(
-        self, task: Task, agents: List[str]
-    ) -> Optional[str]:
+        self, task: Task, agents: list[str]
+    ) -> str | None:
         """Find best agent based on capability match."""
         best_agent = None
         best_score = 0.0
@@ -447,8 +447,8 @@ class TaskCoordinator:
         return best_agent
 
     def _find_best_agent_by_performance(
-        self, task: Task, agents: List[str]
-    ) -> Optional[str]:
+        self, task: Task, agents: list[str]
+    ) -> str | None:
         """Find best agent based on historical performance."""
         best_agent = None
         best_score = 0.0
@@ -473,7 +473,7 @@ class TaskCoordinator:
 
         return best_agent
 
-    def _find_best_agent_by_load(self, task: Task, agents: List[str]) -> Optional[str]:
+    def _find_best_agent_by_load(self, task: Task, agents: list[str]) -> str | None:
         """Find agent with lowest current load."""
         best_agent = None
         lowest_load = float("inf")
@@ -489,7 +489,7 @@ class TaskCoordinator:
 
         return best_agent
 
-    def _find_specialized_agent(self, task: Task, agents: List[str]) -> Optional[str]:
+    def _find_specialized_agent(self, task: Task, agents: list[str]) -> str | None:
         """Find specialized agent for specific task types."""
 
         # Mapping of task types to preferred agent types
@@ -533,7 +533,7 @@ class TaskCoordinator:
         # Fallback to capability-based selection
         return self._find_best_agent_by_capability(task, agents)
 
-    def _find_agent_round_robin(self, task: Task, agents: List[str]) -> Optional[str]:
+    def _find_agent_round_robin(self, task: Task, agents: list[str]) -> str | None:
         """Find agent using round-robin assignment."""
         if not agents:
             return None
@@ -686,13 +686,13 @@ class TaskCoordinator:
             current_tasks = await task_queue.get_agent_active_task_count(agent_name)
             self.agent_workloads[agent_name].current_tasks = current_tasks
 
-    async def _get_recent_completed_tasks(self) -> List[Task]:
+    async def _get_recent_completed_tasks(self) -> list[Task]:
         """Get recently completed tasks for performance analysis."""
         # This would query the task queue for recently completed tasks
         # For now, return empty list
         return []
 
-    async def get_coordination_status(self) -> Dict[str, Any]:
+    async def get_coordination_status(self) -> dict[str, Any]:
         """Get current coordination system status."""
 
         total_agents = len(self.agent_capabilities)
@@ -727,7 +727,7 @@ class TaskCoordinator:
             "strategy_usage": self._get_strategy_usage_stats(),
         }
 
-    def _get_strategy_usage_stats(self) -> Dict[str, int]:
+    def _get_strategy_usage_stats(self) -> dict[str, int]:
         """Get statistics on assignment strategy usage."""
         strategy_counts = {}
 

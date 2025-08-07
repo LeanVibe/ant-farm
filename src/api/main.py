@@ -1,35 +1,34 @@
 """FastAPI server for LeanVibe Agent Hive 2.0 - Agent management and coordination."""
 
-import asyncio
+import sys
 import time
 import uuid
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 from enum import Enum
-import sys
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+import structlog
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import structlog
 
 # Handle both module and direct execution imports
 try:
     from ..core.config import settings
-    from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-    from ..core.message_broker import message_broker, MessageType
-    from ..core.models import get_database_manager, Agent as AgentModel, SystemMetric
+    from ..core.message_broker import MessageType, message_broker
+    from ..core.models import Agent as AgentModel
+    from ..core.models import SystemMetric, get_database_manager
     from ..core.orchestrator import get_orchestrator
+    from ..core.task_queue import Task, TaskPriority, TaskStatus, task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
     from core.config import settings
-    from core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-    from core.message_broker import message_broker, MessageType
-    from core.models import get_database_manager, Agent as AgentModel, SystemMetric
+    from core.message_broker import MessageType, message_broker
+    from core.models import SystemMetric, get_database_manager
     from core.orchestrator import get_orchestrator
+    from core.task_queue import Task, TaskPriority, task_queue
 
 logger = structlog.get_logger()
 
@@ -66,8 +65,8 @@ class AgentInfo(BaseModel):
     type: str
     role: str
     status: AgentStatus
-    capabilities: Dict[str, Any]
-    last_heartbeat: Optional[float] = None
+    capabilities: dict[str, Any]
+    last_heartbeat: float | None = None
     tasks_completed: int = 0
     tasks_failed: int = 0
     uptime: float = 0.0
@@ -78,9 +77,9 @@ class TaskCreate(BaseModel):
     description: str
     type: str
     priority: TaskPriority = TaskPriority.NORMAL
-    assigned_to: Optional[str] = None
-    dependencies: List[str] = Field(default_factory=list)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    assigned_to: str | None = None
+    dependencies: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TaskInfo(BaseModel):
@@ -90,12 +89,12 @@ class TaskInfo(BaseModel):
     type: str
     status: str
     priority: TaskPriority
-    assigned_to: Optional[str] = None
+    assigned_to: str | None = None
     created_at: float
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class SystemStatus(BaseModel):
@@ -106,20 +105,20 @@ class SystemStatus(BaseModel):
     failed_tasks: int
     queue_depth: int
     uptime: float
-    last_analysis: Optional[float] = None
+    last_analysis: float | None = None
 
 
 class MessageSend(BaseModel):
     to_agent: str
     topic: str
-    content: Dict[str, Any]
+    content: dict[str, Any]
     message_type: MessageType = MessageType.DIRECT
 
 
 class APIResponse(BaseModel):
     success: bool
-    data: Optional[Any] = None
-    error: Optional[str] = None
+    data: Any | None = None
+    error: str | None = None
     timestamp: float = Field(default_factory=time.time)
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
@@ -270,7 +269,7 @@ async def get_agent(agent_name: str):
 @app.post("/api/v1/agents", response_model=APIResponse)
 async def spawn_agent(
     agent_type: str,
-    agent_name: Optional[str] = None,
+    agent_name: str | None = None,
     background_tasks: BackgroundTasks = None,
 ):
     """Spawn a new agent."""
@@ -342,7 +341,7 @@ async def check_agent_health(agent_name: str):
 
 # Task management endpoints
 @app.get("/api/v1/tasks", response_model=APIResponse)
-async def list_tasks(status: Optional[str] = None, assigned_to: Optional[str] = None):
+async def list_tasks(status: str | None = None, assigned_to: str | None = None):
     """List tasks with optional filtering."""
     try:
         tasks = await task_queue.list_tasks(status=status, assigned_to=assigned_to)
@@ -481,7 +480,7 @@ async def send_message(message: MessageSend):
 
 
 @app.post("/api/v1/broadcast", response_model=APIResponse)
-async def broadcast_message(topic: str, content: Dict[str, Any]):
+async def broadcast_message(topic: str, content: dict[str, Any]):
     """Broadcast a message to all agents."""
     try:
         message_id = await message_broker.broadcast_message(

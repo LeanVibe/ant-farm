@@ -1,27 +1,26 @@
 """Agent runner system for spawning and managing agents in LeanVibe Agent Hive 2.0."""
 
-import asyncio
 import argparse
+import asyncio
 import signal
 import sys
 import time
-from typing import Dict, Type, Optional
 from pathlib import Path
+
 import structlog
 
 # Handle both module and direct execution imports
 try:
-    from .base_agent import BaseAgent
-    from .meta_agent import MetaAgent
     from ..core.config import settings
     from ..core.task_queue import task_queue
+    from .base_agent import BaseAgent
+    from .meta_agent import MetaAgent
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
     from agents.base_agent import BaseAgent
     from agents.meta_agent import MetaAgent
-    from core.config import settings
     from core.task_queue import task_queue
 
 logger = structlog.get_logger()
@@ -272,7 +271,7 @@ class ResearchAgent(BaseAgent):
 
 
 # Agent registry
-AGENT_TYPES: Dict[str, Type[BaseAgent]] = {
+AGENT_TYPES: dict[str, type[BaseAgent]] = {
     "meta": MetaAgent,
     "developer": DeveloperAgent,
     "qa": QAAgent,
@@ -284,10 +283,10 @@ AGENT_TYPES: Dict[str, Type[BaseAgent]] = {
 class AgentRunner:
     """Manages individual agent lifecycle."""
 
-    def __init__(self, agent_type: str, agent_name: Optional[str] = None):
+    def __init__(self, agent_type: str, agent_name: str | None = None):
         self.agent_type = agent_type
         self.agent_name = agent_name or f"{agent_type}-{int(time.time())}"
-        self.agent: Optional[BaseAgent] = None
+        self.agent: BaseAgent | None = None
         self.shutdown_requested = False
 
         # Setup signal handlers for graceful shutdown
@@ -324,7 +323,7 @@ class AgentRunner:
                 # Give agent time to cleanup
                 try:
                     await asyncio.wait_for(agent_task, timeout=30)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "Agent shutdown timeout, forcing termination",
                         agent=self.agent_name,

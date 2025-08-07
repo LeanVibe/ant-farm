@@ -2,21 +2,22 @@
 
 import asyncio
 import time
-import json
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, asdict
 from enum import Enum
+from typing import Any
+
 import structlog
 
-from .config import settings
 from .advanced_context_engine import (
-    get_advanced_context_engine,
     MemoryConsolidationStats,
+    get_advanced_context_engine,
 )
-from .models import get_database_manager, Agent, SystemMetric
-from .task_queue import task_queue
+from .config import settings
 from .message_broker import message_broker
+from .models import Agent, SystemMetric, get_database_manager
+from .task_queue import task_queue
 
 logger = structlog.get_logger()
 
@@ -62,10 +63,10 @@ class SleepMetrics:
     sleep_start: float
     sleep_end: float
     duration_hours: float
-    consolidation_stats: Dict[str, MemoryConsolidationStats]
+    consolidation_stats: dict[str, MemoryConsolidationStats]
     patterns_discovered: int
-    performance_improvements: Dict[str, float]
-    system_optimizations: List[str]
+    performance_improvements: dict[str, float]
+    system_optimizations: list[str]
     checkpoint_created: bool
     issues_resolved: int
 
@@ -88,11 +89,11 @@ class SystemCheckpoint:
 
     id: str
     created_at: float
-    system_state: Dict[str, Any]
-    agent_states: Dict[str, Dict[str, Any]]
-    performance_baseline: Dict[str, float]
-    memory_stats: Dict[str, Any]
-    active_tasks: List[str]
+    system_state: dict[str, Any]
+    agent_states: dict[str, dict[str, Any]]
+    performance_baseline: dict[str, float]
+    memory_stats: dict[str, Any]
+    active_tasks: list[str]
     git_commit_hash: str
 
 
@@ -100,10 +101,10 @@ class PerformanceMonitor:
     """Monitors system performance for optimization opportunities."""
 
     def __init__(self):
-        self.metrics_history: List[Dict[str, float]] = []
-        self.baseline_metrics: Dict[str, float] = {}
+        self.metrics_history: list[dict[str, float]] = []
+        self.baseline_metrics: dict[str, float] = {}
 
-    async def collect_performance_metrics(self) -> Dict[str, float]:
+    async def collect_performance_metrics(self) -> dict[str, float]:
         """Collect current performance metrics."""
         metrics = {}
 
@@ -168,7 +169,7 @@ class PerformanceMonitor:
             logger.error("Failed to collect performance metrics", error=str(e))
             return {}
 
-    def identify_performance_issues(self) -> List[str]:
+    def identify_performance_issues(self) -> list[str]:
         """Identify performance issues from metrics history."""
         issues = []
 
@@ -196,7 +197,7 @@ class PerformanceMonitor:
 
         return issues
 
-    def suggest_optimizations(self) -> List[str]:
+    def suggest_optimizations(self) -> list[str]:
         """Suggest performance optimizations."""
         optimizations = []
 
@@ -246,15 +247,15 @@ class SleepWakeManager:
 
         # Components
         self.performance_monitor = PerformanceMonitor()
-        self.consolidation_callbacks: List[Callable] = []
+        self.consolidation_callbacks: list[Callable] = []
 
         # State tracking
-        self.current_checkpoint: Optional[SystemCheckpoint] = None
-        self.sleep_metrics_history: List[SleepMetrics] = []
-        self.wake_metrics_history: List[WakeMetrics] = []
+        self.current_checkpoint: SystemCheckpoint | None = None
+        self.sleep_metrics_history: list[SleepMetrics] = []
+        self.wake_metrics_history: list[WakeMetrics] = []
 
         # Adaptive scheduling
-        self.workload_history: List[float] = []
+        self.workload_history: list[float] = []
 
         logger.info("Sleep-wake manager initialized", schedule=asdict(self.schedule))
 
@@ -454,7 +455,7 @@ class SleepWakeManager:
             logger.error("Sleep cycle failed", error=str(e))
             await self._emergency_wake()
 
-    async def _consolidate_memory(self) -> Dict[str, MemoryConsolidationStats]:
+    async def _consolidate_memory(self) -> dict[str, MemoryConsolidationStats]:
         """Consolidate memory for all agents."""
         consolidation_stats = {}
 
@@ -504,7 +505,7 @@ class SleepWakeManager:
 
         return patterns_discovered
 
-    async def _analyze_performance(self) -> Dict[str, float]:
+    async def _analyze_performance(self) -> dict[str, float]:
         """Analyze system performance and identify improvements."""
         improvements = {}
 
@@ -530,7 +531,7 @@ class SleepWakeManager:
 
         return improvements
 
-    async def _optimize_system(self) -> List[str]:
+    async def _optimize_system(self) -> list[str]:
         """Perform system optimizations."""
         optimizations = []
 
@@ -577,7 +578,7 @@ class SleepWakeManager:
 
         return issues_resolved
 
-    async def _create_system_checkpoint(self) -> Optional[SystemCheckpoint]:
+    async def _create_system_checkpoint(self) -> SystemCheckpoint | None:
         """Create a system state checkpoint."""
         try:
             checkpoint_id = f"checkpoint_{int(time.time())}"
@@ -802,7 +803,7 @@ class SleepWakeManager:
         self.current_state = SystemState.AWAKE
         self.last_wake_time = time.time()
 
-    def get_sleep_stats(self) -> Dict[str, Any]:
+    def get_sleep_stats(self) -> dict[str, Any]:
         """Get sleep-wake cycle statistics."""
         if not self.sleep_metrics_history:
             return {
@@ -852,7 +853,7 @@ class SleepWakeManager:
 
 
 # Global instance
-_sleep_wake_manager: Optional[SleepWakeManager] = None
+_sleep_wake_manager: SleepWakeManager | None = None
 
 
 def get_sleep_wake_manager(schedule: SleepSchedule = None) -> SleepWakeManager:

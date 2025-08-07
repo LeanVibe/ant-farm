@@ -1,34 +1,33 @@
 """Meta-Agent for LeanVibe Agent Hive 2.0 - Self-improvement and system coordination."""
 
 import asyncio
-import json
-import os
+import sys
 import time
 import uuid
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-import sys
+from pathlib import Path
+
 import structlog
 
 # Handle both module and direct execution imports
 try:
-    from .base_agent import BaseAgent, TaskResult, ToolResult
     from ..core.config import settings
-    from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-    from ..core.message_broker import message_broker, MessageType
-    from ..core.models import get_database_manager, Agent as AgentModel
+    from ..core.message_broker import MessageType, message_broker
+    from ..core.models import Agent as AgentModel
+    from ..core.models import get_database_manager
+    from ..core.task_queue import Task, TaskPriority, TaskStatus, task_queue
+    from .base_agent import BaseAgent, TaskResult, ToolResult
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from agents.base_agent import BaseAgent, TaskResult, ToolResult
+    from agents.base_agent import BaseAgent, TaskResult
     from core.config import settings
-    from core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-    from core.message_broker import message_broker, MessageType
-    from core.models import get_database_manager, Agent as AgentModel
+    from core.message_broker import MessageType, message_broker
+    from core.models import Agent as AgentModel
+    from core.task_queue import Task, task_queue
 
 logger = structlog.get_logger()
 
@@ -56,9 +55,9 @@ class ImprovementProposal:
     impact_score: float  # 0.0 to 1.0
     complexity_score: float  # 0.0 to 1.0
     risk_score: float  # 0.0 to 1.0
-    affected_components: List[str]
-    implementation_steps: List[str]
-    success_metrics: List[str]
+    affected_components: list[str]
+    implementation_steps: list[str]
+    success_metrics: list[str]
     created_at: float
 
 
@@ -67,12 +66,12 @@ class SystemAnalysis:
     """Analysis of current system state."""
 
     health_score: float
-    performance_metrics: Dict[str, float]
-    agent_efficiency: Dict[str, float]
+    performance_metrics: dict[str, float]
+    agent_efficiency: dict[str, float]
     code_quality_score: float
-    identified_issues: List[str]
-    improvement_opportunities: List[str]
-    resource_utilization: Dict[str, float]
+    identified_issues: list[str]
+    improvement_opportunities: list[str]
+    resource_utilization: dict[str, float]
 
 
 class MetaAgent(BaseAgent):
@@ -82,18 +81,18 @@ class MetaAgent(BaseAgent):
         super().__init__(name, "meta", "system_coordinator")
 
         # Meta-agent specific state
-        self.improvement_proposals: Dict[str, ImprovementProposal] = {}
-        self.active_improvements: Set[str] = set()
-        self.completed_improvements: Set[str] = set()
-        self.failed_improvements: Set[str] = set()
+        self.improvement_proposals: dict[str, ImprovementProposal] = {}
+        self.active_improvements: set[str] = set()
+        self.completed_improvements: set[str] = set()
+        self.failed_improvements: set[str] = set()
 
         # Analysis state
-        self.last_system_analysis: Optional[SystemAnalysis] = None
+        self.last_system_analysis: SystemAnalysis | None = None
         self.analysis_interval = 300  # 5 minutes
         self.last_analysis_time = 0.0
 
         # Performance optimization: Cache for active agents
-        self._active_agents_cache: Optional[List[AgentModel]] = None
+        self._active_agents_cache: list[AgentModel] | None = None
         self._cache_timestamp = 0
         self._cache_ttl = 60  # Cache for 60 seconds
 
@@ -108,7 +107,7 @@ class MetaAgent(BaseAgent):
             modification_enabled=self.modification_enabled,
         )
 
-    async def _get_active_agents_cached(self) -> List[AgentModel]:
+    async def _get_active_agents_cached(self) -> list[AgentModel]:
         """Get active agents with caching to improve performance."""
         current_time = time.time()
 
@@ -131,6 +130,11 @@ class MetaAgent(BaseAgent):
             return agents
         finally:
             db_session.close()
+
+    def _invalidate_agents_cache(self) -> None:
+        """Invalidate the active agents cache."""
+        self._active_agents_cache = None
+        self._cache_timestamp = 0
 
     async def run(self) -> None:
         """Main meta-agent execution loop."""
@@ -242,7 +246,7 @@ class MetaAgent(BaseAgent):
             logger.error("Failed to calculate system health", error=str(e))
             return 0.0
 
-    async def _gather_performance_metrics(self) -> Dict[str, float]:
+    async def _gather_performance_metrics(self) -> dict[str, float]:
         """Gather system performance metrics."""
         metrics = {}
 
@@ -270,13 +274,12 @@ class MetaAgent(BaseAgent):
 
         return metrics
 
-    async def _analyze_agent_efficiency(self) -> Dict[str, float]:
+    async def _analyze_agent_efficiency(self) -> dict[str, float]:
         """Analyze individual agent efficiency."""
         efficiency = {}
 
         try:
-            db_session = self.db_manager.get_session()
-            agents = db_session.query(AgentModel).filter_by(status="active").all()
+            agents = await self._get_active_agents_cached()
 
             for agent in agents:
                 # Calculate efficiency based on task completion ratio
@@ -292,8 +295,6 @@ class MetaAgent(BaseAgent):
                         efficiency[agent.name] = 0.0
                 else:
                     efficiency[agent.name] = 0.5  # Default efficiency
-
-            db_session.close()
 
         except Exception as e:
             logger.error("Failed to analyze agent efficiency", error=str(e))
@@ -338,7 +339,7 @@ class MetaAgent(BaseAgent):
             logger.error("Failed to analyze code quality", error=str(e))
             return 0.5
 
-    async def _identify_system_issues(self) -> List[str]:
+    async def _identify_system_issues(self) -> list[str]:
         """Identify current system issues."""
         issues = []
 
@@ -349,15 +350,13 @@ class MetaAgent(BaseAgent):
                 issues.append(f"Failed tasks detected: {len(failed_tasks)}")
 
             # Check for unresponsive agents
-            db_session = self.db_manager.get_session()
-            agents = db_session.query(AgentModel).filter_by(status="active").all()
+            agents = await self._get_active_agents_cached()
             unresponsive_agents = [
                 agent.name
                 for agent in agents
                 if agent.last_heartbeat
                 and (datetime.utcnow() - agent.last_heartbeat).total_seconds() > 300
             ]
-            db_session.close()
 
             if unresponsive_agents:
                 issues.append(f"Unresponsive agents: {', '.join(unresponsive_agents)}")
@@ -373,7 +372,7 @@ class MetaAgent(BaseAgent):
 
         return issues
 
-    async def _identify_improvement_opportunities(self) -> List[str]:
+    async def _identify_improvement_opportunities(self) -> list[str]:
         """Identify opportunities for system improvement."""
         opportunities = []
 
@@ -417,7 +416,7 @@ class MetaAgent(BaseAgent):
 
         return opportunities
 
-    async def _analyze_resource_utilization(self) -> Dict[str, float]:
+    async def _analyze_resource_utilization(self) -> dict[str, float]:
         """Analyze system resource utilization."""
         utilization = {}
 
@@ -465,7 +464,7 @@ class MetaAgent(BaseAgent):
 
     async def _create_improvement_proposal_for_issue(
         self, issue: str
-    ) -> Optional[ImprovementProposal]:
+    ) -> ImprovementProposal | None:
         """Create improvement proposal to address a specific issue."""
         try:
             prompt = f"""
@@ -517,7 +516,7 @@ class MetaAgent(BaseAgent):
 
     async def _create_improvement_proposal_for_opportunity(
         self, opportunity: str
-    ) -> Optional[ImprovementProposal]:
+    ) -> ImprovementProposal | None:
         """Create improvement proposal for an identified opportunity."""
         try:
             return ImprovementProposal(
@@ -814,13 +813,11 @@ class MetaAgent(BaseAgent):
         except Exception as e:
             logger.error("Failed to coordinate with agents", error=str(e))
 
-    async def _get_active_agents(self) -> List[str]:
+    async def _get_active_agents(self) -> list[str]:
         """Get list of active agent names."""
         try:
-            db_session = self.db_manager.get_session()
-            agents = db_session.query(AgentModel).filter_by(status="active").all()
+            agents = await self._get_active_agents_cached()
             agent_names = [agent.name for agent in agents]
-            db_session.close()
             return agent_names
         except Exception as e:
             logger.error("Failed to get active agents", error=str(e))

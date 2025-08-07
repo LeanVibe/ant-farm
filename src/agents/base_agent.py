@@ -1,40 +1,41 @@
 """Base agent class for LeanVibe Agent Hive 2.0 with multi-CLI tool support."""
 
 import asyncio
-import json
 import subprocess
-import time
-import uuid
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
-from enum import Enum
 import sys
-from pathlib import Path
+import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
 import structlog
 
 # Handle both module and direct execution imports
 try:
-    from ..core.config import settings, CLIToolType
-    from ..core.task_queue import task_queue, Task, TaskStatus
+    from ..core.config import CLIToolType, settings
+    from ..core.context_engine import ContextSearchResult, get_context_engine
     from ..core.message_broker import (
-        message_broker,
+        Message,
         MessageHandler,
         MessageType,
-        Message,
+        message_broker,
     )
-    from ..core.context_engine import get_context_engine, ContextSearchResult
-    from ..core.models import get_database_manager, Agent as AgentModel, SystemMetric
+    from ..core.models import Agent as AgentModel
+    from ..core.models import SystemMetric, get_database_manager
+    from ..core.task_queue import Task, TaskStatus, task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from core.config import settings, CLIToolType
-    from core.task_queue import task_queue, Task, TaskStatus
-    from core.message_broker import message_broker, MessageHandler, MessageType, Message
-    from core.context_engine import get_context_engine, ContextSearchResult
-    from core.models import get_database_manager, Agent as AgentModel, SystemMetric
+    from core.config import CLIToolType, settings
+    from core.context_engine import ContextSearchResult, get_context_engine
+    from core.message_broker import Message, MessageHandler, MessageType, message_broker
+    from core.models import Agent as AgentModel
+    from core.models import SystemMetric, get_database_manager
+    from core.task_queue import Task, task_queue
 
 logger = structlog.get_logger()
 
@@ -54,8 +55,8 @@ class ToolResult:
 
     success: bool
     output: str
-    error: Optional[str] = None
-    tool_used: Optional[str] = None
+    error: str | None = None
+    tool_used: str | None = None
     execution_time: float = 0.0
 
 
@@ -64,9 +65,9 @@ class TaskResult:
     """Result from task processing."""
 
     success: bool
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    metrics: Optional[Dict[str, float]] = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
+    metrics: dict[str, float] | None = None
 
 
 class CLIToolManager:
@@ -77,7 +78,7 @@ class CLIToolManager:
         self.preferred_tool = self._select_preferred_tool()
         self.tool_configs = self._get_tool_configs()
 
-    def _detect_available_tools(self) -> Dict[str, Dict[str, Any]]:
+    def _detect_available_tools(self) -> dict[str, dict[str, Any]]:
         """Detect available CLI tools."""
         tools = {}
 
@@ -112,7 +113,7 @@ class CLIToolManager:
 
         return tools
 
-    def _check_tool_available(self, command: str, args: List[str]) -> bool:
+    def _check_tool_available(self, command: str, args: list[str]) -> bool:
         """Check if a CLI tool is available."""
         try:
             result = subprocess.run([command] + args, capture_output=True, timeout=10)
@@ -120,7 +121,7 @@ class CLIToolManager:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
-    def _select_preferred_tool(self) -> Optional[CLIToolType]:
+    def _select_preferred_tool(self) -> CLIToolType | None:
         """Select preferred tool based on configuration and availability."""
         # Use configured preference if available
         if (
@@ -138,7 +139,7 @@ class CLIToolManager:
 
         return None
 
-    def _get_tool_configs(self) -> Dict[CLIToolType, Dict[str, Any]]:
+    def _get_tool_configs(self) -> dict[CLIToolType, dict[str, Any]]:
         """Get configuration for each tool."""
         return {
             CLIToolType.OPENCODE: {
@@ -159,7 +160,7 @@ class CLIToolManager:
         }
 
     async def execute_prompt(
-        self, prompt: str, tool_override: Optional[CLIToolType] = None
+        self, prompt: str, tool_override: CLIToolType | None = None
     ) -> ToolResult:
         """Execute a prompt using available CLI tools."""
         start_time = time.time()
@@ -259,7 +260,7 @@ class CLIToolManager:
                     success=False, output=stdout.decode(), error=stderr.decode()
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult(
                 success=False, output="", error="opencode execution timed out"
             )
@@ -286,7 +287,7 @@ class CLIToolManager:
                     success=False, output=stdout.decode(), error=stderr.decode()
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult(
                 success=False, output="", error="Claude CLI execution timed out"
             )
@@ -313,7 +314,7 @@ class CLIToolManager:
                     success=False, output=stdout.decode(), error=stderr.decode()
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult(
                 success=False, output="", error="Gemini CLI execution timed out"
             )
@@ -327,8 +328,9 @@ class BaseAgent(ABC):
         self.agent_type = agent_type
         self.role = role
         self.status = "inactive"
-        self.current_task_id: Optional[str] = None
+        self.current_task_id: str | None = None
         self.start_time = time.time()
+        self.agent_uuid: str | None = None  # Database UUID for this agent
 
         # Initialize components
         self.cli_tools = CLIToolManager()
@@ -406,7 +408,7 @@ class BaseAgent(ABC):
         pass
 
     async def execute_with_cli_tool(
-        self, prompt: str, tool_override: Optional[CLIToolType] = None
+        self, prompt: str, tool_override: CLIToolType | None = None
     ) -> ToolResult:
         """Execute prompt using CLI tools with rate limiting."""
 
@@ -571,7 +573,7 @@ class BaseAgent(ABC):
         self,
         to_agent: str,
         topic: str,
-        content: Dict[str, Any],
+        content: dict[str, Any],
         message_type: MessageType = MessageType.DIRECT,
     ) -> str:
         """Send message to another agent."""
@@ -600,12 +602,12 @@ class BaseAgent(ABC):
         importance_score: float = 0.5,
         category: str = "general",
         topic: str = None,
-        metadata: Dict[str, Any] = None,
+        metadata: dict[str, Any] = None,
     ) -> str:
         """Store context in semantic memory."""
 
         context_id = await self.context_engine.store_context(
-            agent_id=self.name,
+            agent_id=self.agent_uuid,
             content=content,
             importance_score=importance_score,
             category=category,
@@ -621,12 +623,12 @@ class BaseAgent(ABC):
         limit: int = 10,
         category_filter: str = None,
         min_importance: float = 0.0,
-    ) -> List[ContextSearchResult]:
+    ) -> list[ContextSearchResult]:
         """Retrieve relevant context from semantic memory."""
 
         return await self.context_engine.retrieve_context(
             query=query,
-            agent_id=self.name,
+            agent_id=self.agent_uuid,
             limit=limit,
             category_filter=category_filter,
             min_importance=min_importance,
@@ -675,6 +677,7 @@ class BaseAgent(ABC):
                 # Update existing agent
                 existing_agent.status = "active"
                 existing_agent.last_heartbeat = datetime.fromtimestamp(time.time())
+                self.agent_uuid = str(existing_agent.id)  # Store the UUID
             else:
                 # Create new agent
                 agent = AgentModel(
@@ -685,6 +688,8 @@ class BaseAgent(ABC):
                     status="active",
                 )
                 db_session.add(agent)
+                db_session.flush()  # Flush to get the ID
+                self.agent_uuid = str(agent.id)  # Store the UUID
 
             db_session.commit()
 
@@ -695,7 +700,7 @@ class BaseAgent(ABC):
         finally:
             db_session.close()
 
-    def _get_capabilities(self) -> Dict[str, Any]:
+    def _get_capabilities(self) -> dict[str, Any]:
         """Get agent capabilities."""
         return {
             "cli_tools": list(self.cli_tools.available_tools.keys()),
@@ -719,7 +724,7 @@ class BaseAgent(ABC):
                 metric_type="histogram",
                 value=execution_time,
                 unit="seconds",
-                agent_id=self.name,
+                agent_id=self.agent_uuid,
                 task_id=task.id,
                 labels={
                     "task_type": task.task_type,
@@ -735,7 +740,7 @@ class BaseAgent(ABC):
                 metric_type="counter",
                 value=1.0 if result.success else 0.0,
                 unit="count",
-                agent_id=self.name,
+                agent_id=self.agent_uuid,
                 task_id=task.id,
                 labels={
                     "task_type": task.task_type,
@@ -754,7 +759,7 @@ class BaseAgent(ABC):
             db_session.close()
 
     # Message handlers
-    async def _handle_ping(self, message: Message) -> Dict[str, Any]:
+    async def _handle_ping(self, message: Message) -> dict[str, Any]:
         """Handle ping message."""
         return {
             "pong": True,
@@ -763,7 +768,7 @@ class BaseAgent(ABC):
             "uptime": time.time() - self.start_time,
         }
 
-    async def _handle_task_assignment(self, message: Message) -> Dict[str, Any]:
+    async def _handle_task_assignment(self, message: Message) -> dict[str, Any]:
         """Handle task assignment message."""
         task_data = message.payload.get("task")
         if task_data:
@@ -778,7 +783,7 @@ class BaseAgent(ABC):
         else:
             return {"error": "No task data provided"}
 
-    async def _handle_health_check(self, message: Message) -> Dict[str, Any]:
+    async def _handle_health_check(self, message: Message) -> dict[str, Any]:
         """Handle health check message."""
         health = await self.health_check()
 
@@ -796,7 +801,7 @@ class BaseAgent(ABC):
             else None,
         }
 
-    async def _handle_shutdown(self, message: Message) -> Dict[str, Any]:
+    async def _handle_shutdown(self, message: Message) -> dict[str, Any]:
         """Handle shutdown message."""
         logger.info("Received shutdown message", agent=self.name)
         self.status = "stopping"

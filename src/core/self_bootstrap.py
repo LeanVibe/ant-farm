@@ -4,20 +4,15 @@ This module enables the system to autonomously continue development and improvem
 without human intervention after initial bootstrap.
 """
 
-import asyncio
-import json
 import time
 import uuid
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
+
 import structlog
 
-from ..core.config import settings
-from ..core.task_queue import task_queue, Task, TaskStatus, TaskPriority
-from ..core.message_broker import message_broker, MessageType
-from ..core.orchestrator import orchestrator
+from ..core.task_queue import Task, TaskPriority, TaskStatus, task_queue
 
 logger = structlog.get_logger()
 
@@ -41,9 +36,9 @@ class DevelopmentGoal:
     priority: float  # 0.0 to 1.0
     complexity: float  # 0.0 to 1.0
     target_phase: DevelopmentPhase
-    success_criteria: List[str]
+    success_criteria: list[str]
     estimated_effort: float  # hours
-    dependencies: List[str]
+    dependencies: list[str]
     created_at: float
 
 
@@ -54,48 +49,48 @@ class SystemCapability:
     description: str
     current_level: float  # 0.0 to 1.0
     target_level: float  # 0.0 to 1.0
-    implementation_tasks: List[str]
-    measurement_criteria: List[str]
+    implementation_tasks: list[str]
+    measurement_criteria: list[str]
 
 
 class SelfBootstrapper:
     """Enhanced bootstrap system for autonomous development continuation."""
-    
+
     def __init__(self):
-        self.development_goals: Dict[str, DevelopmentGoal] = {}
-        self.system_capabilities: Dict[str, SystemCapability] = {}
+        self.development_goals: dict[str, DevelopmentGoal] = {}
+        self.system_capabilities: dict[str, SystemCapability] = {}
         self.active_development_phase = DevelopmentPhase.ANALYSIS
         self.autonomous_mode = False
         self.bootstrap_complete = False
-        
+
         # Development roadmap
-        self.roadmap_tasks: List[str] = []
-        self.completed_milestones: List[str] = []
-        
+        self.roadmap_tasks: list[str] = []
+        self.completed_milestones: list[str] = []
+
         logger.info("Self-bootstrapper initialized")
-    
+
     async def initialize_autonomous_development(self) -> None:
         """Initialize autonomous development capabilities."""
         logger.info("Initializing autonomous development capabilities")
-        
+
         # Define core system capabilities
         await self._define_core_capabilities()
-        
+
         # Create development roadmap
         await self._create_development_roadmap()
-        
+
         # Set up continuous development goals
         await self._setup_continuous_goals()
-        
+
         # Enable autonomous mode
         self.autonomous_mode = True
         self.bootstrap_complete = True
-        
+
         logger.info("Autonomous development capabilities initialized")
-    
+
     async def _define_core_capabilities(self) -> None:
         """Define the core capabilities the system should have."""
-        
+
         capabilities = {
             "self_modification": SystemCapability(
                 name="self_modification",
@@ -114,7 +109,7 @@ class SelfBootstrapper:
                     "Rollback works when needed"
                 ]
             ),
-            
+
             "autonomous_learning": SystemCapability(
                 name="autonomous_learning",
                 description="Ability to learn from experience and improve",
@@ -132,7 +127,7 @@ class SelfBootstrapper:
                     "Knowledge shared between agents"
                 ]
             ),
-            
+
             "system_monitoring": SystemCapability(
                 name="system_monitoring",
                 description="Comprehensive monitoring and self-diagnosis",
@@ -150,7 +145,7 @@ class SelfBootstrapper:
                     "Performance trends tracked"
                 ]
             ),
-            
+
             "task_optimization": SystemCapability(
                 name="task_optimization",
                 description="Optimize task execution and agent coordination",
@@ -168,7 +163,7 @@ class SelfBootstrapper:
                     "Fewer task failures"
                 ]
             ),
-            
+
             "code_quality": SystemCapability(
                 name="code_quality",
                 description="Maintain and improve code quality automatically",
@@ -186,7 +181,7 @@ class SelfBootstrapper:
                     "Fewer bugs introduced"
                 ]
             ),
-            
+
             "security_hardening": SystemCapability(
                 name="security_hardening",
                 description="Continuously improve system security",
@@ -205,16 +200,16 @@ class SelfBootstrapper:
                 ]
             )
         }
-        
+
         self.system_capabilities.update(capabilities)
-        
+
         # Store capabilities in context for agents
         for name, capability in capabilities.items():
             await self._store_capability_context(capability)
-    
+
     async def _create_development_roadmap(self) -> None:
         """Create a development roadmap for autonomous improvement."""
-        
+
         # Phase 1: Foundation Enhancement (Current)
         phase1_goals = [
             DevelopmentGoal(
@@ -233,7 +228,7 @@ class SelfBootstrapper:
                 dependencies=[],
                 created_at=time.time()
             ),
-            
+
             DevelopmentGoal(
                 id="improve_agent_coordination",
                 title="Improve Agent Coordination",
@@ -250,7 +245,7 @@ class SelfBootstrapper:
                 dependencies=["enhance_meta_agent"],
                 created_at=time.time()
             ),
-            
+
             DevelopmentGoal(
                 id="implement_continuous_testing",
                 title="Implement Continuous Testing",
@@ -268,7 +263,7 @@ class SelfBootstrapper:
                 created_at=time.time()
             )
         ]
-        
+
         # Phase 2: Advanced Capabilities
         phase2_goals = [
             DevelopmentGoal(
@@ -287,7 +282,7 @@ class SelfBootstrapper:
                 dependencies=["enhance_meta_agent", "improve_agent_coordination"],
                 created_at=time.time()
             ),
-            
+
             DevelopmentGoal(
                 id="advanced_monitoring",
                 title="Advanced System Monitoring",
@@ -305,7 +300,7 @@ class SelfBootstrapper:
                 created_at=time.time()
             )
         ]
-        
+
         # Phase 3: Optimization and Scaling
         phase3_goals = [
             DevelopmentGoal(
@@ -324,7 +319,7 @@ class SelfBootstrapper:
                 dependencies=["implement_learning_system", "advanced_monitoring"],
                 created_at=time.time()
             ),
-            
+
             DevelopmentGoal(
                 id="scale_agent_system",
                 title="Scale Agent System",
@@ -342,17 +337,17 @@ class SelfBootstrapper:
                 created_at=time.time()
             )
         ]
-        
+
         # Add all goals
         all_goals = phase1_goals + phase2_goals + phase3_goals
         for goal in all_goals:
             self.development_goals[goal.id] = goal
-        
+
         logger.info("Development roadmap created", goal_count=len(all_goals))
-    
+
     async def _setup_continuous_goals(self) -> None:
         """Set up goals that run continuously."""
-        
+
         continuous_goals = [
             DevelopmentGoal(
                 id="continuous_code_quality",
@@ -370,7 +365,7 @@ class SelfBootstrapper:
                 dependencies=[],
                 created_at=time.time()
             ),
-            
+
             DevelopmentGoal(
                 id="continuous_security_hardening",
                 title="Continuous Security Hardening",
@@ -387,7 +382,7 @@ class SelfBootstrapper:
                 dependencies=[],
                 created_at=time.time()
             ),
-            
+
             DevelopmentGoal(
                 id="continuous_performance_monitoring",
                 title="Continuous Performance Monitoring",
@@ -405,39 +400,39 @@ class SelfBootstrapper:
                 created_at=time.time()
             )
         ]
-        
+
         for goal in continuous_goals:
             self.development_goals[goal.id] = goal
-    
+
     async def execute_autonomous_development_cycle(self) -> None:
         """Execute one cycle of autonomous development."""
         if not self.autonomous_mode:
             return
-        
+
         logger.info("Executing autonomous development cycle")
-        
+
         try:
             # Analyze current system state
             await self._analyze_system_state()
-            
+
             # Select next development goal
             next_goal = await self._select_next_goal()
-            
+
             if next_goal:
                 await self._execute_development_goal(next_goal)
-            
+
             # Update capability assessments
             await self._update_capability_assessments()
-            
+
             # Plan next development activities
             await self._plan_next_activities()
-            
+
         except Exception as e:
             logger.error("Autonomous development cycle failed", error=str(e))
-    
+
     async def _analyze_system_state(self) -> None:
         """Analyze current system state to inform development decisions."""
-        
+
         # Create analysis task for meta-agent
         analysis_task = Task(
             id=str(uuid.uuid4()),
@@ -457,50 +452,50 @@ class SelfBootstrapper:
             created_at=time.time(),
             metadata={"autonomous_development": True}
         )
-        
+
         await task_queue.add_task(analysis_task)
         logger.info("System state analysis task created", task_id=analysis_task.id)
-    
-    async def _select_next_goal(self) -> Optional[DevelopmentGoal]:
+
+    async def _select_next_goal(self) -> DevelopmentGoal | None:
         """Select the next development goal to work on."""
-        
+
         # Get available goals (not completed, dependencies met)
         available_goals = []
-        
+
         for goal in self.development_goals.values():
             if goal.id in self.completed_milestones:
                 continue
-            
+
             # Check if dependencies are met
             dependencies_met = all(
-                dep_id in self.completed_milestones 
+                dep_id in self.completed_milestones
                 for dep_id in goal.dependencies
             )
-            
+
             if dependencies_met:
                 available_goals.append(goal)
-        
+
         if not available_goals:
             return None
-        
+
         # Sort by priority and complexity (prefer high priority, low complexity)
         available_goals.sort(
             key=lambda g: (g.priority, -g.complexity),
             reverse=True
         )
-        
+
         selected_goal = available_goals[0]
-        logger.info("Selected next development goal", 
+        logger.info("Selected next development goal",
                    goal_id=selected_goal.id,
                    title=selected_goal.title,
                    priority=selected_goal.priority)
-        
+
         return selected_goal
-    
+
     async def _execute_development_goal(self, goal: DevelopmentGoal) -> None:
         """Execute a specific development goal."""
         logger.info("Executing development goal", goal_id=goal.id, title=goal.title)
-        
+
         # Create implementation tasks based on goal
         if goal.target_phase == DevelopmentPhase.IMPLEMENTATION:
             await self._create_implementation_tasks(goal)
@@ -508,15 +503,15 @@ class SelfBootstrapper:
             await self._create_planning_tasks(goal)
         elif goal.target_phase == DevelopmentPhase.MONITORING:
             await self._create_monitoring_tasks(goal)
-        
+
         # For now, mark as completed (would actually wait for task completion)
         self.completed_milestones.append(goal.id)
-        
+
         logger.info("Development goal execution initiated", goal_id=goal.id)
-    
+
     async def _create_implementation_tasks(self, goal: DevelopmentGoal) -> None:
         """Create implementation tasks for a development goal."""
-        
+
         # Create main implementation task
         impl_task = Task(
             id=str(uuid.uuid4()),
@@ -546,9 +541,9 @@ class SelfBootstrapper:
                 "success_criteria": goal.success_criteria
             }
         )
-        
+
         await task_queue.add_task(impl_task)
-        
+
         # Create testing task
         test_task = Task(
             id=str(uuid.uuid4()),
@@ -565,17 +560,17 @@ class SelfBootstrapper:
                 "autonomous_development": True
             }
         )
-        
+
         await task_queue.add_task(test_task)
-        
-        logger.info("Implementation tasks created", 
+
+        logger.info("Implementation tasks created",
                    goal_id=goal.id,
                    impl_task_id=impl_task.id,
                    test_task_id=test_task.id)
-    
+
     async def _create_planning_tasks(self, goal: DevelopmentGoal) -> None:
         """Create planning tasks for a development goal."""
-        
+
         planning_task = Task(
             id=str(uuid.uuid4()),
             title=f"Plan: {goal.title}",
@@ -599,13 +594,13 @@ class SelfBootstrapper:
                 "autonomous_development": True
             }
         )
-        
+
         await task_queue.add_task(planning_task)
         logger.info("Planning task created", goal_id=goal.id, task_id=planning_task.id)
-    
+
     async def _create_monitoring_tasks(self, goal: DevelopmentGoal) -> None:
         """Create monitoring tasks for continuous goals."""
-        
+
         monitoring_task = Task(
             id=str(uuid.uuid4()),
             title=f"Monitor: {goal.title}",
@@ -628,13 +623,13 @@ class SelfBootstrapper:
                 "continuous": True
             }
         )
-        
+
         await task_queue.add_task(monitoring_task)
         logger.info("Monitoring task created", goal_id=goal.id, task_id=monitoring_task.id)
-    
+
     async def _update_capability_assessments(self) -> None:
         """Update assessments of system capabilities."""
-        
+
         # Create capability assessment task
         assessment_task = Task(
             id=str(uuid.uuid4()),
@@ -657,12 +652,12 @@ class SelfBootstrapper:
             created_at=time.time(),
             metadata={"autonomous_development": True}
         )
-        
+
         await task_queue.add_task(assessment_task)
-    
+
     async def _plan_next_activities(self) -> None:
         """Plan next development activities based on current state."""
-        
+
         planning_task = Task(
             id=str(uuid.uuid4()),
             title="Plan Next Autonomous Development Activities",
@@ -683,12 +678,12 @@ class SelfBootstrapper:
             created_at=time.time(),
             metadata={"autonomous_development": True}
         )
-        
+
         await task_queue.add_task(planning_task)
-    
+
     async def _store_capability_context(self, capability: SystemCapability) -> None:
         """Store capability information in context for agents to access."""
-        
+
         # This would store in the context engine, but we'll simulate it
         context_content = f"""
         System Capability: {capability.name}
@@ -702,24 +697,24 @@ class SelfBootstrapper:
         Measurement Criteria:
         {chr(10).join(f"- {criteria}" for criteria in capability.measurement_criteria)}
         """
-        
+
         # Would use context engine to store this
         logger.info("Capability context stored", capability=capability.name)
-    
-    async def get_development_status(self) -> Dict[str, Any]:
+
+    async def get_development_status(self) -> dict[str, Any]:
         """Get current development status."""
-        
+
         total_goals = len(self.development_goals)
         completed_goals = len(self.completed_milestones)
-        
+
         # Calculate capability progress
         capability_progress = {}
         for name, capability in self.system_capabilities.items():
             progress = capability.current_level / capability.target_level
             capability_progress[name] = min(1.0, progress)
-        
+
         avg_capability_progress = sum(capability_progress.values()) / len(capability_progress)
-        
+
         return {
             "autonomous_mode": self.autonomous_mode,
             "bootstrap_complete": self.bootstrap_complete,

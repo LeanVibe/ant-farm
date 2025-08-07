@@ -5,17 +5,16 @@ import json
 import subprocess
 import time
 import uuid
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import structlog
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
 
-from .task_queue import task_queue, Task, TaskPriority, TaskStatus
+import psycopg2
+import structlog
+
 from .message_broker import message_broker
+from .task_queue import Task, task_queue
 
 logger = structlog.get_logger()
 
@@ -41,13 +40,13 @@ class AgentInfo:
     type: str
     role: str
     status: AgentStatus
-    capabilities: List[str]
-    tmux_session: Optional[str]
+    capabilities: list[str]
+    tmux_session: str | None
     last_heartbeat: float
     created_at: float
     tasks_completed: int
     tasks_failed: int
-    current_task_id: Optional[str] = None
+    current_task_id: str | None = None
     load_factor: float = 0.0
 
 
@@ -70,7 +69,7 @@ class AgentRegistry:
 
     def __init__(self, db_url: str):
         self.db_url = db_url
-        self.agents: Dict[str, AgentInfo] = {}
+        self.agents: dict[str, AgentInfo] = {}
         self._lock = asyncio.Lock()
 
     async def register_agent(self, agent_info: AgentInfo) -> bool:
@@ -121,7 +120,7 @@ class AgentRegistry:
         self,
         agent_name: str,
         status: AgentStatus,
-        current_task_id: Optional[str] = None,
+        current_task_id: str | None = None,
     ) -> bool:
         """Update agent status."""
         async with self._lock:
@@ -154,13 +153,13 @@ class AgentRegistry:
                 )
                 return False
 
-    async def get_agent(self, agent_name: str) -> Optional[AgentInfo]:
+    async def get_agent(self, agent_name: str) -> AgentInfo | None:
         """Get agent information."""
         return self.agents.get(agent_name)
 
     async def list_agents(
-        self, status_filter: Optional[AgentStatus] = None
-    ) -> List[AgentInfo]:
+        self, status_filter: AgentStatus | None = None
+    ) -> list[AgentInfo]:
         """List all agents, optionally filtered by status."""
         agents = list(self.agents.values())
         if status_filter:
@@ -200,8 +199,8 @@ class AgentSpawner:
         self.project_root = project_root
 
     async def spawn_agent(
-        self, agent_type: str, agent_name: str, capabilities: List[str] = None
-    ) -> Optional[str]:
+        self, agent_type: str, agent_name: str, capabilities: list[str] = None
+    ) -> str | None:
         """Spawn a new agent in a tmux session."""
         if capabilities is None:
             capabilities = []
@@ -393,8 +392,8 @@ class AgentOrchestrator:
         logger.info("Agent orchestrator stopped")
 
     async def spawn_agent(
-        self, agent_type: str, agent_name: str = None, capabilities: List[str] = None
-    ) -> Optional[str]:
+        self, agent_type: str, agent_name: str = None, capabilities: list[str] = None
+    ) -> str | None:
         """Spawn a new agent."""
         if len(self.registry.agents) >= self.max_agents:
             logger.warning("Maximum agent limit reached", max_agents=self.max_agents)
@@ -467,7 +466,7 @@ class AgentOrchestrator:
         """Get comprehensive system health metrics."""
         agents = await self.registry.list_agents()
 
-        status_counts = {status: 0 for status in AgentStatus}
+        status_counts = dict.fromkeys(AgentStatus, 0)
         total_load = 0.0
 
         for agent in agents:
@@ -521,7 +520,7 @@ class AgentOrchestrator:
                 logger.error("Task assignment loop error", error=str(e))
                 await asyncio.sleep(5)
 
-    async def _find_suitable_task(self, agent_info: AgentInfo) -> Optional[Task]:
+    async def _find_suitable_task(self, agent_info: AgentInfo) -> Task | None:
         """Find a suitable task for the given agent based on capabilities."""
         # Simple implementation - get any task the agent can handle
         # In a more sophisticated system, this would match task requirements to agent capabilities
@@ -612,7 +611,7 @@ class AgentOrchestrator:
         except Exception as e:
             logger.error("Failed to cleanup orphaned sessions", error=str(e))
 
-    def _get_default_capabilities(self, agent_type: str) -> List[str]:
+    def _get_default_capabilities(self, agent_type: str) -> list[str]:
         """Get default capabilities for agent type."""
         capability_map = {
             "meta": ["system_analysis", "code_generation", "self_improvement"],
