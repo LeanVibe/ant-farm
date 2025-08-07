@@ -199,7 +199,7 @@ class EmbeddingService:
         """Generate embedding using Ollama."""
         try:
             import aiohttp
-            from aiohttp import ClientTimeout, ClientError
+            from aiohttp import ClientError, ClientTimeout
 
             timeout = ClientTimeout(total=30)  # 30 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -210,7 +210,7 @@ class EmbeddingService:
                     response.raise_for_status()
                     result = await response.json()
                     return result["embedding"]
-        except (ClientError, asyncio.TimeoutError) as e:
+        except (TimeoutError, ClientError) as e:
             logger.error("Ollama API request failed", error=str(e))
             raise
         except KeyError as e:

@@ -102,7 +102,7 @@ class TaskQueue:
                 )
 
             logger.info("Task queue initialized with optimized connection settings")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("Redis connection timeout during task queue initialization")
             raise
         except Exception as e:
