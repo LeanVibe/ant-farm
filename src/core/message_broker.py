@@ -17,17 +17,19 @@ logger = structlog.get_logger()
 
 class MessageType(Enum):
     """Message type enumeration."""
-    DIRECT = "direct"         # Agent-to-agent direct message
-    BROADCAST = "broadcast"   # Message to all agents
-    MULTICAST = "multicast"   # Message to multiple specific agents
-    REQUEST = "request"       # Request-reply pattern
-    REPLY = "reply"          # Reply to a request
+
+    DIRECT = "direct"  # Agent-to-agent direct message
+    BROADCAST = "broadcast"  # Message to all agents
+    MULTICAST = "multicast"  # Message to multiple specific agents
+    REQUEST = "request"  # Request-reply pattern
+    REPLY = "reply"  # Reply to a request
     NOTIFICATION = "notification"  # System notifications
 
 
 @dataclass
 class Message:
     """Message structure."""
+
     id: str
     from_agent: str
     to_agent: str  # Can be "broadcast" or specific agent
@@ -73,17 +75,19 @@ class MessageHandler:
                         payload=result or {},
                         timestamp=time.time(),
                         reply_to=message.id,
-                        correlation_id=message.correlation_id
+                        correlation_id=message.correlation_id,
                     )
                     return reply
 
                 return None
 
             except Exception as e:
-                logger.error("Message handler error",
-                           agent=self.agent_name,
-                           topic=message.topic,
-                           error=str(e))
+                logger.error(
+                    "Message handler error",
+                    agent=self.agent_name,
+                    topic=message.topic,
+                    error=str(e),
+                )
 
                 # Send error reply for requests
                 if message.message_type == MessageType.REQUEST:
@@ -96,13 +100,13 @@ class MessageHandler:
                         payload={"error": str(e)},
                         timestamp=time.time(),
                         reply_to=message.id,
-                        correlation_id=message.correlation_id
+                        correlation_id=message.correlation_id,
                     )
                     return error_reply
         else:
-            logger.warning("No handler for topic",
-                         agent=self.agent_name,
-                         topic=message.topic)
+            logger.warning(
+                "No handler for topic", agent=self.agent_name, topic=message.topic
+            )
 
         return None
 
@@ -162,15 +166,17 @@ class MessageBroker:
 
         logger.info("Stopped listening for messages", agent=agent_name)
 
-    async def send_message(self,
-                          from_agent: str,
-                          to_agent: str,
-                          topic: str,
-                          payload: dict[str, Any],
-                          message_type: MessageType = MessageType.DIRECT,
-                          priority: int = 5,
-                          expires_in: int | None = None,
-                          correlation_id: str | None = None) -> str:
+    async def send_message(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        payload: dict[str, Any],
+        message_type: MessageType = MessageType.DIRECT,
+        priority: int = 5,
+        expires_in: int | None = None,
+        correlation_id: str | None = None,
+    ) -> str:
         """Send a message to an agent or broadcast."""
 
         message = Message(
@@ -183,7 +189,7 @@ class MessageBroker:
             timestamp=time.time(),
             expires_at=time.time() + expires_in if expires_in else None,
             priority=priority,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         # Persist message
@@ -202,20 +208,24 @@ class MessageBroker:
         # Store in message history
         await self._store_message_history(message)
 
-        logger.info("Message sent",
-                   from_agent=from_agent,
-                   to_agent=to_agent,
-                   topic=topic,
-                   message_id=message.id)
+        logger.info(
+            "Message sent",
+            from_agent=from_agent,
+            to_agent=to_agent,
+            topic=topic,
+            message_id=message.id,
+        )
 
         return message.id
 
-    async def send_request(self,
-                          from_agent: str,
-                          to_agent: str,
-                          topic: str,
-                          payload: dict[str, Any],
-                          timeout: int = 30) -> dict[str, Any]:
+    async def send_request(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        payload: dict[str, Any],
+        timeout: int = 30,
+    ) -> dict[str, Any]:
         """Send a request and wait for reply."""
 
         correlation_id = str(uuid.uuid4())
@@ -232,7 +242,7 @@ class MessageBroker:
                 topic=topic,
                 payload=payload,
                 message_type=MessageType.REQUEST,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             # Wait for reply
@@ -240,21 +250,18 @@ class MessageBroker:
             return reply.payload
 
         except TimeoutError:
-            logger.error("Request timeout",
-                        from_agent=from_agent,
-                        to_agent=to_agent,
-                        topic=topic)
+            logger.error(
+                "Request timeout", from_agent=from_agent, to_agent=to_agent, topic=topic
+            )
             raise
         finally:
             # Clean up
             if correlation_id in self.pending_requests:
                 del self.pending_requests[correlation_id]
 
-    async def broadcast_message(self,
-                               from_agent: str,
-                               topic: str,
-                               payload: dict[str, Any],
-                               priority: int = 5) -> str:
+    async def broadcast_message(
+        self, from_agent: str, topic: str, payload: dict[str, Any], priority: int = 5
+    ) -> str:
         """Broadcast a message to all agents."""
 
         return await self.send_message(
@@ -263,15 +270,17 @@ class MessageBroker:
             topic=topic,
             payload=payload,
             message_type=MessageType.BROADCAST,
-            priority=priority
+            priority=priority,
         )
 
-    async def multicast_message(self,
-                               from_agent: str,
-                               to_agents: list[str],
-                               topic: str,
-                               payload: dict[str, Any],
-                               priority: int = 5) -> list[str]:
+    async def multicast_message(
+        self,
+        from_agent: str,
+        to_agents: list[str],
+        topic: str,
+        payload: dict[str, Any],
+        priority: int = 5,
+    ) -> list[str]:
         """Send a message to multiple specific agents."""
 
         message_ids = []
@@ -283,16 +292,15 @@ class MessageBroker:
                 topic=topic,
                 payload=payload,
                 message_type=MessageType.MULTICAST,
-                priority=priority
+                priority=priority,
             )
             message_ids.append(message_id)
 
         return message_ids
 
-    async def get_message_history(self,
-                                 agent_name: str,
-                                 limit: int = 100,
-                                 since: float | None = None) -> list[Message]:
+    async def get_message_history(
+        self, agent_name: str, limit: int = 100, since: float | None = None
+    ) -> list[Message]:
         """Get message history for an agent."""
 
         history_key = f"{self.history_prefix}:{agent_name}"
@@ -435,9 +443,11 @@ class MessageBroker:
         # Set TTL for queue
         await self.redis_client.expire(queue_key, 86400)  # 24 hours
 
-        logger.debug("Message queued for offline delivery",
-                    to_agent=message.to_agent,
-                    message_id=message.id)
+        logger.debug(
+            "Message queued for offline delivery",
+            to_agent=message.to_agent,
+            message_id=message.id,
+        )
 
     async def _store_message_history(self, message: Message) -> None:
         """Store message in history for both sender and receiver."""
@@ -460,15 +470,15 @@ class MessageBroker:
         dlq_data = {
             "message_id": message.id,
             "reason": reason,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         await self.redis_client.lpush(dlq_key, json.dumps(dlq_data))
         await self.redis_client.expire(dlq_key, 604800)  # 7 days
 
-        logger.warning("Message moved to dead letter queue",
-                      message_id=message.id,
-                      reason=reason)
+        logger.warning(
+            "Message moved to dead letter queue", message_id=message.id, reason=reason
+        )
 
     def _serialize_message(self, message: Message) -> str:
         """Serialize message for Redis pub/sub."""
@@ -486,7 +496,7 @@ class MessageBroker:
             "correlation_id": message.correlation_id,
             "priority": message.priority,
             "delivery_count": message.delivery_count,
-            "max_retries": message.max_retries
+            "max_retries": message.max_retries,
         }
 
         return json.dumps(data)
@@ -504,7 +514,7 @@ class MessageBroker:
             "timestamp": str(message.timestamp),
             "priority": str(message.priority),
             "delivery_count": str(message.delivery_count),
-            "max_retries": str(message.max_retries)
+            "max_retries": str(message.max_retries),
         }
 
         # Optional fields
@@ -541,7 +551,7 @@ class MessageBroker:
             correlation_id=data.get("correlation_id"),
             priority=int(data.get("priority", 5)),
             delivery_count=int(data.get("delivery_count", 0)),
-            max_retries=int(data.get("max_retries", 3))
+            max_retries=int(data.get("max_retries", 3)),
         )
 
 

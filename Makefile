@@ -200,6 +200,16 @@ watch: ## Watch system activity (split screen)
 
 # ============== TOOLS ==============
 
+.PHONY: tools
+tools: ## Check available CLI agentic coding tools
+	@echo "Checking CLI agentic coding tools..."
+	@which opencode >/dev/null 2>&1 && echo "✓ opencode installed" || echo "✗ opencode not found"
+	@which claude >/dev/null 2>&1 && echo "✓ claude installed" || echo "✗ claude not found"
+	@which gemini >/dev/null 2>&1 && echo "✓ gemini installed" || echo "✗ gemini not found"
+	@echo ""
+	@echo "Priority order: opencode (preferred) → claude → gemini → API fallback"
+	@echo "Force specific tool: export PREFERRED_CLI_TOOL=opencode"
+
 .PHONY: tools-up
 tools-up: ## Start optional tools (pgAdmin, Redis Commander)
 	docker-compose --profile tools up -d

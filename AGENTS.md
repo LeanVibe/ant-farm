@@ -8,7 +8,7 @@ CLI Agentic Coding Tools
 
 Build/lint/test
 - Setup: make setup (auto-detects CLI tools); env: .env.local (API keys optional)
-- Start: make start; Dev API: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+- Start: make start; Dev API: uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 - Tests (all): pytest -q
 - Single test: pytest -q path/to/test_file.py::TestClass::test_case -k "expr"
 - Coverage: pytest --cov --cov-report=term-missing
@@ -19,11 +19,11 @@ Build/lint/test
 Code style
 - Imports: stdlib, third-party, local; absolute imports preferred; no wildcard
 - Formatting: ruff format (PEP 8/black-like); max line length per ruff config
-- Types: Python 3.12 typing, strict where feasible; no Any unless necessary
+- Types: Python 3.11+ typing, strict where feasible; no Any unless necessary
 - Naming: snake_case for funcs/vars, PascalCase for classes, UPPER_SNAKE for consts
 - Errors: raise domain-specific exceptions; never swallow; log with context; no bare except
 - FastAPI: pydantic models for IO; validate at boundaries; return typed responses
-- Concurrency: use Astral-UV loop; prefer async def; avoid blocking calls
+- Concurrency: use async/await patterns; prefer async def; avoid blocking calls
 - Config/secrets: only from .env; never hardcode or log secrets
 - Tests: TDD; >90% coverage; use HTTPX for API; unit before integration; deterministic
 - Docs: update docs/INDEX.md references; scratch work only in /scratchpad

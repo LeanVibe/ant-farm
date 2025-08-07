@@ -23,6 +23,7 @@ Base = declarative_base()
 
 class Agent(Base):
     """Agent model for tracking all agents in the system."""
+
     __tablename__ = "agents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -52,32 +53,47 @@ class Agent(Base):
 
     # Relationships
     tasks = relationship("Task", back_populates="agent", cascade="all, delete-orphan")
-    contexts = relationship("Context", back_populates="agent", cascade="all, delete-orphan")
-    sent_messages = relationship("Conversation", foreign_keys="Conversation.from_agent_id", back_populates="from_agent")
-    received_messages = relationship("Conversation", foreign_keys="Conversation.to_agent_id", back_populates="to_agent")
+    contexts = relationship(
+        "Context", back_populates="agent", cascade="all, delete-orphan"
+    )
+    sent_messages = relationship(
+        "Conversation",
+        foreign_keys="Conversation.from_agent_id",
+        back_populates="from_agent",
+    )
+    received_messages = relationship(
+        "Conversation",
+        foreign_keys="Conversation.to_agent_id",
+        back_populates="to_agent",
+    )
     checkpoints = relationship("SystemCheckpoint", back_populates="agent")
 
     def __repr__(self):
-        return f"<Agent(name='{self.name}', type='{self.type}', status='{self.status}')>"
+        return (
+            f"<Agent(name='{self.name}', type='{self.type}', status='{self.status}')>"
+        )
 
     def to_dict(self):
         """Convert agent to dictionary."""
         return {
-            'id': str(self.id),
-            'name': self.name,
-            'type': self.type,
-            'role': self.role,
-            'status': self.status,
-            'capabilities': self.capabilities,
-            'tasks_completed': self.tasks_completed,
-            'tasks_failed': self.tasks_failed,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_heartbeat': self.last_heartbeat.isoformat() if self.last_heartbeat else None
+            "id": str(self.id),
+            "name": self.name,
+            "type": self.type,
+            "role": self.role,
+            "status": self.status,
+            "capabilities": self.capabilities,
+            "tasks_completed": self.tasks_completed,
+            "tasks_failed": self.tasks_failed,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_heartbeat": self.last_heartbeat.isoformat()
+            if self.last_heartbeat
+            else None,
         }
 
 
 class Task(Base):
     """Task model for tracking all tasks in the system."""
+
     __tablename__ = "tasks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -105,7 +121,7 @@ class Task(Base):
 
     # Performance metrics
     estimated_duration = Column(Integer)  # Estimated duration in seconds
-    actual_duration = Column(Integer)     # Actual duration in seconds
+    actual_duration = Column(Integer)  # Actual duration in seconds
     complexity_score = Column(Float, default=1.0)
 
     # Timestamps
@@ -125,23 +141,26 @@ class Task(Base):
     def to_dict(self):
         """Convert task to dictionary."""
         return {
-            'id': str(self.id),
-            'title': self.title,
-            'description': self.description,
-            'type': self.type,
-            'status': self.status,
-            'priority': self.priority,
-            'agent_id': str(self.agent_id) if self.agent_id else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'started_at': self.started_at.isoformat() if self.started_at else None,
-            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
-            'payload': self.payload,
-            'result': self.result
+            "id": str(self.id),
+            "title": self.title,
+            "description": self.description,
+            "type": self.type,
+            "status": self.status,
+            "priority": self.priority,
+            "agent_id": str(self.agent_id) if self.agent_id else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat()
+            if self.completed_at
+            else None,
+            "payload": self.payload,
+            "result": self.result,
         }
 
 
 class Session(Base):
     """Session model for tracking work sessions and collaboration."""
+
     __tablename__ = "sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -172,15 +191,20 @@ class Session(Base):
     conversations = relationship("Conversation", back_populates="session")
 
     def __repr__(self):
-        return f"<Session(name='{self.name}', type='{self.type}', status='{self.status}')>"
+        return (
+            f"<Session(name='{self.name}', type='{self.type}', status='{self.status}')>"
+        )
 
 
 class Context(Base):
     """Context model for semantic memory and knowledge storage."""
+
     __tablename__ = "contexts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False, index=True)
+    agent_id = Column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False, index=True
+    )
     session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id"), index=True)
 
     # Content
@@ -228,14 +252,21 @@ class Context(Base):
 
 class Conversation(Base):
     """Conversation model for tracking inter-agent communication."""
+
     __tablename__ = "conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False, index=True)
+    session_id = Column(
+        UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False, index=True
+    )
 
     # Message details
-    from_agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False, index=True)
-    to_agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), index=True)  # Nullable for broadcasts
+    from_agent_id = Column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False, index=True
+    )
+    to_agent_id = Column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), index=True
+    )  # Nullable for broadcasts
 
     message_type = Column(String(100), nullable=False, index=True)
     topic = Column(String(200), index=True)
@@ -263,8 +294,12 @@ class Conversation(Base):
 
     # Relationships
     session = relationship("Session", back_populates="conversations")
-    from_agent = relationship("Agent", foreign_keys=[from_agent_id], back_populates="sent_messages")
-    to_agent = relationship("Agent", foreign_keys=[to_agent_id], back_populates="received_messages")
+    from_agent = relationship(
+        "Agent", foreign_keys=[from_agent_id], back_populates="sent_messages"
+    )
+    to_agent = relationship(
+        "Agent", foreign_keys=[to_agent_id], back_populates="received_messages"
+    )
     reply_to_message = relationship("Conversation", remote_side=[id])
 
     def __repr__(self):
@@ -273,12 +308,15 @@ class Conversation(Base):
 
 class SystemCheckpoint(Base):
     """System checkpoint model for tracking system state and changes."""
+
     __tablename__ = "system_checkpoints"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Checkpoint metadata
-    type = Column(String(100), nullable=False, index=True)  # manual, auto, pre_change, post_change
+    type = Column(
+        String(100), nullable=False, index=True
+    )  # manual, auto, pre_change, post_change
     description = Column(Text)
     version = Column(String(50))  # System version at checkpoint
 
@@ -293,7 +331,9 @@ class SystemCheckpoint(Base):
     git_tag = Column(String(100))
 
     # Checkpoint metadata
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"))  # Who created this checkpoint
+    agent_id = Column(
+        UUID(as_uuid=True), ForeignKey("agents.id")
+    )  # Who created this checkpoint
 
     # Performance data
     performance_metrics = Column(JSONB, default={})
@@ -304,7 +344,9 @@ class SystemCheckpoint(Base):
     rollback_script = Column(Text)  # Script to execute rollback
 
     # Status
-    status = Column(String(50), default="created", index=True)  # created, applied, rolled_back
+    status = Column(
+        String(50), default="created", index=True
+    )  # created, applied, rolled_back
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -320,13 +362,16 @@ class SystemCheckpoint(Base):
 
 class SystemMetric(Base):
     """System metrics model for performance monitoring."""
+
     __tablename__ = "system_metrics"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Metric identification
     metric_name = Column(String(200), nullable=False, index=True)
-    metric_type = Column(String(50), nullable=False, index=True)  # counter, gauge, histogram
+    metric_type = Column(
+        String(50), nullable=False, index=True
+    )  # counter, gauge, histogram
 
     # Metric data
     value = Column(Float, nullable=False)
@@ -354,6 +399,7 @@ class SystemMetric(Base):
 
 class CodeArtifact(Base):
     """Code artifacts model for tracking generated code and modifications."""
+
     __tablename__ = "code_artifacts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -361,7 +407,9 @@ class CodeArtifact(Base):
     # Artifact identification
     name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False, index=True)
-    artifact_type = Column(String(100), nullable=False, index=True)  # file, function, class, module
+    artifact_type = Column(
+        String(100), nullable=False, index=True
+    )  # file, function, class, module
 
     # Content
     content = Column(Text, nullable=False)
@@ -373,8 +421,12 @@ class CodeArtifact(Base):
     dependencies = Column(JSONB, default=[])
 
     # Generation context
-    generated_by_agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), index=True)
-    generated_for_task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id"), index=True)
+    generated_by_agent_id = Column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), index=True
+    )
+    generated_for_task_id = Column(
+        UUID(as_uuid=True), ForeignKey("tasks.id"), index=True
+    )
     generation_prompt = Column(Text)
 
     # Version control
@@ -387,7 +439,9 @@ class CodeArtifact(Base):
     quality_score = Column(Float)
 
     # Status
-    status = Column(String(50), default="draft", index=True)  # draft, reviewed, approved, deployed
+    status = Column(
+        String(50), default="draft", index=True
+    )  # draft, reviewed, approved, deployed
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -411,7 +465,9 @@ class DatabaseManager:
     def __init__(self, database_url: str):
         self.database_url = database_url
         self.engine = create_engine(database_url, echo=False)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine
+        )
 
     def create_tables(self):
         """Create all tables."""
@@ -440,7 +496,7 @@ class DatabaseManager:
                     type="system",
                     role="system",
                     capabilities={"system_management": True, "monitoring": True},
-                    status="active"
+                    status="active",
                 )
                 session.add(system_agent)
                 session.commit()
@@ -449,13 +505,13 @@ class DatabaseManager:
 
 
 # Event listeners for automatic updates
-@event.listens_for(Agent, 'before_update')
+@event.listens_for(Agent, "before_update")
 def receive_before_update(mapper, connection, target):
     """Update the updated_at timestamp on agent updates."""
     target.updated_at = datetime.utcnow()
 
 
-@event.listens_for(Context, 'before_update')
+@event.listens_for(Context, "before_update")
 def receive_before_update_context(mapper, connection, target):
     """Update timestamps and access tracking on context updates."""
     target.updated_at = datetime.utcnow()
@@ -465,6 +521,7 @@ def receive_before_update_context(mapper, connection, target):
 
 # Global database manager instance
 db_manager = None
+
 
 def get_database_manager(database_url: str) -> DatabaseManager:
     """Get the global database manager instance."""
