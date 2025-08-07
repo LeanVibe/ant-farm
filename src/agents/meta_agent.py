@@ -14,8 +14,10 @@ import structlog
 # Handle both module and direct execution imports
 try:
     from ..core.config import settings
+    from ..core.context_engine import get_context_engine
     from ..core.message_broker import MessageType, message_broker
     from ..core.models import Agent as AgentModel
+    from ..core.self_modifier import SelfModifier
     from ..core.task_queue import Task, task_queue
     from .base_agent import BaseAgent, TaskResult
 except ImportError:
@@ -24,8 +26,10 @@ except ImportError:
     sys.path.insert(0, str(src_path))
     from agents.base_agent import BaseAgent, TaskResult
     from core.config import settings
+    from core.context_engine import get_context_engine
     from core.message_broker import MessageType, message_broker
     from core.models import Agent as AgentModel
+    from core.self_modifier import SelfModifier
     from core.task_queue import Task, task_queue
 
 logger = structlog.get_logger()
@@ -100,11 +104,28 @@ class MetaAgent(BaseAgent):
         self.max_concurrent_improvements = 3
         self.backup_created = False
 
+        # Initialize core components for self-improvement
+        self.context_engine = None
+        self.self_modifier = None
+
         logger.info(
             "Meta-Agent initialized",
             name=self.name,
             modification_enabled=self.modification_enabled,
         )
+
+    async def initialize(self):
+        """Initialize MetaAgent with required components."""
+        # Initialize base agent
+        await super().initialize()
+
+        # Initialize context engine
+        self.context_engine = await get_context_engine(settings.database_url)
+
+        # Initialize self modifier
+        self.self_modifier = SelfModifier()
+
+        logger.info("MetaAgent components initialized", name=self.name)
 
     async def _get_active_agents_cached(self) -> list[AgentModel]:
         """Get active agents with caching to improve performance."""
@@ -593,11 +614,128 @@ class MetaAgent(BaseAgent):
         try:
             task = await task_queue.get_task(self.name)
             if task:
-                await self.process_task(task)
+                logger.info(
+                    "MetaAgent processing task",
+                    task_id=task.id,
+                    task_type=task.task_type,
+                )
+
+                # This is the core self-improvement workflow from PLAN.md
+                if task.task_type in [
+                    "refactor",
+                    "self_improvement",
+                    "code_modification",
+                ]:
+                    await self._process_self_improvement_task(task)
+                else:
+                    await self.process_task(task)
         except Exception as e:
             logger.error(
                 "Failed to process pending tasks", agent=self.name, error=str(e)
             )
+
+    async def _process_self_improvement_task(self, task: Task) -> None:
+        """Process self-improvement tasks using the ContextEngine and SelfModifier workflow."""
+        logger.info(
+            "Processing self-improvement task",
+            task_id=task.id,
+            description=task.description,
+        )
+
+        try:
+            # Step 1: Use ContextEngine to retrieve relevant context
+            context_results = await self.context_engine.retrieve_context(
+                query=task.description, agent_id=self.name, limit=10, min_importance=0.4
+            )
+
+            logger.info("Retrieved context", results_count=len(context_results))
+
+            # Step 2: Build detailed prompt with context
+            context_text = "\n\n".join(
+                [
+                    f"File: {r.context.metadata.get('file_path', 'unknown')}\n{r.context.content[:500]}..."
+                    for r in context_results[:5]  # Top 5 most relevant
+                ]
+            )
+
+            # Step 3: Determine which files need modification
+            file_paths = []
+            for result in context_results:
+                if result.context.metadata and "file_path" in result.context.metadata:
+                    file_path = result.context.metadata["file_path"]
+                    if file_path not in file_paths:
+                        file_paths.append(file_path)
+
+            # Step 4: Use SelfModifier to propose and apply changes
+            if file_paths:
+                # For now, work on the most relevant file
+                target_file = file_paths[0]
+
+                change_description = f"""
+                Task: {task.description}
+                
+                Relevant Context:
+                {context_text}
+                
+                Please implement the requested changes to {target_file}.
+                """
+
+                # Step 5: Execute the self-modification
+                success = await self.self_modifier.propose_and_apply_change(
+                    file_path=target_file, change_description=change_description
+                )
+
+                if success:
+                    # Step 6: Mark task as completed
+                    await task_queue.complete_task(
+                        task.id,
+                        {
+                            "success": True,
+                            "modified_file": target_file,
+                            "description": "Self-modification completed successfully",
+                        },
+                    )
+
+                    # Store the successful modification in context
+                    await self.context_engine.store_context(
+                        agent_id=self.name,
+                        content=f"Successfully completed self-improvement task: {task.description}. Modified file: {target_file}",
+                        importance_score=0.9,
+                        category="self_improvement",
+                        metadata={
+                            "task_id": str(task.id),
+                            "modified_file": target_file,
+                            "success": True,
+                        },
+                    )
+
+                    logger.info(
+                        "Self-improvement task completed successfully",
+                        task_id=task.id,
+                        file=target_file,
+                    )
+                else:
+                    # Mark task as failed
+                    await task_queue.fail_task(
+                        task.id, "Self-modification failed validation"
+                    )
+                    logger.error("Self-improvement task failed", task_id=task.id)
+
+            else:
+                # No relevant files found
+                await task_queue.fail_task(
+                    task.id, "No relevant files found for modification"
+                )
+                logger.warning(
+                    "No files found for self-improvement task", task_id=task.id
+                )
+
+        except Exception as e:
+            logger.error(
+                "Self-improvement task processing failed", task_id=task.id, error=str(e)
+            )
+            await task_queue.fail_task(task.id, f"Processing error: {str(e)}")
+            raise
 
     async def _execute_improvements(self) -> None:
         """Execute approved improvement proposals."""
@@ -897,6 +1035,15 @@ class MetaAgent(BaseAgent):
                 success=True,
                 data={"coordinated_agents": len(await self._get_active_agents())},
                 metrics={"coordination_time": time.time()},
+            )
+
+        elif task.task_type in ["refactor", "self_improvement", "code_modification"]:
+            # This is handled by _process_self_improvement_task
+            # Return a placeholder result since the task is processed asynchronously
+            return TaskResult(
+                success=True,
+                data={"message": "Self-improvement task initiated"},
+                metrics={"task_type": task.task_type},
             )
 
         else:

@@ -35,6 +35,8 @@ try:
         Permissions,
         SecurityMiddleware,
         get_current_user,
+        rate_limit,
+        require_admin,
     )
     from ..core.config import settings
     from ..core.message_broker import MessageType, message_broker
@@ -57,6 +59,8 @@ except ImportError:
         Permissions,
         SecurityMiddleware,
         get_current_user,
+        rate_limit,
+        require_admin,
     )
     from core.config import settings
     from core.message_broker import MessageType, message_broker
@@ -1097,7 +1101,7 @@ async def list_tasks(
 async def create_task(
     task_create: TaskCreate, current_user: User = Depends(get_current_user)
 ):
-    """Create a new task."""
+    """Create a new task and submit it to the task queue for MetaAgent processing."""
     try:
         task = Task(
             id=str(uuid.uuid4()),
@@ -1105,7 +1109,8 @@ async def create_task(
             description=task_create.description,
             type=task_create.type,
             priority=task_create.priority,
-            assigned_to=task_create.assigned_to,
+            assigned_to=task_create.assigned_to
+            or "meta-agent",  # Default to meta-agent
             dependencies=task_create.dependencies,
             metadata=task_create.metadata,
             status="pending",
@@ -1138,6 +1143,67 @@ async def create_task(
 
     except Exception as e:
         logger.error("Failed to create task", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/tasks/self-improvement", response_model=APIResponse)
+@Permissions.task_create()
+async def create_self_improvement_task(
+    title: str, description: str, current_user: User = Depends(get_current_user)
+):
+    """Create a self-improvement task for the MetaAgent as specified in PLAN.md.
+
+    This is the main entry point for giving the MetaAgent its first self-improvement task.
+    The task will be processed using the ContextEngine → SelfModifier workflow.
+    """
+    try:
+        task = Task(
+            id=str(uuid.uuid4()),
+            title=title,
+            description=description,
+            type="self_improvement",  # Specific type for self-improvement
+            priority=TaskPriority.HIGH,  # High priority for self-improvement
+            assigned_to="meta-agent",  # Always assign to meta-agent
+            dependencies=[],
+            metadata={"api_created": True, "user_id": current_user.id},
+            status="pending",
+            created_at=time.time(),
+        )
+
+        task_id = await task_queue.add_task(task)
+
+        # Broadcast self-improvement task creation event
+        await broadcast_event(
+            "task-update",
+            {
+                "action": "created",
+                "task": {
+                    "id": task_id,
+                    "title": task.title,
+                    "type": "self_improvement",
+                    "status": "pending",
+                    "priority": "high",
+                    "assigned_to": "meta-agent",
+                    "created_at": task.created_at,
+                },
+            },
+        )
+
+        logger.info("Self-improvement task created", task_id=task_id, title=title)
+
+        return APIResponse(
+            success=True,
+            data={
+                "task_id": task_id,
+                "title": title,
+                "type": "self_improvement",
+                "status": "pending",
+                "message": "Self-improvement task submitted to MetaAgent",
+            },
+        )
+
+    except Exception as e:
+        logger.error("Failed to create self-improvement task", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
