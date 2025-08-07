@@ -92,6 +92,11 @@ class MetaAgent(BaseAgent):
         self.analysis_interval = 300  # 5 minutes
         self.last_analysis_time = 0.0
 
+        # Performance optimization: Cache for active agents
+        self._active_agents_cache: Optional[List[AgentModel]] = None
+        self._cache_timestamp = 0
+        self._cache_ttl = 60  # Cache for 60 seconds
+
         # Self-modification safety
         self.modification_enabled = settings.enable_self_modification
         self.max_concurrent_improvements = 3
@@ -102,6 +107,30 @@ class MetaAgent(BaseAgent):
             name=self.name,
             modification_enabled=self.modification_enabled,
         )
+
+    async def _get_active_agents_cached(self) -> List[AgentModel]:
+        """Get active agents with caching to improve performance."""
+        current_time = time.time()
+
+        # Check if cache is valid
+        if (
+            self._active_agents_cache is not None
+            and current_time - self._cache_timestamp < self._cache_ttl
+        ):
+            return self._active_agents_cache
+
+        # Cache is invalid, fetch from database
+        db_session = self.db_manager.get_session()
+        try:
+            agents = db_session.query(AgentModel).filter_by(status="active").all()
+
+            # Update cache
+            self._active_agents_cache = agents
+            self._cache_timestamp = current_time
+
+            return agents
+        finally:
+            db_session.close()
 
     async def run(self) -> None:
         """Main meta-agent execution loop."""
@@ -183,10 +212,8 @@ class MetaAgent(BaseAgent):
     async def _calculate_system_health(self) -> float:
         """Calculate overall system health score."""
         try:
-            # Get all active agents
-            db_session = self.db_manager.get_session()
-            agents = db_session.query(AgentModel).filter_by(status="active").all()
-            db_session.close()
+            # Get all active agents using cached method
+            agents = await self._get_active_agents_cached()
 
             if not agents:
                 return 0.0
@@ -821,7 +848,7 @@ class MetaAgent(BaseAgent):
     async def _process_task_implementation(self, task: Task) -> TaskResult:
         """Process meta-agent specific tasks."""
 
-        if task.type == "system_analysis":
+        if task.task_type == "system_analysis":
             analysis = await self._perform_system_analysis()
             return TaskResult(
                 success=True,
@@ -829,7 +856,7 @@ class MetaAgent(BaseAgent):
                 metrics={"analysis_duration": time.time() - self.last_analysis_time},
             )
 
-        elif task.type == "improvement_proposal":
+        elif task.task_type == "improvement_proposal":
             # Create improvement proposal from task description
             proposal = ImprovementProposal(
                 id=str(uuid.uuid4()),
@@ -853,7 +880,7 @@ class MetaAgent(BaseAgent):
                 metrics={"proposal_count": len(self.improvement_proposals)},
             )
 
-        elif task.type == "agent_coordination":
+        elif task.task_type == "agent_coordination":
             await self._coordinate_agents()
             return TaskResult(
                 success=True,

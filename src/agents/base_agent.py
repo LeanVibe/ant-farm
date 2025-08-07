@@ -457,7 +457,7 @@ class BaseAgent(ABC):
                 category="task_processing",
                 metadata={
                     "task_id": task.id,
-                    "task_type": task.type,
+                    "task_type": task.task_type,
                     "priority": task.priority,
                 },
             )
@@ -524,7 +524,7 @@ class BaseAgent(ABC):
 
         # Retrieve relevant context
         context_results = await self.retrieve_context(
-            f"task {task.type} {task.title}", limit=5
+            f"task {task.task_type} {task.title}", limit=5
         )
 
         # Build prompt with context
@@ -535,7 +535,7 @@ class BaseAgent(ABC):
         prompt = f"""
         Task: {task.title}
         Description: {task.description}
-        Type: {task.type}
+        Type: {task.task_type}
         Priority: {task.priority}
         
         Relevant Context:
@@ -722,7 +722,7 @@ class BaseAgent(ABC):
                 agent_id=self.name,
                 task_id=task.id,
                 labels={
-                    "task_type": task.type,
+                    "task_type": task.task_type,
                     "agent_type": self.agent_type,
                     "success": str(result.success).lower(),
                 },
@@ -738,7 +738,7 @@ class BaseAgent(ABC):
                 agent_id=self.name,
                 task_id=task.id,
                 labels={
-                    "task_type": task.type,
+                    "task_type": task.task_type,
                     "agent_type": self.agent_type,
                     "result": "success" if result.success else "failure",
                 },
