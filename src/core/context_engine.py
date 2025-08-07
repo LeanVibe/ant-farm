@@ -199,14 +199,23 @@ class EmbeddingService:
         """Generate embedding using Ollama."""
         try:
             import aiohttp
+            from aiohttp import ClientTimeout, ClientError
 
-            async with aiohttp.ClientSession() as session:
+            timeout = ClientTimeout(total=30)  # 30 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     "http://localhost:11434/api/embeddings",
                     json={"model": "nomic-embed-text", "prompt": text},
                 ) as response:
+                    response.raise_for_status()
                     result = await response.json()
                     return result["embedding"]
+        except (ClientError, asyncio.TimeoutError) as e:
+            logger.error("Ollama API request failed", error=str(e))
+            raise
+        except KeyError as e:
+            logger.error("Invalid Ollama API response format", error=str(e))
+            raise
         except Exception as e:
             logger.error("Ollama embedding generation failed", error=str(e))
             raise
@@ -421,7 +430,7 @@ class MemoryConsolidator:
             context_groups = self._group_contexts(contexts)
 
             # Process each group
-            for group_key, group_contexts in context_groups.items():
+            for _group_key, group_contexts in context_groups.items():
                 if len(group_contexts) > 5:  # Only compress if we have many contexts
                     compressed = await self.compressor.compress_contexts(group_contexts)
                     if compressed:

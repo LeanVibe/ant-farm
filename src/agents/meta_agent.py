@@ -118,17 +118,32 @@ class MetaAgent(BaseAgent):
             return self._active_agents_cache
 
         # Cache is invalid, fetch from database
-        db_session = self.db_manager.get_session()
         try:
-            agents = db_session.query(AgentModel).filter_by(status="active").all()
+            db_session = self.db_manager.get_session()
+            try:
+                # Query active agents with performance monitoring
+                query_start = time.time()
+                agents = db_session.query(AgentModel).filter_by(status="active").all()
+                query_time = time.time() - query_start
 
-            # Update cache
-            self._active_agents_cache = agents
-            self._cache_timestamp = current_time
+                if query_time > 1.0:  # Log slow queries
+                    logger.warning("Slow agent query detected", query_time=query_time)
 
-            return agents
-        finally:
-            db_session.close()
+                # Update cache
+                self._active_agents_cache = agents
+                self._cache_timestamp = current_time
+
+                return agents
+            finally:
+                db_session.close()
+
+        except Exception as e:
+            logger.error("Failed to fetch active agents", error=str(e))
+            # Return stale cache if available as fallback
+            if self._active_agents_cache is not None:
+                logger.warning("Using stale agent cache due to database error")
+                return self._active_agents_cache
+            raise
 
     def _invalidate_agents_cache(self) -> None:
         """Invalidate the active agents cache."""

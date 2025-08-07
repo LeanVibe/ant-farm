@@ -793,7 +793,7 @@ class PerformanceOptimizer:
             "total_optimizations_applied": len(self.optimization_history),
             "active_optimizations": len(self.active_optimizations),
             "optimization_strategies_used": list(
-                set(a.strategy.value for a in self.optimization_history)
+                {a.strategy.value for a in self.optimization_history}
             ),
             "average_confidence": np.mean(
                 [a.confidence for a in self.optimization_history]

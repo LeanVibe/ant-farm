@@ -84,8 +84,30 @@ class TaskQueue:
 
     async def initialize(self) -> None:
         """Initialize the task queue system."""
-        await self.redis_client.ping()
-        logger.info("Task queue initialized")
+        try:
+            # Test Redis connection with timeout
+            await asyncio.wait_for(self.redis_client.ping(), timeout=5.0)
+
+            # Configure Redis client for better performance
+            # Enable connection pooling and set appropriate timeouts
+            if hasattr(self.redis_client, "connection_pool"):
+                pool = self.redis_client.connection_pool
+                pool.connection_kwargs.update(
+                    {
+                        "socket_timeout": 10.0,
+                        "socket_connect_timeout": 5.0,
+                        "socket_keepalive": True,
+                        "socket_keepalive_options": {},
+                    }
+                )
+
+            logger.info("Task queue initialized with optimized connection settings")
+        except asyncio.TimeoutError:
+            logger.error("Redis connection timeout during task queue initialization")
+            raise
+        except Exception as e:
+            logger.error("Task queue initialization failed", error=str(e))
+            raise
 
     async def submit_task(self, task: Task) -> str:
         """Submit a task to the queue with dependency checking."""
@@ -515,7 +537,7 @@ class TaskQueue:
         """Get total number of tasks in the system."""
         count = 0
         pattern = f"{self.task_prefix}:*"
-        async for task_key in self.redis_client.scan_iter(match=pattern):
+        async for _task_key in self.redis_client.scan_iter(match=pattern):
             count += 1
         return count
 

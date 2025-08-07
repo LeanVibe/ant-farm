@@ -202,7 +202,7 @@ class SelfBootstrapper:
         self.system_capabilities.update(capabilities)
 
         # Store capabilities in context for agents
-        for name, capability in capabilities.items():
+        for _name, capability in capabilities.items():
             await self._store_capability_context(capability)
 
     async def _create_development_roadmap(self) -> None:

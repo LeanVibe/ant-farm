@@ -711,7 +711,10 @@ class SleepWakeManager:
         agents_restored = 0
 
         if self.current_checkpoint:
-            for agent_name, agent_state in self.current_checkpoint.agent_states.items():
+            for (
+                agent_name,
+                _agent_state,
+            ) in self.current_checkpoint.agent_states.items():
                 # Restore agent state (simplified)
                 logger.debug("Restoring agent", agent=agent_name)
                 agents_restored += 1

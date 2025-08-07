@@ -646,12 +646,15 @@ class BaseAgent(ABC):
                 return HealthStatus.DEGRADED
 
             # Check database connection
-            db_session = self.db_manager.get_session()
             try:
+                db_session = self.db_manager.get_session()
                 db_session.execute("SELECT 1")
-                db_session.close()
-            except Exception:
+            except (ConnectionError, OSError, Exception) as e:
+                logger.warning("Database health check failed", error=str(e))
                 return HealthStatus.UNHEALTHY
+            finally:
+                if "db_session" in locals():
+                    db_session.close()
 
             # Check recent performance
             if (

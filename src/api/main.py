@@ -211,7 +211,7 @@ async def get_system_status():
 
     except Exception as e:
         logger.error("Failed to get system status", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Agent management endpoints
@@ -241,7 +241,7 @@ async def list_agents():
 
     except Exception as e:
         logger.error("Failed to list agents", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/agents/{agent_name}", response_model=APIResponse)
@@ -271,7 +271,7 @@ async def get_agent(agent_name: str):
         raise
     except Exception as e:
         logger.error("Failed to get agent", agent_name=agent_name, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/agents", response_model=APIResponse)
@@ -303,7 +303,7 @@ async def spawn_agent(
 
     except Exception as e:
         logger.error("Failed to spawn agent", agent_type=agent_type, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/agents/{agent_name}/stop", response_model=APIResponse)
@@ -326,7 +326,7 @@ async def stop_agent(agent_name: str):
         raise
     except Exception as e:
         logger.error("Failed to stop agent", agent_name=agent_name, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/agents/{agent_name}/health", response_model=APIResponse)
@@ -350,7 +350,7 @@ async def check_agent_health(agent_name: str):
         logger.error(
             "Failed to check agent health", agent_name=agent_name, error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Task management endpoints
@@ -382,7 +382,7 @@ async def list_tasks(status: str | None = None, assigned_to: str | None = None):
 
     except Exception as e:
         logger.error("Failed to list tasks", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/tasks", response_model=APIResponse)
@@ -411,7 +411,7 @@ async def create_task(task_create: TaskCreate):
 
     except Exception as e:
         logger.error("Failed to create task", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/tasks/{task_id}", response_model=APIResponse)
@@ -443,7 +443,7 @@ async def get_task(task_id: str):
         raise
     except Exception as e:
         logger.error("Failed to get task", task_id=task_id, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/tasks/{task_id}/cancel", response_model=APIResponse)
@@ -463,7 +463,7 @@ async def cancel_task(task_id: str):
         raise
     except Exception as e:
         logger.error("Failed to cancel task", task_id=task_id, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Messaging endpoints
@@ -490,7 +490,7 @@ async def send_message(message: MessageSend):
 
     except Exception as e:
         logger.error("Failed to send message", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/broadcast", response_model=APIResponse)
@@ -508,7 +508,7 @@ async def broadcast_message(topic: str, content: dict[str, Any]):
 
     except Exception as e:
         logger.error("Failed to broadcast message", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # System control endpoints
@@ -536,7 +536,7 @@ async def trigger_system_analysis():
 
     except Exception as e:
         logger.error("Failed to trigger system analysis", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/system/shutdown", response_model=APIResponse)
@@ -554,7 +554,7 @@ async def shutdown_system():
 
     except Exception as e:
         logger.error("Failed to shutdown system", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Metrics endpoints
@@ -595,7 +595,7 @@ async def get_metrics():
 
     except Exception as e:
         logger.error("Failed to get metrics", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Global startup time for uptime calculation
