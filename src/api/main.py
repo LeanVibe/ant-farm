@@ -26,6 +26,12 @@ from pydantic import BaseModel, Field
 
 # Handle both module and direct execution imports
 try:
+    from ..core.analytics import (
+        PerformanceMiddleware,
+        get_performance_collector,
+        start_performance_monitoring,
+        stop_performance_monitoring,
+    )
     from ..core.auth import (
         AuthenticationError,
         AuthorizationError,
@@ -47,6 +53,12 @@ except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
+    from core.analytics import (
+        PerformanceMiddleware,
+        get_performance_collector,
+        start_performance_monitoring,
+        stop_performance_monitoring,
+    )
     from core.auth import (
         AuthenticationError,
         AuthorizationError,
@@ -278,6 +290,9 @@ app = FastAPI(
 # Add security middleware
 app.add_middleware(SecurityMiddleware)
 
+# Add performance monitoring middleware
+app.add_middleware(PerformanceMiddleware)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -417,6 +432,9 @@ async def startup_event():
         # Start background event broadcaster
         asyncio.create_task(system_event_broadcaster())
 
+        # Start performance monitoring
+        await start_performance_monitoring()
+
         # Create default admin user if none exists
         if not security_manager.users:
             create_default_admin()
@@ -439,6 +457,9 @@ async def shutdown_event():
         )
         await orch.stop()
         await message_broker.shutdown()
+
+        # Stop performance monitoring
+        await stop_performance_monitoring()
 
         logger.info("API server shut down successfully")
 
@@ -1280,84 +1301,236 @@ async def shutdown_system(current_user: User = Depends(get_current_user)):
 
 
 # Metrics endpoints
-@app.get("/api/v1/metrics", response_model=APIResponse)
-async def get_metrics():
+@app.get(
+    "/api/v1/metrics",
+    response_model=APIResponse,
+    tags=["Metrics"],
+    summary="Get System Metrics",
+    description="""
+         Get comprehensive system performance metrics including:
+         - CPU, memory, and disk utilization
+         - Network statistics
+         - Process and thread counts
+         - API response times and error rates
+         - Agent performance metrics
+         """,
+)
+@Permissions.metrics_read()
+async def get_metrics(
+    time_window_minutes: int = 60, current_user: User = Depends(get_current_user)
+):
     """Get system metrics."""
     try:
-        db_manager = get_database_manager(settings.database_url)
-        db_session = db_manager.get_session()
+        collector = get_performance_collector()
+        metrics_summary = collector.get_metrics_summary(time_window_minutes)
 
-        try:
-            # Get recent metrics
-            metrics = (
-                db_session.query(SystemMetric)
-                .order_by(SystemMetric.timestamp.desc())
-                .limit(100)
-                .all()
-            )
-
-            metric_data = []
-            for metric in metrics:
-                metric_data.append(
-                    {
-                        "name": metric.metric_name,
-                        "type": metric.metric_type,
-                        "value": metric.value,
-                        "unit": metric.unit,
-                        "agent_id": metric.agent_id,
-                        "timestamp": metric.timestamp,
-                        "labels": metric.labels,
-                    }
-                )
-
-            return APIResponse(success=True, data=metric_data)
-
-        finally:
-            db_session.close()
+        return APIResponse(success=True, data=metrics_summary)
 
     except Exception as e:
         logger.error("Failed to get metrics", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get(
+    "/api/v1/metrics/alerts",
+    response_model=APIResponse,
+    tags=["Metrics"],
+    summary="Get Performance Alerts",
+    description="Get current performance alerts based on system thresholds.",
+)
+@Permissions.metrics_read()
+async def get_performance_alerts(current_user: User = Depends(get_current_user)):
+    """Get current performance alerts."""
+    try:
+        collector = get_performance_collector()
+        alerts = collector.get_performance_alerts()
+
+        return APIResponse(success=True, data=alerts)
+
+    except Exception as e:
+        logger.error("Failed to get performance alerts", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get(
+    "/api/v1/metrics/export",
+    tags=["Metrics"],
+    summary="Export Metrics Data",
+    description="""
+         Export historical metrics data in JSON or CSV format.
+         Useful for external analysis, reporting, or backup purposes.
+         """,
+)
+@Permissions.metrics_read()
+async def export_metrics(
+    format: str = "json",
+    time_window_hours: int = 24,
+    current_user: User = Depends(get_current_user),
+):
+    """Export metrics data."""
+    try:
+        collector = get_performance_collector()
+
+        if format.lower() not in ["json", "csv"]:
+            raise HTTPException(
+                status_code=400, detail="Format must be 'json' or 'csv'"
+            )
+
+        exported_data = collector.export_metrics(format, time_window_hours)
+
+        # Set appropriate content type and filename
+        content_type = "application/json" if format.lower() == "json" else "text/csv"
+        filename = f"hive_metrics_{int(time.time())}.{format.lower()}"
+
+        from fastapi.responses import Response
+
+        return Response(
+            content=exported_data,
+            media_type=content_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to export metrics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # Performance and optimization endpoints
-@app.get("/api/v1/performance", response_model=APIResponse)
-async def get_performance_stats():
+@app.get(
+    "/api/v1/performance",
+    response_model=APIResponse,
+    tags=["Metrics"],
+    summary="Get Performance Statistics",
+    description="""
+         Get detailed performance optimization statistics including:
+         - Current system resource utilization
+         - API endpoint performance metrics
+         - Optimization recommendations
+         - Historical performance trends
+         """,
+)
+@Permissions.metrics_read()
+async def get_performance_stats(
+    time_window_minutes: int = 60, current_user: User = Depends(get_current_user)
+):
     """Get performance optimization statistics."""
     try:
-        from ..core.performance_optimizer import get_performance_optimizer
+        collector = get_performance_collector()
 
-        optimizer = get_performance_optimizer()
+        # Get comprehensive performance data
+        metrics_summary = collector.get_metrics_summary(time_window_minutes)
+        api_performance = collector.get_api_performance_summary(time_window_minutes)
+        system_health = collector.get_system_health_score()
+        alerts = collector.get_performance_alerts()
 
-        # Get current performance metrics
-        current_metrics = await optimizer.analyze_performance()
+        # Try to get optimization stats from the existing optimizer
+        optimization_stats = {}
+        try:
+            from ..core.performance_optimizer import get_performance_optimizer
 
-        # Get optimization statistics
-        optimization_stats = optimizer.get_optimization_stats()
-
-        # Get workload prediction
-        workload_prediction = await optimizer.resource_predictor.predict_workload()
+            optimizer = get_performance_optimizer()
+            optimization_stats = optimizer.get_optimization_stats()
+        except Exception:
+            # Fallback if optimizer not available
+            optimization_stats = {
+                "optimizations_applied": 0,
+                "performance_improvements": {},
+                "last_optimization": None,
+            }
 
         return APIResponse(
             success=True,
             data={
-                "current_metrics": {
-                    metric.value: value for metric, value in current_metrics.items()
-                },
+                "system_health_score": system_health,
+                "metrics_summary": metrics_summary,
+                "api_performance": {k: v.to_dict() for k, v in api_performance.items()},
                 "optimization_stats": optimization_stats,
-                "workload_prediction": {
-                    "predicted_task_count": workload_prediction.predicted_task_count,
-                    "predicted_queue_depth": workload_prediction.predicted_queue_depth,
-                    "predicted_resource_usage": workload_prediction.predicted_resource_usage,
-                    "confidence_interval": workload_prediction.confidence_interval,
-                    "timestamp": workload_prediction.timestamp,
-                },
+                "alerts": alerts,
+                "time_window_minutes": time_window_minutes,
+                "recommendations": _generate_performance_recommendations(collector),
             },
         )
 
     except Exception as e:
         logger.error("Failed to get performance stats", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+def _generate_performance_recommendations(collector) -> List[Dict[str, Any]]:
+    """Generate performance recommendations based on current metrics."""
+    recommendations = []
+    alerts = collector.get_performance_alerts()
+
+    # Generate recommendations based on alerts
+    for alert in alerts:
+        if alert["metric"] == "cpu_usage" and alert["type"] == "critical":
+            recommendations.append(
+                {
+                    "type": "optimization",
+                    "priority": "high",
+                    "category": "resource",
+                    "title": "High CPU Usage Detected",
+                    "description": "Consider scaling horizontally or optimizing CPU-intensive operations",
+                    "actions": [
+                        "Review CPU-intensive agents and tasks",
+                        "Consider adding more worker processes",
+                        "Optimize algorithms and reduce computational complexity",
+                    ],
+                }
+            )
+
+        elif alert["metric"] == "memory_usage" and alert["type"] == "critical":
+            recommendations.append(
+                {
+                    "type": "optimization",
+                    "priority": "high",
+                    "category": "resource",
+                    "title": "High Memory Usage Detected",
+                    "description": "Memory usage is approaching critical levels",
+                    "actions": [
+                        "Review memory-intensive operations",
+                        "Implement memory cleanup routines",
+                        "Consider increasing available memory",
+                    ],
+                }
+            )
+
+        elif alert["metric"] == "api_response_time" and alert["type"] == "warning":
+            recommendations.append(
+                {
+                    "type": "optimization",
+                    "priority": "medium",
+                    "category": "performance",
+                    "title": "Slow API Response Times",
+                    "description": "Some API endpoints are responding slowly",
+                    "actions": [
+                        "Review slow endpoints and optimize queries",
+                        "Implement caching for frequently accessed data",
+                        "Consider database indexing improvements",
+                    ],
+                }
+            )
+
+    # Add general recommendations if no alerts
+    if not recommendations:
+        recommendations.append(
+            {
+                "type": "maintenance",
+                "priority": "low",
+                "category": "general",
+                "title": "System Running Optimally",
+                "description": "No performance issues detected at this time",
+                "actions": [
+                    "Continue monitoring system metrics",
+                    "Regular maintenance and updates recommended",
+                    "Consider performance testing under higher loads",
+                ],
+            }
+        )
+
+    return recommendations
 
 
 @app.post("/api/v1/performance/optimize", response_model=APIResponse)
