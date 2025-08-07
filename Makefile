@@ -175,7 +175,7 @@ status: ## Check complete system status (DEPRECATED: use 'hive system status')
 
 .PHONY: api-test
 api-test: ## Test API endpoints
-	@curl -s http://localhost:8000/api/v1/health | jq . || echo "API not responding on port 8000"
+	@curl -s http://localhost:9001/api/v1/health | jq . || echo "API not responding on port 9001"
 
 .PHONY: submit-task
 submit-task: ## Submit a test task to the queue
@@ -215,7 +215,7 @@ monitor: ## Open monitoring tools
 	@echo "Opening monitoring tools..."
 	@echo "pgAdmin: http://localhost:9050 (admin@leanvibe.com / admin)"
 	@echo "Redis Commander: http://localhost:9081" 
-	@echo "API Docs: http://localhost:8000/api/docs"
+	@echo "API Docs: http://localhost:9001/api/docs"
 
 .PHONY: watch
 watch: ## Watch system activity (split screen)

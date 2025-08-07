@@ -445,7 +445,7 @@ class BootstrapAgent:
         console.print("\nNext steps:")
         console.print("1. View bootstrap session: tmux attach -t " + self.session_name)
         console.print("2. View meta-agent: tmux attach -t meta-agent-001")
-        console.print("3. Check API: curl http://localhost:8000/health")
+        console.print("3. Check API: curl http://localhost:9001/api/v1/health")
         console.print("4. View logs: tail -f logs/*.log")
 
     def list_agents(self):

@@ -64,13 +64,13 @@ async def _check_all_services():
     # Check API server
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:8000/api/v1/health")
+            response = await client.get("http://localhost:9001/api/v1/health")
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
                     services["API"] = {
                         "status": "online",
-                        "details": "http://localhost:8000",
+                        "details": "http://localhost:9001",
                     }
                 else:
                     services["API"] = {
@@ -156,7 +156,7 @@ async def _start():
                     "--host",
                     "0.0.0.0",
                     "--port",
-                    "8000",
+                    "9001",
                     "--reload",
                 ],
                 stdout=subprocess.PIPE,
@@ -169,7 +169,7 @@ async def _start():
             # Check if it started successfully
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get("http://localhost:8000/api/v1/health")
+                    response = await client.get("http://localhost:9001/api/v1/health")
                     if response.status_code == 200:
                         success_message("API server started successfully!")
                     else:
@@ -302,7 +302,7 @@ def init_db() -> None:
 @app.command("start-api")
 def start_api(
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
-    port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
+    port: int = typer.Option(9001, "--port", "-p", help="Port to bind to"),
     reload: bool = typer.Option(False, "--reload", "-r", help="Auto-reload on changes"),
 ) -> None:
     """Start the FastAPI server"""

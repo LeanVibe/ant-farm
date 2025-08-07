@@ -49,7 +49,7 @@ services:
       REDIS_URL: redis://redis:6379
       PYTHONUNBUFFERED: 1
     ports:
-      - "8000:8000"
+      - "9001:9001"
     volumes:
       - ./src:/app/src:ro  # Read-only, agents modify files on host
       - ./logs:/app/logs
@@ -58,7 +58,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 9001 --reload
 
   # Optional: pgAdmin for database management
   pgadmin:

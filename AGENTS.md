@@ -34,7 +34,7 @@
 ## Development Commands (Alternative)
 
 - Setup: make setup (auto-detects CLI tools); env: .env (API keys optional)
-- Dev API: `hive system start-api --port 8000 --reload`
+- Dev API: `hive system start-api --port 9001 --reload`
 - Tests (all): pytest -q
 - Single test: pytest -q path/to/test_file.py::TestClass::test_case -k "expr"
 - Coverage: pytest --cov --cov-report=term-missing
@@ -44,7 +44,7 @@
 
 ## Non-Standard Ports (Security)
 
-- API: 8000 (instead of 80/443)
+- API: 9001 (instead of 80/443)
 - PostgreSQL: 5433 (instead of 5432)
 - Redis: 6381 (instead of 6379)
 - pgAdmin: 9050 (development only)

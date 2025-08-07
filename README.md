@@ -55,8 +55,8 @@ hive system status
 hive task submit "Implement new feature X"
 
 # Monitor system
-# API: http://localhost:8000/api/v1/health
-# Dashboard: http://localhost:8000/api/docs (when implemented)
+# API: http://localhost:9001/api/v1/health
+# Dashboard: http://localhost:9001/api/docs (when implemented)
 ```
 
 ## 🏗️ Architecture
@@ -238,22 +238,22 @@ hive agent describe meta-agent
 ### API Monitoring (Current)
 ```bash
 # System health check
-curl http://localhost:8000/api/v1/health
+curl http://localhost:9001/api/v1/health
 
 # Agent information (when implemented)
-curl http://localhost:8000/api/v1/agents
+curl http://localhost:9001/api/v1/agents
 
 # Task coordination (when implemented)
-curl http://localhost:8000/api/v1/tasks
+curl http://localhost:9001/api/v1/tasks
 
 # Submit task via API
-curl -X POST http://localhost:8000/api/v1/tasks \
+curl -X POST http://localhost:9001/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{"description": "Implement feature X", "priority": "high"}'
 ```
 
 **Note**: System uses non-standard ports for security:
-- **API**: 8000 (instead of 80/443)
+- **API**: 9001 (instead of 80/443)
 - **PostgreSQL**: 5433 (instead of 5432)  
 - **Redis**: 6381 (instead of 6379)
 

@@ -91,14 +91,14 @@ hive agent describe meta
 hive system status
 
 # Access API documentation
-open http://localhost:8000/api/docs
+open http://localhost:9001/api/docs
 ```
 
 ## API Access
 
 The system runs on **non-standard ports for security**:
 
-- **API Server**: http://localhost:8000 (instead of 80/443)
+- **API Server**: http://localhost:9001 (instead of 80/443)
 - **PostgreSQL**: localhost:5433 (instead of 5432)
 - **Redis**: localhost:6381 (instead of 6379)
 
@@ -106,13 +106,13 @@ The system runs on **non-standard ports for security**:
 
 ```bash
 # Health check
-curl http://localhost:8000/api/v1/health
+curl http://localhost:9001/api/v1/health
 
 # List agents (when auth implemented)
-curl http://localhost:8000/api/v1/agents
+curl http://localhost:9001/api/v1/agents
 
 # Submit task via API
-curl -X POST http://localhost:8000/api/v1/tasks \
+curl -X POST http://localhost:9001/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{
     "description": "Implement feature X", 
@@ -171,7 +171,7 @@ REDIS_URL=redis://localhost:6381
 
 # API (non-standard port)
 API_HOST=0.0.0.0
-API_PORT=8000
+API_PORT=9001
 
 # CLI Tool Preferences
 PREFERRED_CLI_TOOL=opencode
@@ -274,11 +274,11 @@ hive system status
 
 #### 3. Port Already in Use
 ```bash
-# Check what's using port 8000
-lsof -i :8000
+# Check what's using port 9001
+lsof -i :9001
 
 # Stop conflicting process or change port
-export API_PORT=8001
+export API_PORT=9002
 hive system start
 ```
 
@@ -347,7 +347,7 @@ docker compose ps
 
 - **Issues**: https://github.com/leanvibe/agent-hive/issues
 - **Documentation**: `docs/` directory
-- **API Reference**: http://localhost:8000/api/docs
+- **API Reference**: http://localhost:9001/api/docs
 - **CLI Help**: `hive --help`
 
 ---

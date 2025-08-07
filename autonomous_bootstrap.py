@@ -58,8 +58,8 @@ class AutonomousBootstrap(BootstrapAgent):
         self.console.print("• Predictive performance optimization")
         self.console.print("• Pattern recognition and knowledge extraction")
         self.console.print("\nMonitor via:")
-        self.console.print("• API: http://localhost:8000/api/v1/status")
-        self.console.print("• Dashboard: http://localhost:8000/api/docs")
+        self.console.print("• API: http://localhost:9001/api/v1/status")
+        self.console.print("• Dashboard: http://localhost:9001/api/docs")
         self.console.print("• System Health: python autonomous_bootstrap.py status")
 
     async def _initialize_autonomous_components(self):
@@ -115,11 +115,11 @@ class AutonomousBootstrap(BootstrapAgent):
         """Start the API server."""
         # Create API server startup task
         self.execute_claude_task(
-            "Start the API server: cd src/api && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+            "Start the API server: cd src/api && python -m uvicorn main:app --host 0.0.0.0 --port 9001 --reload",
             session_name="api-server",
         )
 
-        self.console.print("[green]✓[/green] API server starting on port 8000")
+        self.console.print("[green]✓[/green] API server starting on port 9001")
 
     async def _start_autonomous_cycles(self):
         """Start all autonomous cycles."""
@@ -327,7 +327,7 @@ if __name__ == "__main__":
         import requests
 
         try:
-            response = requests.get("http://localhost:8000/api/v1/status")
+            response = requests.get("http://localhost:9001/api/v1/status")
             if response.status_code == 200:
                 data = response.json()
                 print(f"System Health: {data['data']['health_score']:.2f}")
