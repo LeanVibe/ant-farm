@@ -142,8 +142,15 @@ class GitManager:
             # Ensure we're on main branch
             await self._run_git_command(["checkout", self.main_branch])
 
-            # Pull latest changes
-            await self._run_git_command(["pull", "origin", self.main_branch])
+            # Only pull if we have a remote origin
+            try:
+                # Check if origin remote exists
+                result = await self._run_git_command(["remote", "get-url", "origin"])
+                # Pull latest changes
+                await self._run_git_command(["pull", "origin", self.main_branch])
+            except subprocess.CalledProcessError:
+                # No remote origin, skip pull
+                logger.info("No remote origin found, skipping pull")
 
             # Create feature branch
             await self._run_git_command(["checkout", "-b", branch_name])

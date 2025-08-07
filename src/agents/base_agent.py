@@ -684,39 +684,52 @@ class BaseAgent(ABC):
 
     async def _register_agent(self):
         """Register agent in database."""
-        db_session = self.db_manager.get_session()
         try:
-            # Check if agent exists
-            existing_agent = (
-                db_session.query(AgentModel).filter_by(name=self.name).first()
-            )
+            # Run database operations in executor to avoid greenlet issues
+            import asyncio
+            from functools import partial
 
-            if existing_agent:
-                # Update existing agent
-                existing_agent.status = "active"
-                existing_agent.last_heartbeat = datetime.fromtimestamp(time.time())
-                self.agent_uuid = str(existing_agent.id)  # Store the UUID
-            else:
-                # Create new agent
-                agent = AgentModel(
-                    name=self.name,
-                    type=self.agent_type,
-                    role=self.role,
-                    capabilities=self._get_capabilities(),
-                    status="active",
-                )
-                db_session.add(agent)
-                db_session.flush()  # Flush to get the ID
-                self.agent_uuid = str(agent.id)  # Store the UUID
+            def sync_register():
+                db_session = self.db_manager.get_session()
+                try:
+                    # Check if agent exists
+                    existing_agent = (
+                        db_session.query(AgentModel).filter_by(name=self.name).first()
+                    )
 
-            db_session.commit()
+                    if existing_agent:
+                        # Update existing agent
+                        existing_agent.status = "active"
+                        existing_agent.last_heartbeat = datetime.fromtimestamp(
+                            time.time()
+                        )
+                        self.agent_uuid = str(existing_agent.id)  # Store the UUID
+                    else:
+                        # Create new agent
+                        agent = AgentModel(
+                            name=self.name,
+                            type=self.agent_type,
+                            role=self.role,
+                            capabilities=self._get_capabilities(),
+                            status="active",
+                        )
+                        db_session.add(agent)
+                        db_session.flush()  # Flush to get the ID
+                        self.agent_uuid = str(agent.id)  # Store the UUID
+
+                    db_session.commit()
+                    logger.info(f"Agent registered in database: {self.name}")
+
+                finally:
+                    db_session.close()
+
+            # Run in executor to avoid blocking async loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, sync_register)
 
         except Exception as e:
-            db_session.rollback()
-            logger.error("Failed to register agent", agent=self.name, error=str(e))
-            raise
-        finally:
-            db_session.close()
+            logger.warning(f"Failed to register agent in database: {e}")
+            # Continue without database registration - agent can still function
 
     def _get_capabilities(self) -> dict[str, Any]:
         """Get agent capabilities."""
