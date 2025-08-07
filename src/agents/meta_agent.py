@@ -551,7 +551,7 @@ class MetaAgent(BaseAgent):
     async def _process_pending_tasks(self) -> None:
         """Process any tasks assigned to the meta-agent."""
         try:
-            task = await task_queue.get_next_task(self.name)
+            task = await task_queue.get_task(self.name)
             if task:
                 await self.process_task(task)
         except Exception as e:

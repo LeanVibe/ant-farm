@@ -374,6 +374,9 @@ class BaseAgent(ABC):
             # Initialize context engine
             self.context_engine = await get_context_engine(settings.database_url)
 
+            # Initialize task queue
+            await task_queue.initialize()
+
             # Register with message broker
             await message_broker.initialize()
             await message_broker.start_listening(self.name, self.message_handler)

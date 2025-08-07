@@ -14,6 +14,7 @@ try:
     from .base_agent import BaseAgent
     from .meta_agent import MetaAgent
     from ..core.config import settings
+    from ..core.task_queue import task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
@@ -21,6 +22,7 @@ except ImportError:
     from agents.base_agent import BaseAgent
     from agents.meta_agent import MetaAgent
     from core.config import settings
+    from core.task_queue import task_queue
 
 logger = structlog.get_logger()
 
@@ -39,8 +41,9 @@ class DeveloperAgent(BaseAgent):
         while self.status == "active":
             try:
                 # Check for development tasks
-                task = await task_queue.get_next_task(
-                    self.name, task_types=["development", "coding", "implementation"]
+                task = await task_queue.get_task(
+                    self.name,
+                    priorities=[1, 3, 5],  # High to normal priority
                 )
 
                 if task:
@@ -101,8 +104,9 @@ class QAAgent(BaseAgent):
         while self.status == "active":
             try:
                 # Check for QA tasks
-                task = await task_queue.get_next_task(
-                    self.name, task_types=["testing", "qa", "validation"]
+                task = await task_queue.get_task(
+                    self.name,
+                    priorities=[1, 3, 5],  # High to normal priority
                 )
 
                 if task:
@@ -159,8 +163,9 @@ class ArchitectAgent(BaseAgent):
         while self.status == "active":
             try:
                 # Check for architecture tasks
-                task = await task_queue.get_next_task(
-                    self.name, task_types=["architecture", "design", "planning"]
+                task = await task_queue.get_task(
+                    self.name,
+                    priorities=[1, 3, 5],  # High to normal priority
                 )
 
                 if task:
@@ -219,8 +224,9 @@ class ResearchAgent(BaseAgent):
         while self.status == "active":
             try:
                 # Check for research tasks
-                task = await task_queue.get_next_task(
-                    self.name, task_types=["research", "learning", "analysis"]
+                task = await task_queue.get_task(
+                    self.name,
+                    priorities=[1, 3, 5],  # High to normal priority
                 )
 
                 if task:
