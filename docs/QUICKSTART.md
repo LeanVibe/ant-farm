@@ -314,7 +314,7 @@ hive system logs
 hive system status
 
 # Individual service checks
-curl http://localhost:8000/api/v1/health
+curl http://localhost:9001/api/v1/health
 docker compose ps
 ```
 
@@ -323,7 +323,7 @@ docker compose ps
 1. **Submit Complex Tasks**: Try multi-step development tasks
 2. **Monitor Self-Improvement**: Watch the meta-agent enhance itself
 3. **Customize Agents**: Modify agent behavior in `src/agents/`
-4. **Explore API**: Visit http://localhost:8000/api/docs
+4. **Explore API**: Visit http://localhost:9001/api/docs
 5. **Read Architecture**: See `docs/system-architecture.md`
 
 ## CLI Tool Details

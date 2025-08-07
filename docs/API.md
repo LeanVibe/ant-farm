@@ -6,7 +6,7 @@ The LeanVibe Agent Hive 2.0 API provides comprehensive control over an autonomou
 
 ## Base URL
 
-- **Development**: `http://localhost:8000`
+- **Development**: `http://localhost:9001`
 - **Production**: `https://hive.leanvibe.ai`
 
 ## Authentication
@@ -127,7 +127,7 @@ Connect to `/api/v1/ws/events` for real-time updates.
 ### Connection
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/api/v1/ws/events');
+const ws = new WebSocket('ws://localhost:9001/api/v1/ws/events');
 
 ws.onopen = () => {
   console.log('Connected to agent hive');
@@ -385,7 +385,7 @@ Get comprehensive system diagnostics.
 import requests
 
 # Login
-response = requests.post('http://localhost:8000/api/v1/auth/login', json={
+response = requests.post('http://localhost:9001/api/v1/auth/login', json={
     'username': 'admin',
     'password': 'your_password'
 })
@@ -396,7 +396,7 @@ access_token = tokens['access_token']
 headers = {'Authorization': f'Bearer {access_token}'}
 
 # List agents
-agents = requests.get('http://localhost:8000/api/v1/agents', headers=headers)
+agents = requests.get('http://localhost:9001/api/v1/agents', headers=headers)
 print(agents.json())
 
 # Create a task
@@ -406,7 +406,7 @@ task_data = {
     'type': 'analysis',
     'priority': 5
 }
-task = requests.post('http://localhost:8000/api/v1/tasks', 
+task = requests.post('http://localhost:9001/api/v1/tasks', 
                     json=task_data, headers=headers)
 print(task.json())
 ```
@@ -536,8 +536,8 @@ curl -H "Authorization: Bearer $TOKEN" /api/v1/agents
 
 ## Support
 
-- **Documentation**: [API Docs](http://localhost:8000/api/docs)
-- **Interactive API**: [Swagger UI](http://localhost:8000/api/docs)
-- **Alternative Docs**: [ReDoc](http://localhost:8000/api/redoc)
+- **Documentation**: [API Docs](http://localhost:9001/api/docs)
+- **Interactive API**: [Swagger UI](http://localhost:9001/api/docs)
+- **Alternative Docs**: [ReDoc](http://localhost:9001/api/redoc)
 - **GitHub Issues**: [Report Issues](https://github.com/leanvibe/agent-hive/issues)
 - **Email Support**: support@leanvibe.ai
