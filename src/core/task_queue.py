@@ -105,7 +105,14 @@ class TaskQueue:
                 )
 
             # Initialize cache manager
-            self.cache_manager = await get_cache_manager()
+            try:
+                self.cache_manager = await get_cache_manager()
+            except Exception as e:
+                logger.warning(
+                    "Cache manager initialization failed, continuing without caching",
+                    error=str(e),
+                )
+                self.cache_manager = None
 
             logger.info(
                 "Task queue initialized with optimized connection settings and caching"
@@ -197,31 +204,31 @@ class TaskQueue:
         if not task_id:
             return None
 
-            # Get task data
-            task_data = await self.redis_client.hgetall(f"{self.task_prefix}:{task_id}")
-            if not task_data:
-                logger.warning("Task data not found", task_id=task_id)
-                return None
+        # Get task data
+        task_data = await self.redis_client.hgetall(f"{self.task_prefix}:{task_id}")
+        if not task_data:
+            logger.warning("Task data not found", task_id=task_id)
+            return None
 
-            # Convert back to Task object
-            task = await self._dict_to_task(task_data)
+        # Convert back to Task object
+        task = await self._dict_to_task(task_data)
 
-            # Assign to agent
-            task.status = TaskStatus.ASSIGNED
-            task.agent_id = agent_id
-            task.started_at = time.time()
+        # Assign to agent
+        task.status = TaskStatus.ASSIGNED
+        task.agent_id = agent_id
+        task.started_at = time.time()
 
-            # Update in Redis
-            await self._update_task(task)
+        # Update in Redis
+        await self._update_task(task)
 
-            logger.info(
-                "Task assigned",
-                task_id=task_id,
-                agent_id=agent_id,
-                priority=task.priority,
-            )
-            await self._update_stats("assigned")
-            return task
+        logger.info(
+            "Task assigned",
+            task_id=task_id,
+            agent_id=agent_id,
+            priority=task.priority,
+        )
+        await self._update_stats("assigned")
+        return task
 
         # No tasks available in any priority queue after timeout
         return None

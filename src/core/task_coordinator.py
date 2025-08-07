@@ -628,7 +628,7 @@ class TaskCoordinator:
                 # Check if task is still running
                 task = await task_queue.get_task(assignment.task_id)
 
-                if task and task.status == TaskStatus.RUNNING:
+                if task and task.status == TaskStatus.IN_PROGRESS:
                     logger.warning(
                         "Potentially stuck task detected",
                         task_id=assignment.task_id,

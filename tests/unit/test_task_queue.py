@@ -8,7 +8,7 @@ from src.core.task_queue import Task, TaskPriority, TaskQueue, TaskStatus
 @pytest.fixture
 async def task_queue_instance():
     """Fixture to create and initialize a TaskQueue instance for testing."""
-    # Use a separate Redis database for testing
+    # Use the correct Redis port from docker-compose
     queue = TaskQueue(redis_url="redis://localhost:6381/1")
     await queue.initialize()
     # Clear the test database before each test
@@ -268,3 +268,107 @@ async def test_get_total_tasks_and_completed_count(task_queue_instance: TaskQueu
     assert await task_queue_instance.get_total_tasks() == 5
     assert await task_queue_instance.get_completed_tasks_count() == 2
     assert await task_queue_instance.get_failed_tasks_count() == 0
+
+
+@pytest.mark.asyncio
+async def test_get_task_indentation_bug_fix(task_queue_instance: TaskQueue):
+    """Test that the fixed indentation bug allows task retrieval to work correctly.
+
+    This test verifies that the critical bug fix in get_task() method where
+    the main processing block was incorrectly indented has been resolved.
+    """
+    task = Task(
+        title="Indentation Test Task",
+        description="Test for the indentation bug fix",
+        task_type="test",
+        priority=TaskPriority.NORMAL,
+    )
+
+    # Submit task
+    task_id = await task_queue_instance.submit_task(task)
+    assert task_id == task.id
+
+    # Get task - this should work now that indentation is fixed
+    retrieved_task = await task_queue_instance.get_task(
+        "test_agent",
+        priorities=[TaskPriority.NORMAL],
+        timeout=5,  # Short timeout for test
+    )
+
+    # Verify task was properly retrieved and processed
+    assert retrieved_task is not None
+    assert retrieved_task.id == task.id
+    assert retrieved_task.status == TaskStatus.ASSIGNED
+    assert retrieved_task.agent_id == "test_agent"
+    assert retrieved_task.started_at is not None
+
+
+@pytest.mark.asyncio
+async def test_get_task_no_available_tasks_timeout(task_queue_instance: TaskQueue):
+    """Test that get_task properly handles timeout when no tasks are available."""
+    # Try to get a task when queue is empty
+    retrieved_task = await task_queue_instance.get_task(
+        "test_agent",
+        timeout=1,  # 1 second timeout
+    )
+
+    # Should return None after timeout
+    assert retrieved_task is None
+
+
+@pytest.mark.asyncio
+async def test_task_status_constants_usage(task_queue_instance: TaskQueue):
+    """Test that TaskStatus constants are used correctly throughout the system.
+
+    This test verifies that we don't have any undefined status references
+    like the TaskStatus.RUNNING bug that was fixed.
+    """
+    task = Task(
+        title="Status Test Task",
+        description="Test status constants",
+        task_type="test",
+    )
+
+    # Submit and verify initial status
+    task_id = await task_queue_instance.submit_task(task)
+    status = await task_queue_instance.get_task_status(task_id)
+    assert status.status == TaskStatus.PENDING
+
+    # Get and verify assigned status
+    retrieved_task = await task_queue_instance.get_task("test_agent")
+    assert retrieved_task.status == TaskStatus.ASSIGNED
+
+    # Start and verify in_progress status
+    await task_queue_instance.start_task(task_id)
+    status = await task_queue_instance.get_task_status(task_id)
+    assert status.status == TaskStatus.IN_PROGRESS
+
+    # Complete and verify completed status
+    await task_queue_instance.complete_task(task_id)
+    status = await task_queue_instance.get_task_status(task_id)
+    assert status.status == TaskStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_task_assignment_with_agent_id(task_queue_instance: TaskQueue):
+    """Test that tasks are properly assigned to agents with correct agent_id."""
+    task = Task(
+        title="Assignment Test",
+        description="Test agent assignment",
+        task_type="test",
+    )
+
+    task_id = await task_queue_instance.submit_task(task)
+
+    # Get task with specific agent
+    agent_id = "specific-agent-123"
+    retrieved_task = await task_queue_instance.get_task(agent_id)
+
+    assert retrieved_task is not None
+    assert retrieved_task.agent_id == agent_id
+    assert retrieved_task.status == TaskStatus.ASSIGNED
+
+    # Verify the assignment persists in storage
+    status = await task_queue_instance.get_task_status(task_id)
+    assert status.agent_id == agent_id
+    assert status.status == TaskStatus.ASSIGNED
