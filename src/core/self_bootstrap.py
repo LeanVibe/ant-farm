@@ -508,12 +508,12 @@ class SelfBootstrapper:
             title=f"Implement: {goal.title}",
             description=f"""
             Implement the development goal: {goal.description}
-            
+
             Success Criteria:
             {chr(10).join(f"- {criteria}" for criteria in goal.success_criteria)}
-            
+
             Estimated Effort: {goal.estimated_effort} hours
-            
+
             Please implement this goal step by step, ensuring:
             1. Code quality and testing
             2. Documentation updates
@@ -565,7 +565,7 @@ class SelfBootstrapper:
             title=f"Plan: {goal.title}",
             description=f"""
             Create detailed planning for: {goal.description}
-            
+
             Please provide:
             1. Technical architecture and design
             2. Implementation steps and timeline
@@ -592,10 +592,10 @@ class SelfBootstrapper:
             title=f"Monitor: {goal.title}",
             description=f"""
             Continuously monitor: {goal.description}
-            
+
             Monitor for:
             {chr(10).join(f"- {criteria}" for criteria in goal.success_criteria)}
-            
+
             Report any issues or improvement opportunities.
             """,
             type="monitoring",
@@ -630,7 +630,7 @@ class SelfBootstrapper:
             4. Task optimization capability
             5. Code quality capability
             6. Security hardening capability
-            
+
             Provide scores from 0.0 to 1.0 for each capability.
             """,
             type="assessment",
@@ -652,7 +652,7 @@ class SelfBootstrapper:
             description="""
             Based on current system state and completed goals, plan the next
             development activities:
-            
+
             1. Prioritize remaining development goals
             2. Identify new opportunities for improvement
             3. Adjust timelines based on current progress

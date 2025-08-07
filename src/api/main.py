@@ -185,6 +185,9 @@ async def get_system_status():
         queue_depth = await task_queue.get_queue_depth()
 
         # Get active agents
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
         active_agents = await orchestrator.get_active_agent_count()
 
         # Calculate health score (simplified)
@@ -216,6 +219,9 @@ async def get_system_status():
 async def list_agents():
     """List all agents."""
     try:
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
         agents = await orchestrator.list_agents()
         agent_info = []
 
@@ -242,6 +248,9 @@ async def list_agents():
 async def get_agent(agent_name: str):
     """Get specific agent information."""
     try:
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
         agent = await orchestrator.get_agent(agent_name)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
@@ -277,6 +286,9 @@ async def spawn_agent(
             agent_name = f"{agent_type}-{int(time.time())}"
 
         # Spawn agent asynchronously
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
         session_name = await orchestrator.spawn_agent(agent_type, agent_name)
 
         return APIResponse(
@@ -298,6 +310,9 @@ async def spawn_agent(
 async def stop_agent(agent_name: str):
     """Stop a specific agent."""
     try:
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
         success = await orchestrator.stop_agent(agent_name)
 
         if success:

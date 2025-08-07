@@ -311,7 +311,7 @@ class MetaAgent(BaseAgent):
             3. Documentation completeness
             4. Architecture adherence
             5. Performance bottlenecks
-            
+
             Provide a score from 0.0 to 1.0 for overall code quality.
             """
 
@@ -384,7 +384,7 @@ class MetaAgent(BaseAgent):
             3. Agent coordination improvements
             4. New capabilities that would be beneficial
             5. Architecture optimizations
-            
+
             List the top 5 improvement opportunities.
             """
 
@@ -469,7 +469,7 @@ class MetaAgent(BaseAgent):
             prompt = f"""
             Create an improvement proposal to address this system issue:
             Issue: {issue}
-            
+
             Provide:
             1. A clear title for the improvement
             2. Detailed description of the solution
@@ -478,7 +478,7 @@ class MetaAgent(BaseAgent):
             5. Risk assessment (low/medium/high)
             6. Complexity assessment (low/medium/high)
             7. Impact assessment (low/medium/high)
-            
+
             Format as JSON.
             """
 
@@ -670,19 +670,19 @@ class MetaAgent(BaseAgent):
         """Execute a single implementation step."""
         prompt = f"""
         Execute this implementation step for the improvement proposal:
-        
+
         Proposal: {proposal.title}
         Description: {proposal.description}
         Step: {step}
-        
+
         Affected Components: {", ".join(proposal.affected_components)}
-        
+
         Please implement this step carefully, ensuring:
         1. Code quality and testing
         2. Backwards compatibility
         3. Proper error handling
         4. Documentation updates
-        
+
         Make the necessary changes to the codebase.
         """
 
@@ -712,10 +712,10 @@ class MetaAgent(BaseAgent):
             for metric in proposal.success_metrics:
                 prompt = f"""
                 Validate this success metric for the implemented improvement:
-                
+
                 Proposal: {proposal.title}
                 Metric: {metric}
-                
+
                 Check if this metric has been achieved and return true/false.
                 """
 
@@ -740,10 +740,10 @@ class MetaAgent(BaseAgent):
 
         prompt = f"""
         Rollback the changes made for this improvement proposal:
-        
+
         Proposal: {proposal.title}
         Description: {proposal.description}
-        
+
         Restore the system to its previous state before this improvement was attempted.
         Use git or other version control mechanisms as appropriate.
         """
@@ -767,7 +767,7 @@ class MetaAgent(BaseAgent):
             1. Commit all current changes to git
             2. Create a backup branch
             3. Tag the current state for easy recovery
-            
+
             This backup will be used for rollback if improvements fail.
             """
 

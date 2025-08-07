@@ -138,8 +138,8 @@ class AgentRegistry:
                 with conn.cursor() as cursor:
                     cursor.execute(
                         """
-                        UPDATE agents 
-                        SET status = %s, last_heartbeat = NOW() 
+                        UPDATE agents
+                        SET status = %s, last_heartbeat = NOW()
                         WHERE name = %s
                     """,
                         (status.value, agent_name),

@@ -723,7 +723,7 @@ class SleepWakeManager:
         contexts_loaded = 0
 
         try:
-            context_engine = await get_advanced_context_engine(settings.database_url)
+            # context_engine = await get_advanced_context_engine(settings.database_url)
 
             # Load recent contexts back into working memory cache
             # This would involve querying for recent contexts and loading them

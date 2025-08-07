@@ -61,13 +61,13 @@ class DeveloperAgent(BaseAgent):
         try:
             # Look for TODO comments in the codebase
             prompt = """
-            Scan the codebase for TODO comments, incomplete implementations, 
+            Scan the codebase for TODO comments, incomplete implementations,
             or areas that need improvement. Focus on:
             1. Missing functionality
             2. Code that needs refactoring
             3. Performance optimizations
             4. Better error handling
-            
+
             If you find something to work on, implement it.
             Otherwise, analyze the codebase for potential improvements.
             """
@@ -129,7 +129,7 @@ class QAAgent(BaseAgent):
             3. Look for potential bugs or edge cases
             4. Check code quality and style compliance
             5. Validate documentation accuracy
-            
+
             Report any issues found and suggest improvements.
             """
 
@@ -188,7 +188,7 @@ class ArchitectAgent(BaseAgent):
             3. Design pattern improvements
             4. Component coupling issues
             5. Performance optimization opportunities
-            
+
             Suggest architectural improvements and document findings.
             """
 
@@ -249,7 +249,7 @@ class ResearchAgent(BaseAgent):
             3. Best practices for autonomous software development
             4. New tools and frameworks that could benefit us
             5. Security considerations for self-modifying systems
-            
+
             Summarize findings and suggest actionable improvements.
             """
 

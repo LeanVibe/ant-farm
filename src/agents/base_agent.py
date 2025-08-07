@@ -539,10 +539,10 @@ class BaseAgent(ABC):
         Description: {task.description}
         Type: {task.task_type}
         Priority: {task.priority}
-        
+
         Relevant Context:
         {context_text}
-        
+
         Please process this task and provide a detailed response.
         """
 

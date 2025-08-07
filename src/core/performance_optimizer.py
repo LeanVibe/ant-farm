@@ -751,7 +751,6 @@ class PerformanceOptimizer:
 
     async def _apply_predictive_scaling(self, action: OptimizationAction) -> bool:
         """Apply predictive scaling optimization."""
-        params = action.parameters
 
         # Schedule scaling action for future execution
 
