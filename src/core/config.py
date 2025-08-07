@@ -56,7 +56,7 @@ class Settings(BaseSettings):
 
     # Database Configuration
     database_url: str = Field(
-        default="postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive",
+        default="postgresql+asyncpg://hive_user:hive_pass@localhost:5433/leanvibe_hive",
         env="DATABASE_URL",
     )
     database_pool_size: int = Field(default=10, env="DATABASE_POOL_SIZE")

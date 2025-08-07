@@ -838,6 +838,122 @@ class SelfModifier:
 
         return active_count < self.max_concurrent_modifications
 
+    async def propose_and_apply_change(
+        self,
+        file_path: str,
+        change_description: str,
+        agent_id: str = "unknown",
+        modification_type: ModificationType = ModificationType.CODE_REFACTORING,
+    ) -> dict[str, Any]:
+        """
+        Main entry point for MetaAgent to propose and apply code changes.
+
+        This is the simplified workflow from PLAN.md:
+        1. Read file content
+        2. Generate new code using CLI tool (placeholder for now)
+        3. Create feature branch
+        4. Apply changes
+        5. Run tests
+        6. Commit if tests pass, rollback if they fail
+
+        Returns dict with success status and details.
+        """
+        try:
+            file_full_path = self.workspace_path / file_path
+
+            # Validate file exists
+            if not file_full_path.exists():
+                return {
+                    "success": False,
+                    "error": f"File not found: {file_path}",
+                    "file_path": file_path,
+                }
+
+            logger.info(
+                "Starting self-modification",
+                file_path=file_path,
+                description=change_description[:100],
+                agent_id=agent_id,
+            )
+
+            # 1. Read current file content
+            original_content = file_full_path.read_text()
+
+            # 2. For now, create a simple placeholder modification
+            # TODO: Use BaseAgent's execute_with_cli_tool to generate actual changes
+            # This is a minimal implementation for bootstrap
+            modified_content = (
+                original_content + f"\n# Modified by {agent_id}: {change_description}\n"
+            )
+
+            # 3. Create a code change
+            change = CodeChange(
+                file_path=file_path,
+                original_content=original_content,
+                modified_content=modified_content,
+                change_description=change_description,
+                line_numbers=[len(original_content.split("\n")) + 1],
+            )
+
+            # 4. Create proposal
+            proposal_id = await self.propose_modification(
+                title=f"Modify {file_path}",
+                description=change_description,
+                modification_type=modification_type,
+                changes=[change],
+                created_by=agent_id,
+            )
+
+            # 5. Validate the modification (includes testing)
+            validation_result = await self.validate_modification(proposal_id)
+
+            if not validation_result.overall_success:
+                return {
+                    "success": False,
+                    "error": "Validation failed",
+                    "proposal_id": proposal_id,
+                    "validation_result": {
+                        "tests_passed": validation_result.tests_passed,
+                        "issues_found": validation_result.issues_found,
+                        "recommendations": validation_result.recommendations,
+                    },
+                }
+
+            # 6. Apply the modification
+            apply_success = await self.apply_modification(proposal_id)
+
+            if apply_success:
+                return {
+                    "success": True,
+                    "message": "Modification applied successfully",
+                    "proposal_id": proposal_id,
+                    "file_path": file_path,
+                    "change_description": change_description,
+                    "validation_result": {
+                        "tests_passed": validation_result.tests_passed,
+                        "code_quality_score": validation_result.code_quality_score,
+                    },
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to apply modification",
+                    "proposal_id": proposal_id,
+                }
+
+        except Exception as e:
+            logger.error(
+                "propose_and_apply_change failed",
+                file_path=file_path,
+                error=str(e),
+                agent_id=agent_id,
+            )
+            return {
+                "success": False,
+                "error": f"Exception during modification: {str(e)}",
+                "file_path": file_path,
+            }
+
     def get_modification_stats(self) -> dict[str, Any]:
         """Get modification statistics."""
         total_proposals = len(self.modification_records)

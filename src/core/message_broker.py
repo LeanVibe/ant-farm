@@ -558,6 +558,25 @@ class MessageBroker:
             max_retries=int(data.get("max_retries", 3)),
         )
 
+    async def shutdown(self) -> None:
+        """Shutdown the message broker and close connections."""
+        try:
+            # Cancel background tasks
+            if hasattr(self, "_cleanup_task") and self._cleanup_task:
+                self._cleanup_task.cancel()
+                try:
+                    await self._cleanup_task
+                except asyncio.CancelledError:
+                    pass
+
+            # Close Redis connection
+            if self.redis_client:
+                await self.redis_client.close()
+
+            logger.info("Message broker shutdown complete")
+        except Exception as e:
+            logger.error(f"Error during message broker shutdown: {str(e)}")
+
 
 # Global message broker instance
 message_broker = MessageBroker()

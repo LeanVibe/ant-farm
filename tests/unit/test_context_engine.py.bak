@@ -151,8 +151,6 @@ class TestContextEngine:
 
         for ctx in mock_contexts:
             ctx.last_accessed = 0
-            ctx.created_at = Mock()
-            ctx.created_at.timestamp.return_value = time.time() - 3600  # 1 hour ago
 
         # Mock query chain
         mock_query = Mock()
@@ -198,8 +196,6 @@ class TestContextEngine:
 
         for ctx in mock_contexts:
             ctx.last_accessed = 0
-            ctx.created_at = Mock()
-            ctx.created_at.timestamp.return_value = time.time() - 3600  # 1 hour ago
 
         # Mock query chain
         mock_query = Mock()

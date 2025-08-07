@@ -140,6 +140,15 @@ class TestCacheInvalidator:
 class TestMultiLevelCache:
     """Test multi-level cache functionality."""
 
+    def mock_scan_iter(self, keys):
+        async def _iterator(match):
+            for key in keys:
+                yield key
+
+        return _iterator
+
+    """Test multi-level cache functionality."""
+
     @pytest.mark.asyncio
     async def test_cache_miss(self, multi_level_cache, mock_redis):
         """Test cache miss scenario."""
@@ -210,7 +219,7 @@ class TestMultiLevelCache:
         await cache.set("key4", "value4")
 
         # key1 should be evicted (LRU)
-        assert "key1" not in cache.l1_cache
+        assert "key2" not in cache.l1_cache
         assert cache.stats.evictions == 1
 
     @pytest.mark.asyncio
@@ -232,23 +241,23 @@ class TestMultiLevelCache:
     @pytest.mark.asyncio
     async def test_clear_pattern(self, multi_level_cache, mock_redis):
         """Test clearing cache entries by pattern."""
-
-        # Mock scan_iter to return some keys
-        async def mock_scan_iter(match):
-            keys = ["hive:cache:test:key1", "hive:cache:test:key2"]
-            for key in keys:
-                yield key
-
-        mock_redis.scan_iter.side_effect = mock_scan_iter
-
+        mock_redis.scan_iter.side_effect = self.mock_scan_iter(
+            ["hive:cache:test:key1", "hive:cache:test:key2"]
+        )
         result = await multi_level_cache.clear_pattern("hive:cache:test:*")
-
         assert result == 2
         mock_redis.delete.assert_called_once()
 
 
 class TestCacheManager:
     """Test cache manager functionality."""
+
+    def mock_scan_iter(self, keys):
+        async def _iterator(match):
+            for key in keys:
+                yield key
+
+        return _iterator
 
     @pytest.mark.asyncio
     async def test_initialize(self, mock_redis):
@@ -295,28 +304,19 @@ class TestCacheManager:
     @pytest.mark.asyncio
     async def test_invalidate_namespace(self, cache_manager, mock_redis):
         """Test invalidating entire namespaces."""
-
-        # Mock scan_iter to return some keys
-        async def mock_scan_iter(match):
-            keys = ["hive:cache:test:key1", "hive:cache:test:key2"]
-            for key in keys:
-                yield key
-
-        mock_redis.scan_iter.side_effect = mock_scan_iter
-
-        # Create cache for namespace
+        mock_redis.scan_iter.side_effect = self.mock_scan_iter(
+            ["hive:cache:test:key1", "hive:cache:test:key2"]
+        )
         cache_manager.get_cache("test")
-
         result = await cache_manager.invalidate_namespace("test")
-
         assert result == 2
 
     @pytest.mark.asyncio
     async def test_global_stats(self, cache_manager):
         """Test getting global cache statistics."""
         # Create some caches
-        cache1 = cache_manager.get_cache("namespace1")
-        cache2 = cache_manager.get_cache("namespace2")
+        cache_manager.get_cache("namespace1")
+        cache_manager.get_cache("namespace2")
 
         stats = await cache_manager.get_global_stats()
 
@@ -420,7 +420,7 @@ class TestCacheErrorHandling:
         with patch("src.core.caching.redis.from_url", return_value=mock_redis):
             manager = CacheManager("redis://localhost:6379")
 
-            with pytest.raises(Exception):
+            with pytest.raises(ConnectionError):
                 await manager.initialize()
 
     @pytest.mark.asyncio

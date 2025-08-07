@@ -79,7 +79,7 @@ def init():
     async def _init():
         from ..core.config import get_settings
 
-        settings = get_settings()
+        get_settings()
 
         console.print("🚀 Initializing LeanVibe Hive...", style="bold blue")
 

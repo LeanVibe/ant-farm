@@ -256,59 +256,6 @@ class TaskDecomposer:
 
         return sub_tasks
 
-    async def _decompose_parallel(
-        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
-    ) -> dict[str, dict[str, Any]]:
-        """Decompose task for parallel execution."""
-
-        sub_tasks = {}
-
-        # Example parallel decomposition
-        if "system_optimization" in context.metadata.get("task_type", ""):
-            parallel_tasks = [
-                (
-                    "performance_analysis",
-                    ["deployment", "infrastructure", "monitoring"],
-                    "Analyze system performance",
-                ),
-                (
-                    "security_audit",
-                    ["testing", "quality_assurance"],
-                    "Conduct security audit",
-                ),
-                (
-                    "code_review",
-                    ["system_design", "architecture_planning", "analysis"],
-                    "Review code quality",
-                ),
-                (
-                    "documentation_update",
-                    ["code_generation", "testing", "debugging"],
-                    "Update documentation",
-                ),
-            ]
-
-            for task_name, required_caps, description in parallel_tasks:
-                suitable_agents = [
-                    agent
-                    for agent in available_agents
-                    if any(cap in agent.capabilities for cap in required_caps)
-                ]
-
-                if suitable_agents:
-                    selected_agent = min(suitable_agents, key=lambda a: a.load_factor)
-
-                    sub_tasks[task_name] = {
-                        "description": description,
-                        "assigned_agent": selected_agent.agent_name,
-                        "required_capabilities": required_caps,
-                        "depends_on": [],  # No dependencies for parallel tasks
-                        "estimated_duration": 180,
-                        "priority": context.priority,
-                    }
-
-        return sub_tasks
-
     async def _decompose_pipeline(
         self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
     ) -> dict[str, dict[str, Any]]:
@@ -460,55 +407,6 @@ class TaskDecomposer:
 
         return sub_tasks
 
-    async def _decompose_competitive(
-        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
-    ) -> dict[str, dict[str, Any]]:
-        """Decompose task for competitive execution."""
-
-        sub_tasks = {}
-
-        # Select multiple agents to compete
-        required_caps = context.metadata.get("required_capabilities", [])
-        suitable_agents = [
-            agent
-            for agent in available_agents
-            if any(cap in agent.capabilities for cap in required_caps)
-        ][:3]  # Limit to 3 competing agents
-
-        for i, agent in enumerate(suitable_agents):
-            sub_tasks[f"competitive_solution_{i}"] = {
-                "description": f"Develop competing solution for {context.title}",
-                "assigned_agent": agent.agent_name,
-                "required_capabilities": required_caps,
-                "depends_on": [],
-                "estimated_duration": 300,
-                "priority": context.priority,
-                "competitive_round": 1,
-            }
-
-        # Add evaluation task
-        evaluator_agents = [
-            agent
-            for agent in available_agents
-            if "evaluation" in agent.capabilities or "qa" in agent.capabilities
-        ]
-
-        if evaluator_agents:
-            evaluator = evaluator_agents[0]
-            sub_tasks["solution_evaluation"] = {
-                "description": "Evaluate competing solutions and select best",
-                "assigned_agent": evaluator.agent_name,
-                "required_capabilities": ["evaluation", "analysis"],
-                "depends_on": [
-                    f"competitive_solution_{i}" for i in range(len(suitable_agents))
-                ],
-                "estimated_duration": 120,
-                "priority": context.priority,
-                "evaluation_criteria": context.metadata.get("evaluation_criteria", []),
-            }
-
-        return sub_tasks
-
     async def _decompose_delegation(
         self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
     ) -> dict[str, dict[str, Any]]:
@@ -627,11 +525,11 @@ class CollaborationCoordinator:
 
         # Extract participating agents
         context.participating_agents = list(
-            set(
+            {
                 task["assigned_agent"]
                 for task in sub_tasks.values()
                 if "assigned_agent" in task
-            )
+            }
         )
 
         # Store collaboration context

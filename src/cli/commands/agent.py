@@ -14,12 +14,11 @@ from rich.console import Console
 from rich.table import Table
 
 from ..utils import (
+    API_BASE_URL,
     create_status_table,
     error_handler,
     info_message,
     success_message,
-    warning_message,
-    API_BASE_URL,
 )
 
 app = typer.Typer(help="Agent management commands")

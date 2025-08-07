@@ -110,6 +110,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"src/cli/main_old.py" = ["E402"]
+"test_echo_queue.py" = ["E402"]
+"src/api/main.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

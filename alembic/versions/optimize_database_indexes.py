@@ -12,8 +12,9 @@ Revises: 7b71b9a0ac9e
 Create Date: 2024-01-01 12:00:00.000000
 """
 
-from alembic import op
 from sqlalchemy import text
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "optimize_indexes"

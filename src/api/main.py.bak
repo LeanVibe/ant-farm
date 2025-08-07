@@ -1093,12 +1093,6 @@ async def check_agent_health(agent_name: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/test")
-async def test_endpoint():
-    """Simple test endpoint without authentication."""
-    return {"message": "Hello from API server", "timestamp": time.time()}
-
-
 # Task management endpoints
 @app.get("/api/v1/tasks", response_model=APIResponse)
 # @Permissions.task_read()  # Temporarily disabled for CLI testing

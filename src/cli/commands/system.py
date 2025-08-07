@@ -96,7 +96,9 @@ async def _check_all_services():
 
         engine = create_async_engine(settings.database_url)
         async with engine.begin() as conn:
-            await conn.execute("SELECT 1")
+            from sqlalchemy import text
+
+            await conn.execute(text("SELECT 1"))
         await engine.dispose()
 
         services["Database"] = {"status": "online", "details": "PostgreSQL connected"}
@@ -145,7 +147,7 @@ async def _start():
             info_message("Starting API server...")
 
             # Start API server in background
-            api_process = subprocess.Popen(
+            subprocess.Popen(
                 [
                     sys.executable,
                     "-m",
@@ -172,8 +174,8 @@ async def _start():
                         success_message("API server started successfully!")
                     else:
                         warning_message("API server may not have started properly")
-            except:
-                warning_message("Could not verify API server startup")
+            except Exception as e:
+                warning_message(f"Could not verify API server startup: {e}")
         else:
             info_message("API server is already running")
 
@@ -242,7 +244,7 @@ def restart():
 async def _stop_services():
     """Internal async stop function"""
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["pkill", "-f", "uvicorn.*src.api.main:app"], capture_output=True, text=True
         )
     except Exception:
@@ -278,8 +280,8 @@ def init_db() -> None:
     console.print("[cyan]Initializing database...[/cyan]")
 
     try:
-        from ...core.models import get_database_manager
         from ...core.config import get_settings
+        from ...core.models import get_database_manager
 
         settings = get_settings()
         db_manager = get_database_manager(settings.database_url)

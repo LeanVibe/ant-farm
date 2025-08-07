@@ -179,7 +179,7 @@ class IntegrationTester:
             print(f"  ✓ API routes registered: {len(routes)} routes")
 
             # Test orchestrator creation
-            orch = await get_orchestrator(settings.database_url, Path("."))
+            await get_orchestrator(settings.database_url, Path("."))
             print("  ✓ Orchestrator creation successful")
 
             return True

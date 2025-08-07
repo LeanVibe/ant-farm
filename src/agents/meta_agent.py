@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -1052,3 +1053,13 @@ class MetaAgent(BaseAgent):
         else:
             # Use base implementation for other task types
             return await super()._process_task_implementation(task)
+
+    async def _on_collaboration_completed(self, result: dict[str, Any]) -> None:
+        """Called when a collaboration is completed."""
+        logger.info("Collaboration completed", result=result)
+        # Meta-agent can learn from collaboration outcomes
+
+    async def _on_collaboration_failed(self, failure_info: dict[str, Any]) -> None:
+        """Called when a collaboration fails."""
+        logger.warning("Collaboration failed", failure_info=failure_info)
+        # Meta-agent can analyze failures for system improvement

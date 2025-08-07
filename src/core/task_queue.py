@@ -183,302 +183,9 @@ class TaskQueue:
 
         return task.id
 
-    async def get_task(
-        self, agent_id: str, priorities: list[int] | None = None, timeout: int = 60
-    ) -> Task | None:
-        """Get next available task for agent with priority ordering."""
-        if priorities is None:
-            priorities = [1, 3, 5, 7, 9]  # All priorities
-
-        # Check queues in priority order
-        queue_keys = [f"{self.queue_prefix}:p{p}" for p in sorted(priorities)]
-
-        if not queue_keys:
-            return None
-
-        # Blocking pop from the highest priority queue that has tasks
-        try:
-            queue_name, task_id = await self.redis_client.brpop(
-                queue_keys, timeout=timeout
-            )
-        except (TimeoutError, TypeError):
-            # brpop returns None on timeout, which can cause TypeError if not handled
-            return None
-
-        if not task_id:
-            return None
-
-        # Get task data
-        task_data = await self.redis_client.hgetall(f"{self.task_prefix}:{task_id}")
-        if not task_data:
-            logger.warning("Task data not found", task_id=task_id)
-            return None
-
-        # Convert back to Task object
-        task = await self._dict_to_task(task_data)
-
-        # Assign to agent
-        task.status = TaskStatus.ASSIGNED
-        task.agent_id = agent_id
-        task.started_at = time.time()
-
-        # Update in Redis
-        await self._update_task(task)
-
-        logger.info(
-            "Task assigned",
-            task_id=task_id,
-            agent_id=agent_id,
-            priority=task.priority,
-        )
-        await self._update_stats("assigned")
-        return task
-
-        # No tasks available in any priority queue after timeout
-        return None
-
-    async def start_task(self, task_id: str) -> bool:
-        """Mark task as in progress."""
-        task_key = f"{self.task_prefix}:{task_id}"
-        task_data = await self.redis_client.hgetall(task_key)
-
-        if not task_data:
-            return False
-
-        # Update status
-        await self.redis_client.hset(task_key, "status", TaskStatus.IN_PROGRESS)
-        await self._update_stats("started")
-
-        logger.info("Task started", task_id=task_id)
-        return True
-
-    async def complete_task(
-        self, task_id: str, result: dict[str, Any] | None = None
-    ) -> bool:
-        """Mark task as completed and process dependent tasks."""
-        task_key = f"{self.task_prefix}:{task_id}"
-        task_data = await self.redis_client.hgetall(task_key)
-
-        if not task_data:
-            return False
-
-        # Update task
-        updates = {"status": TaskStatus.COMPLETED, "completed_at": str(time.time())}
-        if result:
-            updates["result"] = json.dumps(result)
-
-        await self.redis_client.hset(task_key, mapping=updates)
-
-        # Process dependent tasks
-        await self._process_dependent_tasks(task_id)
-
-        # Invalidate related caches
-        if self.cache_manager:
-            await self.cache_manager.invalidate_dependency("task_queue_stats")
-            agent_id = task_data.get("agent_id")
-            if agent_id:
-                await self.cache_manager.invalidate_dependency(f"agent:{agent_id}")
-
-        logger.info("Task completed", task_id=task_id)
-        await self._update_stats("completed")
-        return True
-
-    async def fail_task(self, task_id: str, error: str, retry: bool = True) -> bool:
-        """Mark task as failed and handle retry logic."""
-        task_key = f"{self.task_prefix}:{task_id}"
-        task_data = await self.redis_client.hgetall(task_key)
-
-        if not task_data:
-            return False
-
-        task = await self._dict_to_task(task_data)
-
-        # Check if we should retry
-        if retry and task.retry_count < task.max_retries:
-            # Increment retry count and requeue with exponential backoff
-            task.retry_count += 1
-            task.status = TaskStatus.PENDING
-            task.agent_id = None
-
-            # Calculate delay (exponential backoff)
-            delay = min(300, 2**task.retry_count)  # Max 5 minutes
-
-            await self._update_task(task)
-
-            # Schedule retry
-            await asyncio.sleep(delay)
-            queue_key = f"{self.queue_prefix}:p{task.priority}"
-            await self.redis_client.lpush(queue_key, task_id)
-
-            logger.info(
-                "Task scheduled for retry",
-                task_id=task_id,
-                retry_count=task.retry_count,
-                delay=delay,
-            )
-            return True
-        else:
-            # Mark as permanently failed
-            updates = {
-                "status": TaskStatus.FAILED,
-                "error_message": error,
-                "completed_at": str(time.time()),
-            }
-            await self.redis_client.hset(task_key, mapping=updates)
-
-            logger.error("Task failed permanently", task_id=task_id, error=error)
-            await self._update_stats("failed")
-            return True
-
-    async def cancel_task(self, task_id: str) -> bool:
-        """Cancel a pending or assigned task."""
-        task_key = f"{self.task_prefix}:{task_id}"
-        task_data = await self.redis_client.hgetall(task_key)
-
-        if not task_data:
-            return False
-
-        # Remove from queue if still pending
-        task = await self._dict_to_task(task_data)
-        if task.status in [TaskStatus.PENDING, TaskStatus.ASSIGNED]:
-            queue_key = f"{self.queue_prefix}:p{task.priority}"
-            await self.redis_client.lrem(queue_key, 1, task_id)
-
-        # Update status
-        await self.redis_client.hset(task_key, "status", TaskStatus.CANCELLED)
-
-        logger.info("Task cancelled", task_id=task_id)
-        await self._update_stats("cancelled")
-        return True
-
-    async def get_task_status(self, task_id: str) -> Task | None:
-        """Get current status of a task."""
-        task_key = f"{self.task_prefix}:{task_id}"
-        task_data = await self.redis_client.hgetall(task_key)
-
-        if not task_data:
-            return None
-
-        return await self._dict_to_task(task_data)
-
-    async def get_queue_stats(self) -> QueueStats:
-        """Get comprehensive queue statistics with caching."""
-
-        # Generate cache key
-        cache_key = CacheKey.generate("queue_stats")
-
-        # Try cache first
-        if self.cache_manager:
-            cache = self.cache_manager.get_cache(
-                "task_queue_stats", TASK_QUEUE_CACHE_CONFIG
-            )
-            cached_stats = await cache.get(cache_key)
-            if cached_stats is not None:
-                logger.debug("Queue stats cache hit")
-                return cached_stats
-
-        # Count tasks by status - using SCAN for better performance
-        all_task_keys = []
-        async for key in self.redis_client.scan_iter(match=f"{self.task_prefix}:*"):
-            all_task_keys.append(key)
-
-        status_counts = {
-            TaskStatus.PENDING: 0,
-            TaskStatus.ASSIGNED: 0,
-            TaskStatus.IN_PROGRESS: 0,
-            TaskStatus.COMPLETED: 0,
-            TaskStatus.FAILED: 0,
-        }
-
-        completion_times = []
-
-        # Process tasks in batches for better performance
-        batch_size = 100
-        for i in range(0, len(all_task_keys), batch_size):
-            batch_keys = all_task_keys[i : i + batch_size]
-
-            # Use pipeline for batch processing
-            pipe = self.redis_client.pipeline()
-            for task_key in batch_keys:
-                pipe.hgetall(task_key)
-
-            batch_results = await pipe.execute()
-
-            for task_data in batch_results:
-                if not task_data:
-                    continue
-
-                status = task_data.get("status", TaskStatus.PENDING)
-                status_counts[status] = status_counts.get(status, 0) + 1
-
-                # Calculate completion time for completed tasks
-                if status == TaskStatus.COMPLETED:
-                    started = task_data.get("started_at")
-                    completed = task_data.get("completed_at")
-                    if started and completed:
-                        try:
-                            completion_times.append(float(completed) - float(started))
-                        except (ValueError, TypeError):
-                            pass  # Skip invalid timestamps
-
-        # Count queue sizes by priority
-        queue_sizes = {}
-        for priority in [1, 3, 5, 7, 9]:
-            queue_key = f"{self.queue_prefix}:p{priority}"
-            size = await self.redis_client.llen(queue_key)
-            queue_sizes[priority] = size
-
-        avg_completion_time = (
-            sum(completion_times) / len(completion_times) if completion_times else 0.0
-        )
-
-        stats = QueueStats(
-            pending_tasks=status_counts[TaskStatus.PENDING],
-            assigned_tasks=status_counts[TaskStatus.ASSIGNED],
-            in_progress_tasks=status_counts[TaskStatus.IN_PROGRESS],
-            completed_tasks=status_counts[TaskStatus.COMPLETED],
-            failed_tasks=status_counts[TaskStatus.FAILED],
-            total_tasks=sum(status_counts.values()),
-            average_completion_time=avg_completion_time,
-            queue_size_by_priority=queue_sizes,
-        )
-
-        # Cache the results
-        if self.cache_manager:
-            await cache.set(cache_key, stats, dependencies=["task_queue_stats"])
-
-        return stats
-
-    async def cleanup_expired_tasks(self) -> int:
-        """Clean up expired tasks and reassign them."""
-        current_time = time.time()
-        cleaned_count = 0
-
-        # Find tasks that have timed out
-        all_task_keys = await self.redis_client.keys(f"{self.task_prefix}:*")
-
-        for task_key in all_task_keys:
-            task_data = await self.redis_client.hgetall(task_key)
-            if not task_data:
-                continue
-
-            status = task_data.get("status")
-            started_at = task_data.get("started_at")
-            timeout = int(task_data.get("timeout_seconds", 300))
-
-            if status == TaskStatus.IN_PROGRESS and started_at:
-                if current_time - float(started_at) > timeout:
-                    task_id = task_key.split(":")[-1]
-                    task = await self._dict_to_task(task_data)
-                    task.error_message = "Task timeout"
-                    await self._update_task(task)
-                    await self.fail_task(task_id, "Task timeout", retry=True)
-                    cleaned_count += 1
-
-        if cleaned_count > 0:
-            logger.info("Cleaned up expired tasks", count=cleaned_count)
-
-        return cleaned_count
+    async def add_task(self, task: Task) -> str:
+        """Alias for submit_task to maintain API compatibility."""
+        return await self.submit_task(task)
 
     async def _dependencies_satisfied(self, task: Task) -> bool:
         """Check if all task dependencies are completed."""
@@ -720,6 +427,283 @@ class TaskQueue:
             await cache.set(cache_key, count, dependencies=["task_queue_stats"])
 
         return count
+
+    async def get_task(self, agent_id: str = None) -> Task | None:
+        """Get next available task from priority queues using BRPOP."""
+        try:
+            # Check queues in priority order (lower number = higher priority)
+            queue_keys = []
+            for priority in sorted(TaskPriority):
+                queue_key = f"{self.queue_prefix}:p{priority.value}"
+                queue_keys.append(queue_key)
+
+            # Use BRPOP to atomically get task from highest priority queue
+            # Timeout of 1 second to avoid blocking forever
+            result = await self.redis_client.brpop(queue_keys, timeout=1)
+
+            if not result:
+                return None
+
+            queue_key, task_id = result
+
+            # Get task data
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                logger.warning("Task data not found", task_id=task_id)
+                return None
+
+            # Convert to Task object
+            task = await self._dict_to_task(task_data)
+
+            # Assign to agent if provided
+            if agent_id:
+                task.agent_id = agent_id
+                task.status = TaskStatus.ASSIGNED
+                task.started_at = time.time()
+                await self._update_task(task)
+
+            logger.info("Task retrieved from queue", task_id=task_id, agent_id=agent_id)
+            return task
+
+        except Exception as e:
+            logger.error("Failed to get task from queue", error=str(e))
+            return None
+
+    async def list_tasks(
+        self, status: str = None, assigned_to: str = None
+    ) -> list[Task]:
+        """List tasks with optional filtering."""
+        tasks = []
+        try:
+            pattern = f"{self.task_prefix}:*"
+            async for task_key in self.redis_client.scan_iter(match=pattern):
+                task_data = await self.redis_client.hgetall(task_key)
+                if task_data:
+                    task = await self._dict_to_task(task_data)
+
+                    # Apply filters
+                    if status and task.status != status:
+                        continue
+                    if assigned_to and task.agent_id != assigned_to:
+                        continue
+
+                    tasks.append(task)
+
+            # Sort by created_at (newest first)
+            tasks.sort(key=lambda t: t.created_at, reverse=True)
+            return tasks
+
+        except Exception as e:
+            logger.error("Failed to list tasks", error=str(e))
+            return []
+
+    async def get_queue_depth(self) -> int:
+        """Get total number of pending tasks across all priority queues."""
+        try:
+            total_depth = 0
+            for priority in TaskPriority:
+                queue_key = f"{self.queue_prefix}:p{priority.value}"
+                depth = await self.redis_client.llen(queue_key)
+                total_depth += depth
+            return total_depth
+
+        except Exception as e:
+            logger.error("Failed to get queue depth", error=str(e))
+            return 0
+
+    async def get_queue_stats(self) -> QueueStats:
+        """Get comprehensive queue statistics."""
+        try:
+            # Count tasks by status
+            status_counts = {
+                TaskStatus.PENDING: 0,
+                TaskStatus.ASSIGNED: 0,
+                TaskStatus.IN_PROGRESS: 0,
+                TaskStatus.COMPLETED: 0,
+                TaskStatus.FAILED: 0,
+            }
+
+            # Count tasks by priority
+            priority_counts = {}
+
+            completion_times = []
+            total_tasks = 0
+
+            pattern = f"{self.task_prefix}:*"
+            async for task_key in self.redis_client.scan_iter(match=pattern):
+                task_data = await self.redis_client.hgetall(task_key)
+                if task_data:
+                    total_tasks += 1
+                    status = task_data.get("status", TaskStatus.PENDING)
+                    if status in status_counts:
+                        status_counts[status] += 1
+
+                    priority = int(task_data.get("priority", TaskPriority.NORMAL.value))
+                    priority_counts[priority] = priority_counts.get(priority, 0) + 1
+
+                    # Calculate completion time if task is completed
+                    if status == TaskStatus.COMPLETED:
+                        created_at = float(task_data.get("created_at", 0))
+                        completed_at = float(task_data.get("completed_at", 0))
+                        if created_at > 0 and completed_at > 0:
+                            completion_times.append(completed_at - created_at)
+
+            avg_completion_time = (
+                sum(completion_times) / len(completion_times)
+                if completion_times
+                else 0.0
+            )
+
+            return QueueStats(
+                pending_tasks=status_counts[TaskStatus.PENDING],
+                assigned_tasks=status_counts[TaskStatus.ASSIGNED],
+                in_progress_tasks=status_counts[TaskStatus.IN_PROGRESS],
+                completed_tasks=status_counts[TaskStatus.COMPLETED],
+                failed_tasks=status_counts[TaskStatus.FAILED],
+                total_tasks=total_tasks,
+                average_completion_time=avg_completion_time,
+                queue_size_by_priority=priority_counts,
+            )
+
+        except Exception as e:
+            logger.error("Failed to get queue stats", error=str(e))
+            return QueueStats(0, 0, 0, 0, 0, 0, 0.0, {})
+
+    async def fail_task(
+        self, task_id: str, error_message: str, retry: bool = True
+    ) -> bool:
+        """Mark a task as failed with optional retry."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                logger.warning("Task not found for failure", task_id=task_id)
+                return False
+
+            task = await self._dict_to_task(task_data)
+            task.status = TaskStatus.FAILED
+            task.error_message = error_message
+            task.completed_at = time.time()
+
+            # Handle retry logic
+            if retry and task.retry_count < task.max_retries:
+                task.retry_count += 1
+                task.status = TaskStatus.PENDING
+                task.error_message = None
+                task.completed_at = None
+
+                # Re-queue the task
+                queue_key = f"{self.queue_prefix}:p{task.priority.value}"
+                await self.redis_client.lpush(queue_key, task_id)
+
+                logger.info(
+                    "Task queued for retry",
+                    task_id=task_id,
+                    retry_count=task.retry_count,
+                )
+            else:
+                logger.info(
+                    "Task marked as failed", task_id=task_id, error=error_message
+                )
+
+            await self._update_task(task)
+            await self._update_stats("failed")
+
+            return True
+
+        except Exception as e:
+            logger.error("Failed to mark task as failed", task_id=task_id, error=str(e))
+            return False
+
+    async def complete_task(self, task_id: str, result: dict = None) -> bool:
+        """Mark a task as completed."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                logger.warning("Task not found for completion", task_id=task_id)
+                return False
+
+            task = await self._dict_to_task(task_data)
+            task.status = TaskStatus.COMPLETED
+            task.result = result or {}
+            task.completed_at = time.time()
+
+            await self._update_task(task)
+            await self._update_stats("completed")
+
+            # Process dependent tasks
+            await self._process_dependent_tasks(task_id)
+
+            logger.info("Task marked as completed", task_id=task_id)
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Failed to mark task as completed", task_id=task_id, error=str(e)
+            )
+            return False
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a task."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                return False
+
+            task = await self._dict_to_task(task_data)
+            task.status = TaskStatus.CANCELLED
+            task.completed_at = time.time()
+
+            await self._update_task(task)
+            await self._update_stats("cancelled")
+
+            logger.info("Task cancelled", task_id=task_id)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to cancel task", task_id=task_id, error=str(e))
+            return False
+
+    async def cleanup_expired_tasks(self) -> int:
+        """Clean up expired tasks and return count of cleaned tasks."""
+        cleaned_count = 0
+        current_time = time.time()
+
+        try:
+            pattern = f"{self.task_prefix}:*"
+            async for task_key in self.redis_client.scan_iter(match=pattern):
+                task_data = await self.redis_client.hgetall(task_key)
+                if not task_data:
+                    continue
+
+                status = task_data.get("status")
+                started_at = task_data.get("started_at")
+                timeout = int(task_data.get("timeout_seconds", 300))
+
+                if status == TaskStatus.IN_PROGRESS and started_at:
+                    if current_time - float(started_at) > timeout:
+                        task_id = task_key.split(":")[-1]
+                        task = await self._dict_to_task(task_data)
+                        task.error_message = "Task timeout"
+                        await self._update_task(task)
+                        await self.fail_task(task_id, "Task timeout", retry=True)
+                        cleaned_count += 1
+
+            if cleaned_count > 0:
+                logger.info("Cleaned up expired tasks", count=cleaned_count)
+
+            return cleaned_count
+
+        except Exception as e:
+            logger.error("Failed to cleanup expired tasks", error=str(e))
+            return 0
 
 
 # Global task queue instance

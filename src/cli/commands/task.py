@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 
 from ..utils import (
+    API_BASE_URL,
     confirm_action,
     create_status_table,
     error_handler,
@@ -48,9 +49,7 @@ async def _list_tasks(status_filter: str = None, assigned_filter: str = None):
             params["assigned_to"] = assigned_filter
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                "http://localhost:8001/api/v1/tasks", params=params
-            )
+            response = await client.get(f"{API_BASE_URL}/api/v1/tasks", params=params)
 
             if response.status_code == 200:
                 data = response.json()
@@ -174,9 +173,7 @@ async def _submit_task(
 
         # Submit the task
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "http://localhost:8001/api/v1/tasks", json=task_data
-            )
+            response = await client.post(f"{API_BASE_URL}/api/v1/tasks", json=task_data)
 
             if response.status_code == 200:
                 data = response.json()
@@ -226,7 +223,7 @@ async def _show_task_logs(task_id: str, follow: bool):
     try:
         # First, get task info
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"http://localhost:8001/api/v1/tasks/{task_id}")
+            response = await client.get(f"{API_BASE_URL}/api/v1/tasks/{task_id}")
 
             if response.status_code == 200:
                 data = response.json()
@@ -299,7 +296,7 @@ async def _cancel_task(task_id: str, force: bool):
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                f"http://localhost:8001/api/v1/tasks/{task_id}/cancel"
+                f"{API_BASE_URL}/api/v1/tasks/{task_id}/cancel"
             )
 
             if response.status_code == 200:
@@ -346,7 +343,7 @@ async def _submit_self_improvement(title: str, description: str):
         # Submit the self-improvement task
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                "http://localhost:8001/api/v1/tasks/self-improvement",
+                f"{API_BASE_URL}/api/v1/tasks/self-improvement",
                 params={"title": title, "description": description},
             )
 

@@ -75,56 +75,18 @@ class AgentRegistry:
         self.db_manager.create_tables()
 
     async def register_agent(self, agent_info: AgentInfo) -> bool:
-        """Register a new agent using SQLAlchemy."""
+        """Register a new agent (temporarily using in-memory only)."""
         async with self._lock:
             try:
-                session = self.db_manager.get_session()
-                try:
-                    # Create or update agent in database
-                    agent = session.query(Agent).filter_by(name=agent_info.name).first()
+                # Temporarily skip database operations to avoid greenlet issues
+                # TODO: Fix async database operations
 
-                    if agent:
-                        # Update existing agent
-                        agent.type = agent_info.type
-                        agent.role = agent_info.role
-                        agent.capabilities = agent_info.capabilities
-                        agent.status = agent_info.status.value
-                        agent.tmux_session = agent_info.tmux_session
-                        agent.last_heartbeat = datetime.utcnow()
-                        agent.updated_at = datetime.utcnow()
-                    else:
-                        # Create new agent
-                        agent = Agent(
-                            id=uuid.UUID(agent_info.id),
-                            name=agent_info.name,
-                            type=agent_info.type,
-                            role=agent_info.role,
-                            capabilities=agent_info.capabilities,
-                            status=agent_info.status.value,
-                            tmux_session=agent_info.tmux_session,
-                            last_heartbeat=datetime.utcnow(),
-                            created_at=datetime.utcnow(),
-                            tasks_completed=agent_info.tasks_completed,
-                            tasks_failed=agent_info.tasks_failed,
-                        )
-                        session.add(agent)
+                # Store in memory
+                self.agents[agent_info.name] = agent_info
+                logger.info("Agent registered in memory", agent_name=agent_info.name)
+                return True
 
-                    session.commit()
-
-                    # Store in memory
-                    self.agents[agent_info.name] = agent_info
-
-                    logger.info(
-                        "Agent registered",
-                        agent_name=agent_info.name,
-                        agent_type=agent_info.type,
-                    )
-                    return True
-
-                finally:
-                    session.close()
-
-            except SQLAlchemyError as e:
+            except Exception as e:
                 logger.error(
                     "Failed to register agent", agent_name=agent_info.name, error=str(e)
                 )
@@ -241,7 +203,7 @@ class AgentSpawner:
                 "-d",
                 "-s",
                 session_name,
-                f"cd {self.project_root} && python -m src.agents.{agent_type} --name {agent_name}",
+                f"cd {self.project_root} && python -m src.agents.runner --type {agent_type} --name {agent_name}",
             ]
 
             subprocess.run(cmd, check=True)
@@ -401,14 +363,12 @@ class AgentOrchestrator:
         # Initialize task queue
         await task_queue.initialize()
 
-        # Start background tasks
-        tasks = [
-            self.health_monitor.start_monitoring(),
-            self._task_assignment_loop(),
-            self._cleanup_loop(),
-        ]
+        # Start background tasks as fire-and-forget
+        asyncio.create_task(self.health_monitor.start_monitoring())
+        asyncio.create_task(self._task_assignment_loop())
+        asyncio.create_task(self._cleanup_loop())
 
-        await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info("Agent orchestrator background tasks started")
 
     async def stop(self) -> None:
         """Stop the orchestrator."""

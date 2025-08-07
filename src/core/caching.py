@@ -219,7 +219,8 @@ class MultiLevelCache:
         """Clear all keys matching a pattern."""
         try:
             keys = []
-            async for key in self.redis_client.scan_iter(match=pattern):
+            scan_iter = self.redis_client.scan_iter(match=pattern)
+            async for key in scan_iter:
                 keys.append(key)
 
             if keys:
@@ -265,7 +266,7 @@ class MultiLevelCache:
     async def _set_l1(self, key: str, value: Any):
         """Set value in L1 cache with LRU eviction."""
         # Check if we need to evict
-        if len(self.l1_cache) >= self.config.max_size:
+        if len(self.l1_cache) >= self.config.max_size and key not in self.l1_cache:
             await self._evict_l1_lru()
 
         self.l1_cache[key] = value
@@ -277,8 +278,10 @@ class MultiLevelCache:
             return
 
         lru_key = min(self.l1_access_times, key=self.l1_access_times.get)
-        del self.l1_cache[lru_key]
-        del self.l1_access_times[lru_key]
+        if lru_key in self.l1_cache:
+            del self.l1_cache[lru_key]
+        if lru_key in self.l1_access_times:
+            del self.l1_access_times[lru_key]
         self.stats.evictions += 1
 
     def _serialize(self, value: Any) -> str:
@@ -326,7 +329,7 @@ class CacheManager:
             logger.info("Cache manager initialized")
         except Exception as e:
             logger.error("Cache manager initialization failed", error=str(e))
-            raise
+            raise ConnectionError(f"Failed to connect to Redis: {e}") from e
 
     def get_cache(
         self, namespace: str, config: CacheConfig | None = None
@@ -338,7 +341,7 @@ class CacheManager:
 
         return self.caches[namespace]
 
-    async def cached(
+    def cached(
         self,
         namespace: str,
         ttl: int | None = None,

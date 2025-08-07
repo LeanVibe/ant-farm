@@ -491,12 +491,20 @@ class DatabaseManager:
         )
 
     def create_tables(self):
-        """Create all tables."""
-        Base.metadata.create_all(bind=self.engine)
+        """Create all tables using sync engine."""
+        # Convert async URL to sync URL for table creation
+        sync_url = self.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        sync_engine = create_engine(sync_url, echo=False)
+        Base.metadata.create_all(bind=sync_engine)
+        sync_engine.dispose()
 
     def drop_tables(self):
-        """Drop all tables."""
-        Base.metadata.drop_all(bind=self.engine)
+        """Drop all tables using sync engine."""
+        # Convert async URL to sync URL for table operations
+        sync_url = self.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        sync_engine = create_engine(sync_url, echo=False)
+        Base.metadata.drop_all(bind=sync_engine)
+        sync_engine.dispose()
 
     def get_session(self):
         """Get a database session."""

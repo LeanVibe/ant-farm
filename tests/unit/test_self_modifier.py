@@ -386,7 +386,7 @@ class TestSelfModifier:
     ):
         """Test getting stats with actual modification data."""
         # Create a proposal to have some data
-        proposal_id = await self_modifier.propose_modification(
+        await self_modifier.propose_modification(
             title="Test for stats",
             description="Creating data for stats test",
             modification_type=ModificationType.BUG_FIX,

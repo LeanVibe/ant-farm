@@ -7,14 +7,11 @@ the LeanVibe Agent Hive system. The CLI provides kubectl/gh-style
 commands for power users.
 """
 
-import asyncio
 import subprocess
-import time
 from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
@@ -44,7 +41,7 @@ def run_command(cmd: str, description: str = None) -> str:
 
 def demo_section(title: str, description: str):
     """Create a demo section header"""
-    console.print(f"\n")
+    console.print("\n")
     console.print(
         Panel(
             f"[bold]{title}[/bold]\n{description}", border_style="blue", padding=(1, 2)
@@ -104,7 +101,7 @@ def main():
     run_command("make status", "Quick status check via Makefile")
 
     # Conclusion
-    console.print(f"\n")
+    console.print("\n")
     console.print(
         Panel(
             "[bold green]✅ CLI Demo Complete![/bold green]\n\n"
