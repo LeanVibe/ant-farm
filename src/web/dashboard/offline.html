@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#00d4aa">
+    <title>LeanVibe Agent Hive - Offline</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow-x: hidden;
+        }
+
+        .offline-container {
+            max-width: 600px;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .offline-animation {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+            position: relative;
+        }
+
+        .wifi-icon {
+            font-size: 4rem;
+            color: #666;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .offline-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #00d4aa;
+            text-shadow: 0 0 20px rgba(0, 212, 170, 0.3);
+        }
+
+        .offline-subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .retry-section {
+            margin: 2rem 0;
+        }
+
+        .retry-button {
+            background: linear-gradient(135deg, #00d4aa, #00e5bb);
+            color: #1a1a2e;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            box-shadow: 0 4px 20px rgba(0, 212, 170, 0.3);
+            margin: 0 0.5rem;
+        }
+
+        .retry-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 212, 170, 0.4);
+        }
+
+        .retry-button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .retry-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 6px 25px rgba(255, 255, 255, 0.2);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: left;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .feature-card h3 {
+            color: #00d4aa;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .feature-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-card li {
+            margin-bottom: 0.5rem;
+            opacity: 0.8;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .feature-card li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #00d4aa;
+            font-weight: bold;
+        }
+
+        .network-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-info {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .offline-container {
+                padding: 1rem;
+            }
+
+            .offline-title {
+                font-size: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .retry-button {
+                display: block;
+                width: 100%;
+                margin: 0.5rem 0;
+            }
+        }
+
+        /* Loading animation */
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .loading.show {
+            display: flex;
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00d4aa;
+            animation: loading 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes loading {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="network-status" id="networkStatus">
+        <span id="networkStatusText">Offline</span>
+    </div>
+
+    <div class="offline-container">
+        <div class="offline-animation">
+            <div class="wifi-icon">📡</div>
+        </div>
+
+        <h1 class="offline-title">You're Offline</h1>
+        
+        <p class="offline-subtitle">
+            Don't worry! The LeanVibe Agent Hive dashboard works offline too. 
+            Some features are cached and ready to use.
+        </p>
+
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span>No internet connection</span>
+        </div>
+
+        <div class="retry-section">
+            <button class="retry-button" onclick="retryConnection()">
+                Try Again
+            </button>
+            <a href="/" class="retry-button secondary">
+                Go to Dashboard
+            </a>
+        </div>
+
+        <div class="loading" id="loading">
+            <span>Checking connection</span>
+            <div class="loading-dots">
+                <div class="loading-dot"></div>
+                <div class="loading-dot"></div>
+                <div class="loading-dot"></div>
+            </div>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>📊 Available Offline</h3>
+                <ul>
+                    <li>Cached dashboard interface</li>
+                    <li>Previous session data</li>
+                    <li>Agent status history</li>
+                    <li>Task information</li>
+                    <li>System metrics</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>🔄 Auto-Sync</h3>
+                <ul>
+                    <li>Automatic reconnection</li>
+                    <li>Background data sync</li>
+                    <li>Queued actions</li>
+                    <li>Real-time updates</li>
+                    <li>Seamless experience</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>📱 PWA Features</h3>
+                <ul>
+                    <li>Installable app</li>
+                    <li>Offline functionality</li>
+                    <li>Push notifications</li>
+                    <li>Background sync</li>
+                    <li>Native app feel</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-info">
+            <p>
+                LeanVibe Agent Hive • Progressive Web App<br>
+                This app will automatically reconnect when your internet connection is restored.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let isCheckingConnection = false;
+
+        // Update network status
+        function updateNetworkStatus() {
+            const statusText = document.getElementById('networkStatusText');
+            const statusIndicator = document.querySelector('.status-indicator');
+            const statusDot = document.querySelector('.status-dot');
+            
+            if (navigator.onLine) {
+                statusText.textContent = 'Online';
+                statusIndicator.querySelector('span').textContent = 'Connection restored';
+                statusDot.style.background = '#00d4aa';
+                statusDot.style.animation = 'none';
+                
+                // Redirect to dashboard after a short delay
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+            } else {
+                statusText.textContent = 'Offline';
+                statusIndicator.querySelector('span').textContent = 'No internet connection';
+                statusDot.style.background = '#ff6b6b';
+                statusDot.style.animation = 'blink 1.5s infinite';
+            }
+        }
+
+        // Retry connection
+        async function retryConnection() {
+            if (isCheckingConnection) return;
+            
+            isCheckingConnection = true;
+            const loading = document.getElementById('loading');
+            loading.classList.add('show');
+            
+            try {
+                // Try to fetch a small resource to test connectivity
+                const response = await fetch('/api/v1/health', {
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (response.ok) {
+                    // Connection restored
+                    updateNetworkStatus();
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    throw new Error('Server not responding');
+                }
+            } catch (error) {
+                console.log('Connection test failed:', error);
+                // Show temporary message
+                const statusIndicator = document.querySelector('.status-indicator span');
+                const originalText = statusIndicator.textContent;
+                statusIndicator.textContent = 'Still offline - try again later';
+                
+                setTimeout(() => {
+                    statusIndicator.textContent = originalText;
+                }, 3000);
+            } finally {
+                loading.classList.remove('show');
+                isCheckingConnection = false;
+            }
+        }
+
+        // Auto-retry every 30 seconds
+        setInterval(() => {
+            if (navigator.onLine && !isCheckingConnection) {
+                retryConnection();
+            }
+        }, 30000);
+
+        // Listen for online/offline events
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+
+        // Initialize
+        updateNetworkStatus();
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
+                event.preventDefault();
+                retryConnection();
+            }
+        });
+
+        // Service worker communication
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data.type === 'CONNECTIVITY_CHANGE') {
+                    updateNetworkStatus();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

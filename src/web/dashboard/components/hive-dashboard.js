@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { pwaManager } from '../services/pwa-manager.js';
 
 export class HiveDashboard extends LitElement {
     static styles = css`
@@ -163,6 +164,31 @@ export class HiveDashboard extends LitElement {
         super.connectedCallback();
         this.initializeWebSocket();
         this.loadSystemStatus();
+        this.initializePWA();
+    }
+
+    initializePWA() {
+        // Initialize PWA features
+        if (pwaManager) {
+            // Set up offline status indicator
+            window.addEventListener('online', () => {
+                this.updateConnectivityStatus(true);
+            });
+            
+            window.addEventListener('offline', () => {
+                this.updateConnectivityStatus(false);
+            });
+            
+            // Check initial connectivity
+            this.updateConnectivityStatus(navigator.onLine);
+        }
+    }
+
+    updateConnectivityStatus(isOnline) {
+        const statusIndicator = this.shadowRoot?.querySelector('.status-indicator span');
+        if (statusIndicator) {
+            statusIndicator.textContent = isOnline ? 'System Operational' : 'Offline Mode';
+        }
     }
 
     initializeWebSocket() {
