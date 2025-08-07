@@ -202,10 +202,24 @@ watch: ## Watch system activity (split screen)
 
 .PHONY: tools
 tools: ## Check available CLI agentic coding tools
-	@echo "Checking CLI agentic coding tools..."
-	@which opencode >/dev/null 2>&1 && echo "✓ opencode installed" || echo "✗ opencode not found"
-	@which claude >/dev/null 2>&1 && echo "✓ claude installed" || echo "✗ claude not found"
-	@which gemini >/dev/null 2>&1 && echo "✓ gemini installed" || echo "✗ gemini not found"
+	@echo "CLI Agentic Coding Tools:"
+	@echo "========================"
+	@which opencode >/dev/null 2>&1 && echo "✓ opencode detected (PREFERRED)" || echo "✗ opencode not found - install: curl -fsSL https://opencode.ai/install | bash"
+	@which claude >/dev/null 2>&1 && echo "✓ Claude Code CLI detected" || echo "✗ Claude Code CLI not found - install: https://claude.ai/cli"
+	@which gemini >/dev/null 2>&1 && echo "✓ Gemini CLI detected" || echo "✗ Gemini CLI not found - install: https://ai.google.dev/gemini-api/docs/cli"
+	@which gcloud >/dev/null 2>&1 && gcloud ai --version >/dev/null 2>&1 && echo "✓ Google Cloud AI detected" || true
+	@echo ""
+	@if ! which opencode >/dev/null 2>&1 && ! which claude >/dev/null 2>&1 && ! which gemini >/dev/null 2>&1 && ! (which gcloud >/dev/null 2>&1 && gcloud ai --version >/dev/null 2>&1); then \
+		echo "⚠️  WARNING: No CLI agentic coding tools detected!"; \
+		echo "   Install at least one tool for optimal experience:"; \
+		echo "   • opencode (recommended): curl -fsSL https://opencode.ai/install | bash"; \
+		echo "   • Claude Code CLI: https://claude.ai/cli"; \
+		echo "   • Gemini CLI: https://ai.google.dev/gemini-api/docs/cli"; \
+		echo ""; \
+		echo "   System will still work with API keys as fallback."; \
+	else \
+		echo "✓ At least one CLI tool detected - system ready!"; \
+	fi
 	@echo ""
 	@echo "Priority order: opencode (preferred) → claude → gemini → API fallback"
 	@echo "Force specific tool: export PREFERRED_CLI_TOOL=opencode"
