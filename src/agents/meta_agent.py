@@ -5,6 +5,7 @@ import json
 import os
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass
@@ -196,7 +197,10 @@ class MetaAgent(BaseAgent):
 
             for agent in agents:
                 # Check if agent is responsive (simplified)
-                if agent.last_heartbeat and (time.time() - agent.last_heartbeat) < 300:
+                if (
+                    agent.last_heartbeat
+                    and (datetime.utcnow() - agent.last_heartbeat).total_seconds() < 300
+                ):
                     healthy_agents += 1
 
             agent_health = healthy_agents / total_agents if total_agents > 0 else 0.0
@@ -323,7 +327,8 @@ class MetaAgent(BaseAgent):
             unresponsive_agents = [
                 agent.name
                 for agent in agents
-                if agent.last_heartbeat and (time.time() - agent.last_heartbeat) > 300
+                if agent.last_heartbeat
+                and (datetime.utcnow() - agent.last_heartbeat).total_seconds() > 300
             ]
             db_session.close()
 

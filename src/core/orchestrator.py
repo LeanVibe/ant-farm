@@ -5,6 +5,7 @@ import json
 import subprocess
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Any
 import psycopg2
@@ -21,6 +22,7 @@ logger = structlog.get_logger()
 
 class AgentStatus(Enum):
     """Agent status enumeration."""
+
     STARTING = "starting"
     ACTIVE = "active"
     IDLE = "idle"
@@ -33,6 +35,7 @@ class AgentStatus(Enum):
 @dataclass
 class AgentInfo:
     """Agent information structure."""
+
     id: str
     name: str
     type: str
@@ -51,6 +54,7 @@ class AgentInfo:
 @dataclass
 class SystemHealth:
     """System health metrics."""
+
     total_agents: int
     active_agents: int
     idle_agents: int
@@ -63,12 +67,12 @@ class SystemHealth:
 
 class AgentRegistry:
     """Manages agent registration and tracking."""
-    
+
     def __init__(self, db_url: str):
         self.db_url = db_url
         self.agents: Dict[str, AgentInfo] = {}
         self._lock = asyncio.Lock()
-    
+
     async def register_agent(self, agent_info: AgentInfo) -> bool:
         """Register a new agent."""
         async with self._lock:
@@ -76,157 +80,190 @@ class AgentRegistry:
                 # Store in database
                 conn = psycopg2.connect(self.db_url)
                 with conn.cursor() as cursor:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO agents (id, name, type, role, capabilities, status, tmux_session, created_at, last_heartbeat)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                         ON CONFLICT (name) DO UPDATE SET
                             status = EXCLUDED.status,
                             last_heartbeat = NOW()
-                    """, (
-                        agent_info.id,
-                        agent_info.name,
-                        agent_info.type,
-                        agent_info.role,
-                        json.dumps(agent_info.capabilities),
-                        agent_info.status.value,
-                        agent_info.tmux_session
-                    ))
+                    """,
+                        (
+                            agent_info.id,
+                            agent_info.name,
+                            agent_info.type,
+                            agent_info.role,
+                            json.dumps(agent_info.capabilities),
+                            agent_info.status.value,
+                            agent_info.tmux_session,
+                        ),
+                    )
                     conn.commit()
                 conn.close()
-                
+
                 # Store in memory
                 self.agents[agent_info.name] = agent_info
-                
-                logger.info("Agent registered", agent_name=agent_info.name, agent_type=agent_info.type)
+
+                logger.info(
+                    "Agent registered",
+                    agent_name=agent_info.name,
+                    agent_type=agent_info.type,
+                )
                 return True
-                
+
             except Exception as e:
-                logger.error("Failed to register agent", agent_name=agent_info.name, error=str(e))
+                logger.error(
+                    "Failed to register agent", agent_name=agent_info.name, error=str(e)
+                )
                 return False
-    
-    async def update_agent_status(self, agent_name: str, status: AgentStatus, current_task_id: Optional[str] = None) -> bool:
+
+    async def update_agent_status(
+        self,
+        agent_name: str,
+        status: AgentStatus,
+        current_task_id: Optional[str] = None,
+    ) -> bool:
         """Update agent status."""
         async with self._lock:
             if agent_name not in self.agents:
                 return False
-            
+
             self.agents[agent_name].status = status
-            self.agents[agent_name].last_heartbeat = time.time()
+            self.agents[agent_name].last_heartbeat = datetime.utcnow()
             if current_task_id is not None:
                 self.agents[agent_name].current_task_id = current_task_id
-            
+
             # Update database
             try:
                 conn = psycopg2.connect(self.db_url)
                 with conn.cursor() as cursor:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE agents 
                         SET status = %s, last_heartbeat = NOW() 
                         WHERE name = %s
-                    """, (status.value, agent_name))
+                    """,
+                        (status.value, agent_name),
+                    )
                     conn.commit()
                 conn.close()
                 return True
             except Exception as e:
-                logger.error("Failed to update agent status", agent_name=agent_name, error=str(e))
+                logger.error(
+                    "Failed to update agent status", agent_name=agent_name, error=str(e)
+                )
                 return False
-    
+
     async def get_agent(self, agent_name: str) -> Optional[AgentInfo]:
         """Get agent information."""
         return self.agents.get(agent_name)
-    
-    async def list_agents(self, status_filter: Optional[AgentStatus] = None) -> List[AgentInfo]:
+
+    async def list_agents(
+        self, status_filter: Optional[AgentStatus] = None
+    ) -> List[AgentInfo]:
         """List all agents, optionally filtered by status."""
         agents = list(self.agents.values())
         if status_filter:
             agents = [a for a in agents if a.status == status_filter]
         return agents
-    
+
     async def remove_agent(self, agent_name: str) -> bool:
         """Remove agent from registry."""
         async with self._lock:
             if agent_name in self.agents:
                 del self.agents[agent_name]
-                
+
                 # Update database
                 try:
                     conn = psycopg2.connect(self.db_url)
                     with conn.cursor() as cursor:
-                        cursor.execute("DELETE FROM agents WHERE name = %s", (agent_name,))
+                        cursor.execute(
+                            "DELETE FROM agents WHERE name = %s", (agent_name,)
+                        )
                         conn.commit()
                     conn.close()
                     return True
                 except Exception as e:
-                    logger.error("Failed to remove agent from database", agent_name=agent_name, error=str(e))
+                    logger.error(
+                        "Failed to remove agent from database",
+                        agent_name=agent_name,
+                        error=str(e),
+                    )
                     return False
             return False
 
 
 class AgentSpawner:
     """Handles spawning new agent instances."""
-    
+
     def __init__(self, project_root: Path):
         self.project_root = project_root
-    
-    async def spawn_agent(self, agent_type: str, agent_name: str, capabilities: List[str] = None) -> Optional[str]:
+
+    async def spawn_agent(
+        self, agent_type: str, agent_name: str, capabilities: List[str] = None
+    ) -> Optional[str]:
         """Spawn a new agent in a tmux session."""
         if capabilities is None:
             capabilities = []
-        
+
         session_name = f"hive-{agent_name}"
-        
+
         try:
             # Create tmux session
             cmd = [
-                "tmux", "new-session", "-d", "-s", session_name,
-                f"cd {self.project_root} && python -m src.agents.{agent_type} --name {agent_name}"
+                "tmux",
+                "new-session",
+                "-d",
+                "-s",
+                session_name,
+                f"cd {self.project_root} && python -m src.agents.{agent_type} --name {agent_name}",
             ]
-            
+
             subprocess.run(cmd, check=True)
-            
+
             logger.info("Agent spawned", agent_name=agent_name, session=session_name)
             return session_name
-            
+
         except subprocess.CalledProcessError as e:
             logger.error("Failed to spawn agent", agent_name=agent_name, error=str(e))
             return None
-    
+
     async def terminate_agent(self, agent_name: str, session_name: str) -> bool:
         """Terminate an agent and its tmux session."""
         try:
             # Send graceful shutdown signal
-            subprocess.run([
-                "tmux", "send-keys", "-t", session_name, "C-c", "Enter"
-            ], check=True)
-            
+            subprocess.run(
+                ["tmux", "send-keys", "-t", session_name, "C-c", "Enter"], check=True
+            )
+
             # Wait a bit for graceful shutdown
             await asyncio.sleep(2)
-            
+
             # Force kill session if still running
-            subprocess.run([
-                "tmux", "kill-session", "-t", session_name
-            ], check=True)
-            
+            subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
+
             logger.info("Agent terminated", agent_name=agent_name)
             return True
-            
+
         except subprocess.CalledProcessError as e:
-            logger.error("Failed to terminate agent", agent_name=agent_name, error=str(e))
+            logger.error(
+                "Failed to terminate agent", agent_name=agent_name, error=str(e)
+            )
             return False
 
 
 class HealthMonitor:
     """Monitors agent health and system metrics."""
-    
+
     def __init__(self, registry: AgentRegistry, heartbeat_interval: int = 30):
         self.registry = registry
         self.heartbeat_interval = heartbeat_interval
         self.running = False
-    
+
     async def start_monitoring(self) -> None:
         """Start health monitoring loop."""
         self.running = True
-        
+
         while self.running:
             try:
                 await self._check_agent_health()
@@ -234,34 +271,36 @@ class HealthMonitor:
             except Exception as e:
                 logger.error("Health monitor error", error=str(e))
                 await asyncio.sleep(5)
-    
+
     async def stop_monitoring(self) -> None:
         """Stop health monitoring."""
         self.running = False
-    
+
     async def _check_agent_health(self) -> None:
         """Check health of all agents."""
         current_time = time.time()
         dead_agents = []
-        
+
         for agent_name, agent_info in self.registry.agents.items():
             # Check heartbeat timeout
             time_since_heartbeat = current_time - agent_info.last_heartbeat
-            
+
             if time_since_heartbeat > self.heartbeat_interval * 2:
                 if agent_info.status != AgentStatus.STOPPED:
-                    logger.warning("Agent appears unresponsive", 
-                                 agent_name=agent_name, 
-                                 time_since_heartbeat=time_since_heartbeat)
-                    
+                    logger.warning(
+                        "Agent appears unresponsive",
+                        agent_name=agent_name,
+                        time_since_heartbeat=time_since_heartbeat,
+                    )
+
                     # Try to ping the agent
                     if not await self._ping_agent(agent_name):
                         dead_agents.append(agent_name)
-        
+
         # Handle dead agents
         for agent_name in dead_agents:
             await self._handle_dead_agent(agent_name)
-    
+
     async def _ping_agent(self, agent_name: str) -> bool:
         """Ping an agent to check if it's responsive."""
         try:
@@ -270,110 +309,115 @@ class HealthMonitor:
                 from_agent="orchestrator",
                 to_agent=agent_name,
                 topic="ping",
-                payload={"timestamp": time.time()}
+                payload={"timestamp": time.time()},
             )
-            
+
             # Wait for pong response (simplified - would need proper message handling)
             # This is a basic implementation
             return True
-            
+
         except Exception as e:
             logger.error("Failed to ping agent", agent_name=agent_name, error=str(e))
             return False
-    
+
     async def _handle_dead_agent(self, agent_name: str) -> None:
         """Handle a dead/unresponsive agent."""
         agent_info = await self.registry.get_agent(agent_name)
         if not agent_info:
             return
-        
+
         # Mark as error state
         await self.registry.update_agent_status(agent_name, AgentStatus.ERROR)
-        
+
         # If agent had a current task, mark it as failed
         if agent_info.current_task_id:
             await task_queue.fail_task(
-                agent_info.current_task_id, 
-                f"Agent {agent_name} became unresponsive"
+                agent_info.current_task_id, f"Agent {agent_name} became unresponsive"
             )
-        
+
         # Clean up tmux session if it exists
         if agent_info.tmux_session:
             try:
-                subprocess.run([
-                    "tmux", "kill-session", "-t", agent_info.tmux_session
-                ], check=False)  # Don't fail if session doesn't exist
+                subprocess.run(
+                    ["tmux", "kill-session", "-t", agent_info.tmux_session], check=False
+                )  # Don't fail if session doesn't exist
             except Exception:
                 pass
-        
+
         logger.error("Agent marked as dead", agent_name=agent_name)
 
 
 class AgentOrchestrator:
     """Main orchestrator for managing agent lifecycle and task distribution."""
-    
-    def __init__(self, 
-                 db_url: str,
-                 project_root: Path,
-                 max_agents: int = 50,
-                 heartbeat_interval: int = 30):
+
+    def __init__(
+        self,
+        db_url: str,
+        project_root: Path,
+        max_agents: int = 50,
+        heartbeat_interval: int = 30,
+    ):
         self.db_url = db_url
         self.project_root = project_root
         self.max_agents = max_agents
-        
+
         self.registry = AgentRegistry(db_url)
         self.spawner = AgentSpawner(project_root)
         self.health_monitor = HealthMonitor(self.registry, heartbeat_interval)
-        
+
         self.running = False
         self.task_assignment_running = False
-    
+
     async def start(self) -> None:
         """Start the orchestrator."""
         self.running = True
         logger.info("Agent orchestrator starting")
-        
+
         # Initialize task queue
         await task_queue.initialize()
-        
+
         # Start background tasks
         tasks = [
             self.health_monitor.start_monitoring(),
             self._task_assignment_loop(),
-            self._cleanup_loop()
+            self._cleanup_loop(),
         ]
-        
+
         await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     async def stop(self) -> None:
         """Stop the orchestrator."""
         self.running = False
         self.task_assignment_running = False
         await self.health_monitor.stop_monitoring()
         logger.info("Agent orchestrator stopped")
-    
-    async def spawn_agent(self, agent_type: str, agent_name: str = None, capabilities: List[str] = None) -> Optional[str]:
+
+    async def spawn_agent(
+        self, agent_type: str, agent_name: str = None, capabilities: List[str] = None
+    ) -> Optional[str]:
         """Spawn a new agent."""
         if len(self.registry.agents) >= self.max_agents:
             logger.warning("Maximum agent limit reached", max_agents=self.max_agents)
             return None
-        
+
         if not agent_name:
             agent_name = f"{agent_type}-{uuid.uuid4().hex[:8]}"
-        
+
         if capabilities is None:
             capabilities = self._get_default_capabilities(agent_type)
-        
+
         # Check if agent name already exists
         if agent_name in self.registry.agents:
             logger.warning("Agent name already exists", agent_name=agent_name)
             return None
-        
+
         # Spawn the agent
-        session_name = await self.spawner.spawn_agent(agent_type, agent_name, capabilities)
+        session_name = await self.spawner.spawn_agent(
+            agent_type, agent_name, capabilities
+        )
         if not session_name:
             return None
-        
+
         # Register the agent
         agent_info = AgentInfo(
             id=str(uuid.uuid4()),
@@ -383,55 +427,61 @@ class AgentOrchestrator:
             status=AgentStatus.STARTING,
             capabilities=capabilities,
             tmux_session=session_name,
-            last_heartbeat=time.time(),
-            created_at=time.time(),
+            last_heartbeat=datetime.utcnow(),
+            created_at=datetime.utcnow(),
             tasks_completed=0,
-            tasks_failed=0
+            tasks_failed=0,
         )
-        
+
         if await self.registry.register_agent(agent_info):
-            logger.info("Agent successfully spawned and registered", agent_name=agent_name)
+            logger.info(
+                "Agent successfully spawned and registered", agent_name=agent_name
+            )
             return agent_name
         else:
             # Registration failed, clean up
             await self.spawner.terminate_agent(agent_name, session_name)
             return None
-    
+
     async def terminate_agent(self, agent_name: str) -> bool:
         """Terminate an agent."""
         agent_info = await self.registry.get_agent(agent_name)
         if not agent_info:
             return False
-        
+
         # Mark as stopping
         await self.registry.update_agent_status(agent_name, AgentStatus.STOPPING)
-        
+
         # Terminate the session
-        success = await self.spawner.terminate_agent(agent_name, agent_info.tmux_session)
-        
+        success = await self.spawner.terminate_agent(
+            agent_name, agent_info.tmux_session
+        )
+
         if success:
             # Remove from registry
             await self.registry.remove_agent(agent_name)
-        
+
         return success
-    
+
     async def get_system_health(self) -> SystemHealth:
         """Get comprehensive system health metrics."""
         agents = await self.registry.list_agents()
-        
+
         status_counts = {status: 0 for status in AgentStatus}
         total_load = 0.0
-        
+
         for agent in agents:
             status_counts[agent.status] += 1
             total_load += agent.load_factor
-        
+
         # Get queue stats
         queue_stats = await task_queue.get_queue_stats()
-        
+
         # Calculate tasks per minute (simplified)
-        tasks_per_minute = queue_stats.completed_tasks / max(1, (time.time() - 3600) / 60)  # Rough estimate
-        
+        tasks_per_minute = queue_stats.completed_tasks / max(
+            1, (time.time() - 3600) / 60
+        )  # Rough estimate
+
         return SystemHealth(
             total_agents=len(agents),
             active_agents=status_counts[AgentStatus.ACTIVE],
@@ -440,94 +490,91 @@ class AgentOrchestrator:
             error_agents=status_counts[AgentStatus.ERROR],
             avg_load_factor=total_load / max(1, len(agents)),
             queue_size=sum(queue_stats.queue_size_by_priority.values()),
-            tasks_per_minute=tasks_per_minute
+            tasks_per_minute=tasks_per_minute,
         )
-    
+
     async def _task_assignment_loop(self) -> None:
         """Main task assignment loop."""
         self.task_assignment_running = True
-        
+
         while self.running and self.task_assignment_running:
             try:
                 # Get available agents
                 available_agents = await self.registry.list_agents(AgentStatus.IDLE)
-                
+
                 if not available_agents:
                     await asyncio.sleep(1)
                     continue
-                
+
                 # Try to assign tasks
                 for agent_info in available_agents:
                     # Get next task for this agent
                     task = await self._find_suitable_task(agent_info)
-                    
+
                     if task:
                         # Assign task to agent
                         await self._assign_task_to_agent(task, agent_info)
-                
+
                 await asyncio.sleep(1)  # Check every second
-                
+
             except Exception as e:
                 logger.error("Task assignment loop error", error=str(e))
                 await asyncio.sleep(5)
-    
+
     async def _find_suitable_task(self, agent_info: AgentInfo) -> Optional[Task]:
         """Find a suitable task for the given agent based on capabilities."""
         # Simple implementation - get any task the agent can handle
         # In a more sophisticated system, this would match task requirements to agent capabilities
-        
+
         task = await task_queue.get_task(agent_info.name)
         return task
-    
+
     async def _assign_task_to_agent(self, task: Task, agent_info: AgentInfo) -> bool:
         """Assign a task to an agent."""
         try:
             # Update agent status
             await self.registry.update_agent_status(
-                agent_info.name, 
-                AgentStatus.BUSY, 
-                task.id
+                agent_info.name, AgentStatus.BUSY, task.id
             )
-            
+
             # Send task to agent via message broker
             await message_broker.send_message(
                 from_agent="orchestrator",
                 to_agent=agent_info.name,
                 topic="task_assignment",
-                payload={
-                    "task_id": task.id,
-                    "task": task.model_dump()
-                }
+                payload={"task_id": task.id, "task": task.model_dump()},
             )
-            
-            logger.info("Task assigned to agent", 
-                       task_id=task.id, 
-                       agent_name=agent_info.name)
+
+            logger.info(
+                "Task assigned to agent", task_id=task.id, agent_name=agent_info.name
+            )
             return True
-            
+
         except Exception as e:
-            logger.error("Failed to assign task", 
-                        task_id=task.id, 
-                        agent_name=agent_info.name, 
-                        error=str(e))
+            logger.error(
+                "Failed to assign task",
+                task_id=task.id,
+                agent_name=agent_info.name,
+                error=str(e),
+            )
             return False
-    
+
     async def _cleanup_loop(self) -> None:
         """Periodic cleanup tasks."""
         while self.running:
             try:
                 # Clean up expired tasks
                 await task_queue.cleanup_expired_tasks()
-                
+
                 # Clean up orphaned tmux sessions
                 await self._cleanup_orphaned_sessions()
-                
+
                 await asyncio.sleep(300)  # Run every 5 minutes
-                
+
             except Exception as e:
                 logger.error("Cleanup loop error", error=str(e))
                 await asyncio.sleep(60)
-    
+
     async def _cleanup_orphaned_sessions(self) -> None:
         """Clean up tmux sessions that don't have corresponding agents."""
         try:
@@ -535,28 +582,36 @@ class AgentOrchestrator:
             result = subprocess.run(
                 ["tmux", "list-sessions", "-F", "#{session_name}"],
                 capture_output=True,
-                text=True
+                text=True,
             )
-            
+
             if result.returncode != 0:
                 return
-            
-            active_sessions = set(result.stdout.strip().split('\n'))
-            agent_sessions = {agent.tmux_session for agent in self.registry.agents.values() if agent.tmux_session}
-            
+
+            active_sessions = set(result.stdout.strip().split("\n"))
+            agent_sessions = {
+                agent.tmux_session
+                for agent in self.registry.agents.values()
+                if agent.tmux_session
+            }
+
             # Find orphaned sessions (sessions that start with 'hive-' but don't have agents)
-            orphaned = {s for s in active_sessions if s.startswith('hive-') and s not in agent_sessions}
-            
+            orphaned = {
+                s
+                for s in active_sessions
+                if s.startswith("hive-") and s not in agent_sessions
+            }
+
             for session in orphaned:
                 try:
                     subprocess.run(["tmux", "kill-session", "-t", session], check=True)
                     logger.info("Cleaned up orphaned session", session=session)
                 except subprocess.CalledProcessError:
                     pass
-                    
+
         except Exception as e:
             logger.error("Failed to cleanup orphaned sessions", error=str(e))
-    
+
     def _get_default_capabilities(self, agent_type: str) -> List[str]:
         """Get default capabilities for agent type."""
         capability_map = {
@@ -564,14 +619,15 @@ class AgentOrchestrator:
             "developer": ["code_generation", "testing", "debugging"],
             "qa": ["testing", "quality_assurance", "bug_reporting"],
             "architect": ["system_design", "architecture_planning"],
-            "devops": ["deployment", "infrastructure", "monitoring"]
+            "devops": ["deployment", "infrastructure", "monitoring"],
         }
-        
+
         return capability_map.get(agent_type, ["general"])
 
 
 # Global orchestrator instance
 orchestrator = None
+
 
 async def get_orchestrator(db_url: str, project_root: Path) -> AgentOrchestrator:
     """Get the global orchestrator instance."""
