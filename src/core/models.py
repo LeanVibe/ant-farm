@@ -15,6 +15,23 @@ from sqlalchemy import (
     event,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+try:
+    from pgvector.sqlalchemy import Vector
+
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    PGVECTOR_AVAILABLE = False
+
+    # Fallback for when pgvector is not available
+    class Vector:
+        def __init__(self, dim):
+            self.dim = dim
+
+        def __call__(self, *args, **kwargs):
+            return Text  # Fallback to TEXT column
+
+
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -211,8 +228,10 @@ class Context(Base):
     content = Column(Text, nullable=False)
     content_type = Column(String(50), default="text")  # text, code, image, etc.
 
-    # For future pgvector support
-    # embedding = Column(VECTOR(1536))  # OpenAI ada-002 dimension
+    # Vector embeddings for semantic search
+    embedding = Column(
+        Vector(1536) if PGVECTOR_AVAILABLE else Text
+    )  # OpenAI ada-002 dimension
     embedding_model = Column(String(100))  # Which model created the embedding
 
     # Classification and importance
@@ -272,8 +291,10 @@ class Conversation(Base):
     topic = Column(String(200), index=True)
     content = Column(Text, nullable=False)
 
-    # For future pgvector support
-    # embedding = Column(VECTOR(1536))  # For semantic search of conversations
+    # Vector embeddings for semantic search of conversations
+    embedding = Column(
+        Vector(1536) if PGVECTOR_AVAILABLE else Text
+    )  # For semantic search
 
     # Message threading
     reply_to = Column(UUID(as_uuid=True), ForeignKey("conversations.id"))

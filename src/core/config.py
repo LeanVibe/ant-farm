@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     database_max_overflow: int = Field(default=20, env="DATABASE_MAX_OVERFLOW")
 
     # Redis Configuration
-    redis_url: str = Field(default="redis://localhost:6380", env="REDIS_URL")
+    redis_url: str = Field(default="redis://localhost:6381", env="REDIS_URL")
     redis_password: str | None = Field(default=None, env="REDIS_PASSWORD")
     redis_db: int = Field(default=0, env="REDIS_DB")
 

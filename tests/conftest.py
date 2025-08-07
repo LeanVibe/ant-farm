@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://test_user:test_pass@localhost:5433/test_leanvibe_hive"
 )
-TEST_REDIS_URL = "redis://localhost:6380"
+TEST_REDIS_URL = "redis://localhost:6381"
 
 
 @pytest.fixture(scope="session")
@@ -78,7 +78,7 @@ def mock_agent():
 @pytest.fixture
 def sample_task():
     """Create a sample task for testing."""
-    from src.core.models import Task
+    from src.core.task_queue import Task
 
     return Task(
         id="test-task-123",
