@@ -187,10 +187,92 @@ async def system_event_broadcaster():
 # FastAPI app
 app = FastAPI(
     title="LeanVibe Agent Hive 2.0",
-    description="Multi-agent autonomous development system",
+    description="""
+    **LeanVibe Agent Hive 2.0** is an autonomous multi-agent development system that uses AI agents to build and enhance software continuously.
+
+    ## Features
+
+    * **Multi-Agent Orchestration**: Spawn, monitor, and coordinate multiple AI agents
+    * **Real-time Task Management**: Create, assign, and track development tasks
+    * **Self-Improvement Engine**: Agents can modify their own code safely
+    * **Advanced Context Engine**: Semantic memory and knowledge management
+    * **WebSocket Events**: Real-time dashboard updates and notifications
+    * **Progressive Web App**: Installable with offline capabilities
+    * **Security**: JWT authentication with role-based permissions
+
+    ## Authentication
+
+    Most endpoints require authentication using JWT Bearer tokens. Get your token by calling the `/api/v1/auth/login` endpoint.
+
+    ## Rate Limiting
+
+    API calls are rate-limited per IP address:
+    - Authentication endpoints: 10 requests/minute
+    - General endpoints: 100 requests/minute
+    - WebSocket connections: 50 connections/minute
+
+    ## WebSocket Events
+
+    Connect to `/api/v1/ws/events` for real-time updates:
+    - `system-status`: System health and metrics
+    - `agent-update`: Agent lifecycle events
+    - `task-update`: Task status changes
+    - `message`: Inter-agent communication
+    - `metrics-update`: Performance metrics
+
+    ## Error Handling
+
+    All endpoints return standardized error responses:
+    - 400: Bad Request - Invalid input data
+    - 401: Unauthorized - Authentication required
+    - 403: Forbidden - Insufficient permissions
+    - 404: Not Found - Resource not found
+    - 429: Too Many Requests - Rate limit exceeded
+    - 500: Internal Server Error - System error
+    """,
     version="2.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    openapi_tags=[
+        {
+            "name": "Authentication",
+            "description": "User authentication and authorization endpoints",
+        },
+        {
+            "name": "System",
+            "description": "System status, health checks, and control operations",
+        },
+        {"name": "Agents", "description": "Agent lifecycle management and monitoring"},
+        {"name": "Tasks", "description": "Task creation, assignment, and tracking"},
+        {
+            "name": "Messages",
+            "description": "Inter-agent communication and broadcasting",
+        },
+        {"name": "Metrics", "description": "System performance and monitoring data"},
+        {"name": "Context", "description": "Memory and context management for agents"},
+        {
+            "name": "Modifications",
+            "description": "Self-improvement and code modification system",
+        },
+        {
+            "name": "Workflows",
+            "description": "Development workflow and Git integration",
+        },
+        {
+            "name": "Diagnostics",
+            "description": "System diagnostics and troubleshooting",
+        },
+    ],
+    contact={
+        "name": "LeanVibe Team",
+        "url": "https://leanvibe.ai",
+        "email": "support@leanvibe.ai",
+    },
+    license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
+    servers=[
+        {"url": "http://localhost:8000", "description": "Development server"},
+        {"url": "https://hive.leanvibe.ai", "description": "Production server"},
+    ],
 )
 
 # Add security middleware
@@ -502,7 +584,64 @@ async def handle_websocket_message(websocket: WebSocket, message: dict):
 
 
 # Authentication endpoints
-@app.post("/api/v1/auth/login", response_model=APIResponse)
+@app.post(
+    "/api/v1/auth/login",
+    response_model=APIResponse,
+    tags=["Authentication"],
+    summary="User Login",
+    description="""
+          Authenticate a user and receive JWT access and refresh tokens.
+          
+          The access token expires in 30 minutes and should be included in the 
+          Authorization header as 'Bearer <token>' for subsequent requests.
+          
+          The refresh token expires in 7 days and can be used to obtain new 
+          access tokens without re-entering credentials.
+          """,
+    responses={
+        200: {
+            "description": "Login successful",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                            "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                            "token_type": "bearer",
+                            "expires_in": 1800,
+                            "user": {
+                                "id": "123e4567-e89b-12d3-a456-426614174000",
+                                "username": "admin",
+                                "email": "admin@leanvibe.ai",
+                                "is_admin": True,
+                                "permissions": ["system:admin", "agent:write"],
+                            },
+                        },
+                        "timestamp": 1640995200.0,
+                        "request_id": "req_123456",
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Invalid credentials or account locked",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid username or password"}
+                }
+            },
+        },
+        429: {
+            "description": "Too many login attempts",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Rate limit exceeded: 10 requests per minute"}
+                }
+            },
+        },
+    },
+)
 @rate_limit(10)  # Limit login attempts
 async def login(request: Request, login_request: LoginRequest):
     """Authenticate user and return JWT tokens."""
@@ -660,7 +799,36 @@ async def broadcast_event(event_type: str, payload: dict):
 
 
 # Health check endpoints
-@app.get("/health", response_model=APIResponse)
+@app.get(
+    "/health",
+    response_model=APIResponse,
+    tags=["System"],
+    summary="Basic Health Check",
+    description="""
+         Simple health check endpoint that returns system status.
+         
+         This endpoint does not require authentication and can be used for:
+         - Load balancer health checks
+         - Monitoring system availability
+         - Service discovery health probes
+         - Basic connectivity testing
+         """,
+    responses={
+        200: {
+            "description": "System is healthy",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {"status": "healthy", "service": "agent-hive-api"},
+                        "timestamp": 1640995200.0,
+                        "request_id": "req_123456",
+                    }
+                }
+            },
+        }
+    },
+)
 async def health_check():
     """Basic health check."""
     return APIResponse(
