@@ -2,6 +2,8 @@
 
 ## LeanVibe Hive CLI Commands (Primary Interface)
 
+**🎯 Always use the `hive` CLI - it's the proper way to manage the system!**
+
 **Initialize & Start System:**
 - Setup: `hive init` (initializes DB, migrations, Docker services)
 - Start system: `hive system start` (API server, core services)
@@ -24,6 +26,14 @@
 - Populate context: `hive context populate`
 - Search context: `hive context search "query"`
 
+## ⚠️ Non-Standard Ports (Security Through Obscurity)
+
+**All services use non-standard ports for enhanced security:**
+- **API**: 9001 (instead of 80/443/8000)
+- **PostgreSQL**: 5433 (instead of 5432)
+- **Redis**: 6381 (instead of 6379)
+- **pgAdmin**: 9050 (development only)
+
 ## CLI Agentic Coding Tools
 
 - Auto-detection: system checks for opencode, claude, gemini CLI tools
@@ -41,13 +51,6 @@
 - Lint/format: ruff check .; ruff format .
 - Typecheck: mypy . (if configured) or pyright
 - DB/infra: docker compose up -d postgres redis; alembic upgrade head
-
-## Non-Standard Ports (Security)
-
-- API: 9001 (instead of 80/443)
-- PostgreSQL: 5433 (instead of 5432)
-- Redis: 6381 (instead of 6379)
-- pgAdmin: 9050 (development only)
 
 ## Code style
 
