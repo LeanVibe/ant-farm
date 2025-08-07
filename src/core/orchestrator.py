@@ -75,15 +75,16 @@ class AgentRegistry:
         self.db_manager.create_tables()
 
     async def register_agent(self, agent_info: AgentInfo) -> bool:
-        """Register a new agent (temporarily using in-memory only)."""
+        """Register a new agent."""
         async with self._lock:
             try:
-                # Temporarily skip database operations to avoid greenlet issues
-                # TODO: Fix async database operations
-
                 # Store in memory
                 self.agents[agent_info.name] = agent_info
-                logger.info("Agent registered in memory", agent_name=agent_info.name)
+
+                # Store in database (async implementation)
+                await self._store_agent_in_db(agent_info)
+
+                logger.info("Agent registered", agent_name=agent_info.name)
                 return True
 
             except Exception as e:
@@ -92,13 +93,58 @@ class AgentRegistry:
                 )
                 return False
 
+    async def _store_agent_in_db(self, agent_info: AgentInfo) -> None:
+        """Store agent in database asynchronously."""
+        try:
+            # For now, use a simple approach - run sync DB operations in thread
+            import asyncio
+            from functools import partial
+
+            def sync_store():
+                session = self.db_manager.get_session()
+                try:
+                    # Check if agent already exists
+                    existing = (
+                        session.query(Agent).filter_by(name=agent_info.name).first()
+                    )
+                    if existing:
+                        return
+
+                    # Create new agent record
+                    agent = Agent(
+                        id=agent_info.id,
+                        name=agent_info.name,
+                        type=agent_info.type,
+                        role=agent_info.role,
+                        status=agent_info.status.value,
+                        capabilities=agent_info.capabilities,
+                        last_heartbeat=datetime.utcnow(),
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                    session.add(agent)
+                    session.commit()
+                finally:
+                    session.close()
+
+            # Run in executor to avoid blocking async loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, sync_store)
+
+        except Exception as e:
+            logger.warning(
+                "Failed to store agent in database",
+                agent_name=agent_info.name,
+                error=str(e),
+            )
+
     async def update_agent_status(
         self,
         agent_name: str,
         status: AgentStatus,
         current_task_id: str | None = None,
     ) -> bool:
-        """Update agent status using SQLAlchemy."""
+        """Update agent status."""
         async with self._lock:
             if agent_name not in self.agents:
                 return False
@@ -108,8 +154,16 @@ class AgentRegistry:
             if current_task_id is not None:
                 self.agents[agent_name].current_task_id = current_task_id
 
-            # Update database
-            try:
+            # Update database asynchronously
+            await self._update_agent_in_db(agent_name, status)
+            return True
+
+    async def _update_agent_in_db(self, agent_name: str, status: AgentStatus) -> None:
+        """Update agent in database asynchronously."""
+        try:
+            import asyncio
+
+            def sync_update():
                 session = self.db_manager.get_session()
                 try:
                     agent = session.query(Agent).filter_by(name=agent_name).first()
@@ -118,20 +172,19 @@ class AgentRegistry:
                         agent.last_heartbeat = datetime.utcnow()
                         agent.updated_at = datetime.utcnow()
                         session.commit()
-                        return True
-                    else:
-                        logger.warning(
-                            "Agent not found in database", agent_name=agent_name
-                        )
-                        return False
                 finally:
                     session.close()
 
-            except SQLAlchemyError as e:
-                logger.error(
-                    "Failed to update agent status", agent_name=agent_name, error=str(e)
-                )
-                return False
+            # Run in executor to avoid blocking async loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, sync_update)
+
+        except Exception as e:
+            logger.warning(
+                "Failed to update agent in database",
+                agent_name=agent_name,
+                error=str(e),
+            )
 
     async def get_agent(self, agent_name: str) -> AgentInfo | None:
         """Get agent information."""
@@ -147,37 +200,41 @@ class AgentRegistry:
         return agents
 
     async def remove_agent(self, agent_name: str) -> bool:
-        """Remove agent from registry using SQLAlchemy."""
+        """Remove agent from registry."""
         async with self._lock:
             if agent_name in self.agents:
                 del self.agents[agent_name]
 
-                # Update database
-                try:
-                    session = self.db_manager.get_session()
-                    try:
-                        agent = session.query(Agent).filter_by(name=agent_name).first()
-                        if agent:
-                            session.delete(agent)
-                            session.commit()
-                            return True
-                        else:
-                            logger.warning(
-                                "Agent not found in database for removal",
-                                agent_name=agent_name,
-                            )
-                            return False
-                    finally:
-                        session.close()
-
-                except SQLAlchemyError as e:
-                    logger.error(
-                        "Failed to remove agent from database",
-                        agent_name=agent_name,
-                        error=str(e),
-                    )
-                    return False
+                # Update database asynchronously
+                await self._remove_agent_from_db(agent_name)
+                return True
             return False
+
+    async def _remove_agent_from_db(self, agent_name: str) -> None:
+        """Remove agent from database asynchronously."""
+        try:
+            import asyncio
+
+            def sync_remove():
+                session = self.db_manager.get_session()
+                try:
+                    agent = session.query(Agent).filter_by(name=agent_name).first()
+                    if agent:
+                        session.delete(agent)
+                        session.commit()
+                finally:
+                    session.close()
+
+            # Run in executor to avoid blocking async loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, sync_remove)
+
+        except Exception as e:
+            logger.warning(
+                "Failed to remove agent from database",
+                agent_name=agent_name,
+                error=str(e),
+            )
 
 
 class AgentSpawner:

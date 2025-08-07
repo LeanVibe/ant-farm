@@ -862,7 +862,7 @@ async def detailed_health_check():
         orchestrator = await get_orchestrator(settings.database_url, Path("."))
 
         # Test Redis connection
-        await message_broker.redis.ping()
+        await message_broker.redis_client.ping()
 
         return APIResponse(
             success=True,
@@ -1956,8 +1956,10 @@ async def get_system_diagnostics():
 def start_server():
     """Start the API server."""
     import uvicorn
+    from ..core.config import get_settings
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    settings = get_settings()
+    uvicorn.run(app, host="0.0.0.0", port=settings.api_port)
 
 
 if __name__ == "__main__":

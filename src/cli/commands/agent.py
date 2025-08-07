@@ -329,19 +329,40 @@ def bootstrap():
     console.print("[cyan]Bootstrapping LeanVibe Agent Hive 2.0...[/cyan]")
 
     try:
-        # Import bootstrap functionality
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-        from bootstrap import BootstrapAgent
+        # Simply spawn a MetaAgent to start the self-improvement process
+        console.print("🤖 Spawning Meta Agent for system bootstrap...")
 
-        agent = BootstrapAgent()
-        agent.bootstrap_system()
+        # Call the spawn command to create a meta agent
+        import subprocess
 
-        success_message("Bootstrap completed successfully!")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "src.cli.main",
+                "agent",
+                "spawn",
+                "meta",
+                "--name",
+                "bootstrap-meta",
+            ],
+            capture_output=True,
+            text=True,
+        )
 
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        console.print("Make sure all dependencies are installed: uv sync")
-        sys.exit(1)
+        if result.returncode == 0:
+            success_message("Meta Agent spawned successfully!")
+            console.print("🎯 System bootstrap initiated. The Meta Agent will:")
+            console.print("   • Analyze system health and performance")
+            console.print("   • Identify optimization opportunities")
+            console.print("   • Propose and implement improvements")
+            console.print("   • Monitor system metrics continuously")
+            console.print("\n💡 Use 'hive task submit' to give the Meta Agent tasks")
+            console.print("💡 Use 'hive agent list' to see active agents")
+        else:
+            console.print(f"[red]Failed to spawn Meta Agent: {result.stderr}[/red]")
+            sys.exit(1)
+
     except Exception as e:
         console.print(f"[red]Bootstrap failed: {e}[/red]")
         sys.exit(1)
