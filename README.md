@@ -1,14 +1,14 @@
 # LeanVibe Agent Hive 2.0
 
-A **fully autonomous** multi-agent development system that builds and improves itself continuously using multiple CLI agentic coding tools.
+A multi-agent development system designed to build and improve itself continuously using multiple CLI agentic coding tools.
 
-## ✨ Core Capabilities
+## ✨ Planned Capabilities
 
-🤖 **Autonomous Development**: Continues development 24/7 without human intervention  
-🔄 **Self-Improvement**: Analyzes and enhances its own code automatically  
-🎯 **Intelligent Coordination**: Smart task assignment based on agent capabilities  
-🛡️ **Safe Modifications**: Automatic testing and rollback for all changes  
-📊 **Performance Learning**: Improves efficiency through experience  
+🤖 **Autonomous Development**: (Planned) Continues development 24/7 without human intervention  
+🔄 **Self-Improvement**: (In Development) Analyzes and enhances its own code automatically  
+🎯 **Intelligent Coordination**: (Planned) Smart task assignment based on agent capabilities  
+🛡️ **Safe Modifications**: (Planned) Automatic testing and rollback for all changes  
+📊 **Performance Learning**: (Planned) Improves efficiency through experience  
 
 ## 🛠️ Supported CLI Tools
 
@@ -35,49 +35,56 @@ The system auto-detects and uses any of these CLI agentic coding tools:
 docker --version  # Docker 20.10+
 
 # Check available CLI tools  
-python bootstrap.py tools
+hive tools
 
 # Start Docker services
-docker-compose up -d
+docker compose up -d
 
-# Bootstrap the autonomous system
-python bootstrap.py bootstrap
+# Initialize database
+hive init-db
 
-# Or start autonomous mode directly
-python autonomous_bootstrap.py autonomous
+# Bootstrap the system (creates initial structure)
+hive bootstrap
+
+# Start individual agents
+hive run-agent meta
+hive run-agent developer
+
+# Start API server
+hive start-api
 
 # Monitor system status
-python autonomous_bootstrap.py status
-# API: http://localhost:8000/api/v1/status
-# Dashboard: http://localhost:8000/api/docs
+hive status
+# API: http://localhost:8000/api/v1/status (when implemented)
+# Dashboard: http://localhost:8000/api/docs (when implemented)
 ```
 
 ## 🏗️ Architecture
 
-### Autonomous Agent System
-- **Meta-Agent**: Self-improvement coordinator with system analysis and code modification
-- **Developer Agent**: Code implementation, proactive development, and refactoring
-- **QA Agent**: Testing, validation, and quality assurance  
-- **Architect Agent**: System design, architecture decisions, and planning
-- **Research Agent**: Knowledge acquisition, trend analysis, and improvement research
+### Agent System (In Development)
+- **Meta-Agent**: (Placeholder) Self-improvement coordinator with system analysis and code modification
+- **Developer Agent**: (Basic Implementation) Code implementation, proactive development, and refactoring
+- **QA Agent**: (Placeholder) Testing, validation, and quality assurance  
+- **Architect Agent**: (Placeholder) System design, architecture decisions, and planning
+- **Research Agent**: (Placeholder) Knowledge acquisition, trend analysis, and improvement research
 
-### Multi-CLI Support
+### Multi-CLI Support (Working)
 - **Tool Detection**: Auto-discovers opencode, Claude CLI, Gemini CLI
 - **Priority Fallback**: opencode → Claude → Gemini → API  
-- **Unified Interface**: Same agent code works with any tool
-- **Smart Switching**: Automatic failover if one tool fails
+- **Unified Interface**: (Planned) Same agent code works with any tool
+- **Smart Switching**: (Planned) Automatic failover if one tool fails
 
-### Core Infrastructure
+### Core Infrastructure (Mixed Status)
 
-1. **Task Coordinator** - Intelligent task assignment with capability-based matching
-2. **Self-Bootstrapper** - Autonomous development continuation system
-3. **Agent Orchestrator** - Agent lifecycle management and spawning
-4. **Task Queue** - Redis-based priority task distribution with dependencies
-5. **Message Broker** - Inter-agent communication via pub/sub
-6. **Context Engine** - Vector-based semantic memory with pgvector
-7. **API Server** - RESTful interface for system control and monitoring
+1. **Task Coordinator** - (Placeholder) Intelligent task assignment with capability-based matching
+2. **Self-Bootstrapper** - (Placeholder) Autonomous development continuation system
+3. **Agent Orchestrator** - (Placeholder) Agent lifecycle management and spawning
+4. **Task Queue** - (Placeholder) Redis-based priority task distribution with dependencies
+5. **Message Broker** - (Placeholder) Inter-agent communication via pub/sub
+6. **Context Engine** - (Placeholder) Vector-based semantic memory with pgvector
+7. **API Server** - (Basic Implementation) RESTful interface for system control and monitoring
 
-## 🔄 Self-Improvement Capabilities
+## 🔄 Self-Improvement Capabilities (Planned)
 
 ### Development Phases
 1. **Analysis** - System health assessment and bottleneck identification
@@ -87,7 +94,7 @@ python autonomous_bootstrap.py status
 5. **Deployment** - Safe rollout with rollback capabilities
 6. **Monitoring** - Continuous performance tracking
 
-### System Capabilities
+### Target System Capabilities
 - **Self-Modification**: Safe code editing with backup/rollback (Target: 90%)
 - **Autonomous Learning**: Experience-based performance improvement (Target: 80%)
 - **System Monitoring**: Comprehensive health and performance tracking (Target: 90%)
@@ -100,9 +107,11 @@ python autonomous_bootstrap.py status
 ```
 ant-farm/
 ├── bootstrap.py            # Enhanced bootstrap system with multi-CLI support
-├── autonomous_bootstrap.py # Autonomous operation starter
+├── autonomous_bootstrap.py # Autonomous operation starter (placeholder)
 ├── src/
-│   ├── core/              # Core system components
+│   ├── cli/               # Unified CLI interface (NEW)
+│   │   └── main.py            # Single hive command entry point
+│   ├── core/              # Core system components (placeholders)
 │   │   ├── orchestrator.py      # Agent lifecycle management  
 │   │   ├── task_queue.py        # Priority task distribution
 │   │   ├── task_coordinator.py  # Intelligent task assignment
@@ -111,61 +120,59 @@ ant-farm/
 │   │   ├── self_bootstrap.py    # Autonomous development system
 │   │   ├── config.py           # Multi-CLI configuration
 │   │   └── models.py           # Database models
-│   ├── agents/            # Agent implementations
+│   ├── agents/            # Agent implementations (basic)
 │   │   ├── base_agent.py       # Multi-CLI base agent
 │   │   ├── meta_agent.py       # Self-improvement coordinator
 │   │   └── runner.py           # Agent process management
-│   └── api/               # FastAPI server
+│   └── api/               # FastAPI server (basic)
 │       └── main.py            # REST API endpoints
-├── tests/                 # Comprehensive test suite
-├── docs/                  # Architecture and API documentation
+├── tests/                 # Test suite (to be created)
+├── docs/                  # Architecture and planning documentation
 ├── docker-compose.yaml    # Infrastructure services
 ├── AGENTS.md             # CLI tool configuration context
-└── requirements.txt      # Python dependencies
+└── pyproject.toml        # Python dependencies and configuration
 ```
 
 ## 📊 Key Features
 
-### Autonomous Operation
-- **24/7 Development**: Continuous improvement without human intervention
-- **Self-Bootstrapping**: Extends its own capabilities autonomously  
-- **Intelligent Coordination**: Multi-agent task optimization
-- **Performance Learning**: Adapts based on task success patterns
+### Planned Autonomous Operation
+- **24/7 Development**: (Planned) Continuous improvement without human intervention
+- **Self-Bootstrapping**: (Planned) Extends its own capabilities autonomously  
+- **Intelligent Coordination**: (Planned) Multi-agent task optimization
+- **Performance Learning**: (Planned) Adapts based on task success patterns
 
-### Safety & Reliability  
-- **Safe Modifications**: Automatic backup before any code changes
-- **Rollback System**: Instant recovery from failed improvements
-- **Testing Integration**: All changes validated automatically
-- **Health Monitoring**: Continuous system status assessment
+### Planned Safety & Reliability  
+- **Safe Modifications**: (Planned) Automatic backup before any code changes
+- **Rollback System**: (Planned) Instant recovery from failed improvements
+- **Testing Integration**: (Planned) All changes validated automatically
+- **Health Monitoring**: (Planned) Continuous system status assessment
 
-### Multi-CLI Integration
+### Multi-CLI Integration (Working)
 - **Tool Flexibility**: Works with any available CLI agentic coding tool
-- **Smart Fallback**: Graceful degradation across tool failures
-- **Performance Optimization**: Learns which tools work best for specific tasks
-- **Unified Experience**: Same capabilities regardless of underlying tool
+- **Smart Fallback**: (Planned) Graceful degradation across tool failures
+- **Performance Optimization**: (Planned) Learns which tools work best for specific tasks
+- **Unified Experience**: (Planned) Same capabilities regardless of underlying tool
 
-## 🎯 Current Status: Phase 3 Complete ✅
+## 🎯 Current Status: Phase 0 - Foundational Scaffolding 🚧
 
-- ✅ **Phase 1: Core Infrastructure** - Task queue, message broker, context engine
-- ✅ **Phase 2: Agent System** - Meta-agent, specialized agents, autonomous development
-- ✅ **Phase 3: Advanced Intelligence** - Self-modification, memory consolidation, predictive optimization
-- 📋 **Phase 4: Scale & Production** - Multi-node deployment, enterprise features
+**Reality Check**: The project is in early development with foundational infrastructure being built.
 
-### Phase 3 Advanced Intelligence Capabilities
-- **Advanced Semantic Memory**: Hierarchical memory layers with pattern recognition
-- **Safe Self-Modification**: Git-based code changes with sandbox testing and rollback
-- **Sleep-Wake Cycles**: Memory consolidation and system optimization during downtime
-- **Predictive Optimization**: Machine learning-based performance tuning and resource scaling
-- **Pattern Discovery**: Automated knowledge extraction from system behavior and context
+### Completed ✅
+- **CLI Unification**: Single `hive` command replaces multiple startup scripts
+- **Multi-CLI Detection**: Auto-discovery of opencode, Claude CLI, Gemini CLI
+- **Project Structure**: Basic directory layout and configuration
+- **Docker Setup**: PostgreSQL and Redis service configuration
 
-### Immediate Capabilities
-- Intelligent memory management with automatic consolidation and compression
-- Safe autonomous code modification with comprehensive validation and rollback
-- Predictive workload management and proactive resource scaling
-- Sleep-wake cycles for memory optimization and system maintenance
-- Advanced pattern recognition and knowledge discovery
-- Multi-strategy performance optimization with confidence-based selection
-- Comprehensive semantic search across hierarchical memory layers
+### In Progress 🔄
+- **Core Infrastructure**: Task queue, message broker, context engine (placeholders exist)
+- **Agent System**: Base agent implementations (basic structure)
+- **Database Models**: SQLAlchemy models (incomplete)
+
+### Planned 📋
+- **Phase 1: Core Infrastructure** - Task queue, message broker, context engine
+- **Phase 2: Agent System** - Meta-agent, specialized agents, autonomous development  
+- **Phase 3: Advanced Intelligence** - Self-modification, memory consolidation, predictive optimization
+- **Phase 4: Scale & Production** - Multi-node deployment, enterprise features
 
 ## 🛠️ Technology Stack
 
@@ -177,7 +184,7 @@ ant-farm/
 - **Deployment**: Docker Compose with tmux session management
 - **Monitoring**: Real-time metrics and health assessment
 
-## 🎯 Success Metrics
+## 🎯 Target Success Metrics (Future Goals)
 
 - **Autonomous Operation**: >95% uptime without human intervention
 - **Task Success Rate**: >85% successful task completion
@@ -188,45 +195,62 @@ ant-farm/
 
 ## 📚 Usage Examples
 
-### Advanced Autonomous Operation
+### Basic Operation (Current)
 ```bash
-# Start advanced autonomous system with Phase 3 capabilities
-python autonomous_bootstrap.py autonomous
+# Check available CLI tools
+hive tools
 
-# Check comprehensive system status
-python autonomous_bootstrap.py status
+# Start system components
+hive init-db
+hive start-api
 
-# Monitor memory consolidation and patterns
-python autonomous_bootstrap.py memory
+# Run individual agents
+hive run-agent meta
+hive run-agent developer
 
-# Check performance optimization status
-python autonomous_bootstrap.py performance
-
-# View sleep-wake cycle status
-python autonomous_bootstrap.py sleep
+# Check system status
+hive status
 ```
 
-### API Monitoring
+### Planned Advanced Operation (Future)
 ```bash
-# System health with advanced metrics
+# Start advanced autonomous system with Phase 3 capabilities
+hive autonomous
+
+# Check comprehensive system status
+hive status --detailed
+
+# Monitor memory consolidation and patterns
+hive memory
+
+# Check performance optimization status
+hive performance
+
+# View sleep-wake cycle status
+hive sleep
+```
+
+### API Monitoring (Planned)
+```bash
+# System health with basic metrics (when implemented)
 curl http://localhost:8000/api/v1/status
 
-# Agent capabilities and performance
+# Agent information (when implemented)
 curl http://localhost:8000/api/v1/agents
 
-# Task coordination and intelligent assignment
+# Task coordination (when implemented)
 curl http://localhost:8000/api/v1/tasks
 
-# Performance metrics and optimization history
+# Performance metrics (when implemented)
 curl http://localhost:8000/api/v1/metrics
 
-# Trigger advanced system analysis
+# Trigger system analysis (when implemented)
 curl -X POST http://localhost:8000/api/v1/system/analyze
 ```
 
-### Advanced Operations
+### Advanced Operations (Planned)
 ```bash
-# Create complex task with dependencies
+# Create complex task with dependencies (when implemented)
 curl -X POST http://localhost:8000/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{
@@ -238,10 +262,10 @@ curl -X POST http://localhost:8000/api/v1/tasks \
     "metadata": {"complexity": "high", "estimated_hours": 8}
   }'
 
-# Force memory consolidation
+# Force memory consolidation (when implemented)
 curl -X POST http://localhost:8000/api/v1/system/consolidate
 
-# Trigger performance optimization
+# Trigger performance optimization (when implemented)
 curl -X POST http://localhost:8000/api/v1/system/optimize
 ```
 
@@ -254,13 +278,25 @@ curl -X POST http://localhost:8000/api/v1/system/optimize
 
 ## 🔮 Roadmap
 
-### Phase 3: Advanced Intelligence (Next)
+### Phase 1: Core Infrastructure (Current)
+- Implement task queue with Redis backend
+- Create message broker for inter-agent communication
+- Build context engine with pgvector semantic search
+- Complete database models and migrations
+
+### Phase 2: Agent System (Next)
+- Complete agent orchestrator implementation
+- Build specialized agent implementations  
+- Implement autonomous development capabilities
+- Add agent communication and coordination
+
+### Phase 3: Advanced Intelligence (Future)
 - Machine learning integration for pattern recognition
 - Advanced performance optimization algorithms  
 - Predictive task scheduling based on resource patterns
 - Enhanced agent specialization and skill development
 
-### Phase 4: Scale & Production
+### Phase 4: Scale & Production (Future)
 - Multi-node deployment with load balancing
 - Advanced monitoring and alerting systems
 - Production-grade security and access controls
@@ -276,14 +312,15 @@ curl -X POST http://localhost:8000/api/v1/system/optimize
 
 ## 🤝 Contributing
 
-This system develops itself autonomously! However, you can:
+This system is designed to develop itself autonomously (when completed)! Currently in early development, you can:
 
 1. **Submit Issues**: Report bugs or suggest features via GitHub issues
-2. **CLI Tool Support**: Help add support for new agentic coding tools
-3. **Documentation**: Improve setup guides and architectural documentation
-4. **Testing**: Contribute test cases and validation scenarios
+2. **Core Implementation**: Help implement task queue, message broker, and context engine
+3. **CLI Tool Support**: Help add support for new agentic coding tools
+4. **Documentation**: Improve setup guides and architectural documentation
+5. **Testing**: Contribute test cases and validation scenarios
 
-The Meta-Agent will analyze contributions and integrate improvements automatically.
+Once the Meta-Agent is fully implemented, it will analyze contributions and integrate improvements automatically.
 
 ## 📄 License
 
