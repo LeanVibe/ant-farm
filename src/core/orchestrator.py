@@ -10,10 +10,11 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
-import psycopg2
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 from .message_broker import message_broker
+from .models import Agent, get_database_manager
 from .task_queue import Task, task_queue
 
 logger = structlog.get_logger()
@@ -65,52 +66,66 @@ class SystemHealth:
 
 
 class AgentRegistry:
-    """Manages agent registration and tracking."""
+    """Manages agent registration and tracking using SQLAlchemy."""
 
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    def __init__(self, database_url: str):
+        self.db_manager = get_database_manager(database_url)
         self.agents: dict[str, AgentInfo] = {}
         self._lock = asyncio.Lock()
+        # Initialize database
+        self.db_manager.create_tables()
 
     async def register_agent(self, agent_info: AgentInfo) -> bool:
-        """Register a new agent."""
+        """Register a new agent using SQLAlchemy."""
         async with self._lock:
             try:
-                # Store in database
-                conn = psycopg2.connect(self.db_url)
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        INSERT INTO agents (id, name, type, role, capabilities, status, tmux_session, created_at, last_heartbeat)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                        ON CONFLICT (name) DO UPDATE SET
-                            status = EXCLUDED.status,
-                            last_heartbeat = NOW()
-                    """,
-                        (
-                            agent_info.id,
-                            agent_info.name,
-                            agent_info.type,
-                            agent_info.role,
-                            json.dumps(agent_info.capabilities),
-                            agent_info.status.value,
-                            agent_info.tmux_session,
-                        ),
+                session = self.db_manager.get_session()
+                try:
+                    # Create or update agent in database
+                    agent = session.query(Agent).filter_by(name=agent_info.name).first()
+
+                    if agent:
+                        # Update existing agent
+                        agent.type = agent_info.type
+                        agent.role = agent_info.role
+                        agent.capabilities = agent_info.capabilities
+                        agent.status = agent_info.status.value
+                        agent.tmux_session = agent_info.tmux_session
+                        agent.last_heartbeat = datetime.utcnow()
+                        agent.updated_at = datetime.utcnow()
+                    else:
+                        # Create new agent
+                        agent = Agent(
+                            id=uuid.UUID(agent_info.id),
+                            name=agent_info.name,
+                            type=agent_info.type,
+                            role=agent_info.role,
+                            capabilities=agent_info.capabilities,
+                            status=agent_info.status.value,
+                            tmux_session=agent_info.tmux_session,
+                            last_heartbeat=datetime.utcnow(),
+                            created_at=datetime.utcnow(),
+                            tasks_completed=agent_info.tasks_completed,
+                            tasks_failed=agent_info.tasks_failed,
+                        )
+                        session.add(agent)
+
+                    session.commit()
+
+                    # Store in memory
+                    self.agents[agent_info.name] = agent_info
+
+                    logger.info(
+                        "Agent registered",
+                        agent_name=agent_info.name,
+                        agent_type=agent_info.type,
                     )
-                    conn.commit()
-                conn.close()
+                    return True
 
-                # Store in memory
-                self.agents[agent_info.name] = agent_info
+                finally:
+                    session.close()
 
-                logger.info(
-                    "Agent registered",
-                    agent_name=agent_info.name,
-                    agent_type=agent_info.type,
-                )
-                return True
-
-            except Exception as e:
+            except SQLAlchemyError as e:
                 logger.error(
                     "Failed to register agent", agent_name=agent_info.name, error=str(e)
                 )
@@ -122,32 +137,36 @@ class AgentRegistry:
         status: AgentStatus,
         current_task_id: str | None = None,
     ) -> bool:
-        """Update agent status."""
+        """Update agent status using SQLAlchemy."""
         async with self._lock:
             if agent_name not in self.agents:
                 return False
 
             self.agents[agent_name].status = status
-            self.agents[agent_name].last_heartbeat = datetime.utcnow()
+            self.agents[agent_name].last_heartbeat = time.time()
             if current_task_id is not None:
                 self.agents[agent_name].current_task_id = current_task_id
 
             # Update database
             try:
-                conn = psycopg2.connect(self.db_url)
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        UPDATE agents
-                        SET status = %s, last_heartbeat = NOW()
-                        WHERE name = %s
-                    """,
-                        (status.value, agent_name),
-                    )
-                    conn.commit()
-                conn.close()
-                return True
-            except Exception as e:
+                session = self.db_manager.get_session()
+                try:
+                    agent = session.query(Agent).filter_by(name=agent_name).first()
+                    if agent:
+                        agent.status = status.value
+                        agent.last_heartbeat = datetime.utcnow()
+                        agent.updated_at = datetime.utcnow()
+                        session.commit()
+                        return True
+                    else:
+                        logger.warning(
+                            "Agent not found in database", agent_name=agent_name
+                        )
+                        return False
+                finally:
+                    session.close()
+
+            except SQLAlchemyError as e:
                 logger.error(
                     "Failed to update agent status", agent_name=agent_name, error=str(e)
                 )
@@ -167,22 +186,30 @@ class AgentRegistry:
         return agents
 
     async def remove_agent(self, agent_name: str) -> bool:
-        """Remove agent from registry."""
+        """Remove agent from registry using SQLAlchemy."""
         async with self._lock:
             if agent_name in self.agents:
                 del self.agents[agent_name]
 
                 # Update database
                 try:
-                    conn = psycopg2.connect(self.db_url)
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            "DELETE FROM agents WHERE name = %s", (agent_name,)
-                        )
-                        conn.commit()
-                    conn.close()
-                    return True
-                except Exception as e:
+                    session = self.db_manager.get_session()
+                    try:
+                        agent = session.query(Agent).filter_by(name=agent_name).first()
+                        if agent:
+                            session.delete(agent)
+                            session.commit()
+                            return True
+                        else:
+                            logger.warning(
+                                "Agent not found in database for removal",
+                                agent_name=agent_name,
+                            )
+                            return False
+                    finally:
+                        session.close()
+
+                except SQLAlchemyError as e:
                     logger.error(
                         "Failed to remove agent from database",
                         agent_name=agent_name,
@@ -426,8 +453,8 @@ class AgentOrchestrator:
             status=AgentStatus.STARTING,
             capabilities=capabilities,
             tmux_session=session_name,
-            last_heartbeat=datetime.utcnow(),
-            created_at=datetime.utcnow(),
+            last_heartbeat=time.time(),
+            created_at=time.time(),
             tasks_completed=0,
             tasks_failed=0,
         )
