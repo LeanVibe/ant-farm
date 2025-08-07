@@ -260,7 +260,7 @@ curl -X POST http://localhost:9001/api/v1/tasks \
 ### Advanced Operations (Planned)
 ```bash
 # Create complex task with dependencies (when implemented)
-curl -X POST http://localhost:8000/api/v1/tasks \
+curl -X POST http://localhost:9001/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Implement machine learning optimization", 
@@ -272,10 +272,10 @@ curl -X POST http://localhost:8000/api/v1/tasks \
   }'
 
 # Force memory consolidation (when implemented)
-curl -X POST http://localhost:8000/api/v1/system/consolidate
+curl -X POST http://localhost:9001/api/v1/system/consolidate
 
 # Trigger performance optimization (when implemented)
-curl -X POST http://localhost:8000/api/v1/system/optimize
+curl -X POST http://localhost:9001/api/v1/system/optimize
 ```
 
 ## 📚 Documentation
@@ -283,7 +283,7 @@ curl -X POST http://localhost:8000/api/v1/system/optimize
 - [AGENTS.md](AGENTS.md) - CLI tool integration and configuration
 - [CLAUDE.md](CLAUDE.md) - Claude-specific setup and context
 - [QUICKSTART.md](QUICKSTART.md) - Step-by-step setup guide
-- [API Documentation](http://localhost:8000/api/docs) - Interactive API explorer (when running)
+- [API Documentation](http://localhost:9001/api/docs) - Interactive API explorer (when running)
 
 ## 🔮 Roadmap
 

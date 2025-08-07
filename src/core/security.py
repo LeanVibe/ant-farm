@@ -92,7 +92,7 @@ class SecurityConfig:
     API_RATE_LIMIT_WEBSOCKET: int = 50
 
     # Security headers
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:9001"]
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
 
     # Content Security Policy

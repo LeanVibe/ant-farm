@@ -272,7 +272,7 @@ app = FastAPI(
     },
     license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
     servers=[
-        {"url": "http://localhost:8000", "description": "Development server"},
+        {"url": "http://localhost:9001", "description": "Development server"},
         {"url": "https://hive.leanvibe.ai", "description": "Production server"},
     ],
 )
