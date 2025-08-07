@@ -1,11 +1,16 @@
 # LeanVibe Agent Hive - Hybrid Architecture Makefile
 # Docker runs infrastructure, agents run in tmux on host
+# 
+# NOTE: The 'hive' CLI is the preferred way to manage the system.
+# Use 'hive --help' for modern command interface.
 
 .PHONY: help
 help: ## Show this help message
 	@echo "LeanVibe Agent Hive 2.0 - Hybrid Architecture"
 	@echo ""
-	@echo "Usage: make [command]"
+	@echo "PREFERRED: Use 'hive --help' for modern CLI interface"
+	@echo ""
+	@echo "Legacy Make commands:"
 	@echo ""
 	@echo "Infrastructure (Docker):"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E '(docker|db|redis)' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -164,12 +169,13 @@ logs: ## Tail all log files
 	tail -f logs/*.log 2>/dev/null || echo "No log files yet"
 
 .PHONY: status
-status: ## Check complete system status (using new hive CLI)
+status: ## Check complete system status (DEPRECATED: use 'hive system status')
+	@echo "⚠️  DEPRECATED: Use 'hive system status' instead"
 	@python -m src.cli.main system status
 
 .PHONY: api-test
 api-test: ## Test API endpoints
-	@curl -s http://localhost:9000/health | jq . || echo "API not responding"
+	@curl -s http://localhost:8000/api/v1/health | jq . || echo "API not responding on port 8000"
 
 .PHONY: submit-task
 submit-task: ## Submit a test task to the queue
@@ -208,8 +214,8 @@ clean: agent-killall docker-clean ## Full cleanup and reset
 monitor: ## Open monitoring tools
 	@echo "Opening monitoring tools..."
 	@echo "pgAdmin: http://localhost:9050 (admin@leanvibe.com / admin)"
-	@echo "Redis Commander: http://localhost:9081"
-	@echo "API Docs: http://localhost:9000/docs"
+	@echo "Redis Commander: http://localhost:9081" 
+	@echo "API Docs: http://localhost:8000/api/docs"
 
 .PHONY: watch
 watch: ## Watch system activity (split screen)

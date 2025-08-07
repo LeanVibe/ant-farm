@@ -51,7 +51,7 @@ def cache_config():
 async def cache_manager(mock_redis):
     """Cache manager instance for testing."""
     with patch("src.core.caching.redis.from_url", return_value=mock_redis):
-        manager = CacheManager("redis://localhost:6379")
+        manager = CacheManager("redis://localhost:6381")
         await manager.initialize()
         return manager
 
@@ -263,7 +263,7 @@ class TestCacheManager:
     async def test_initialize(self, mock_redis):
         """Test cache manager initialization."""
         with patch("src.core.caching.redis.from_url", return_value=mock_redis):
-            manager = CacheManager("redis://localhost:6379")
+            manager = CacheManager("redis://localhost:6381")
             await manager.initialize()
 
             mock_redis.ping.assert_called_once()
@@ -418,7 +418,7 @@ class TestCacheErrorHandling:
         mock_redis.ping.side_effect = Exception("Connection failed")
 
         with patch("src.core.caching.redis.from_url", return_value=mock_redis):
-            manager = CacheManager("redis://localhost:6379")
+            manager = CacheManager("redis://localhost:6381")
 
             with pytest.raises(ConnectionError):
                 await manager.initialize()
