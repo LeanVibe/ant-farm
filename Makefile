@@ -119,6 +119,24 @@ agent-killall: ## Kill all agent sessions
 tmux-ls: ## List all tmux sessions
 	@tmux ls 2>/dev/null || echo "No tmux sessions"
 
+# ============== HIVE CLI ==============
+
+.PHONY: hive
+hive: ## Run hive CLI command (use: make hive ARGS="system status")
+	@python -m src.cli.main $(ARGS)
+
+.PHONY: status
+status: ## Check complete system status
+	@python -m src.cli.main system status
+
+.PHONY: start-hive
+start-hive: ## Start the hive system (API + services)
+	@python -m src.cli.main system start
+
+.PHONY: hive-init
+hive-init: ## Initialize the hive system
+	@python -m src.cli.main init
+
 # ============== DEVELOPMENT ==============
 
 .PHONY: generate
@@ -146,18 +164,12 @@ logs: ## Tail all log files
 	tail -f logs/*.log 2>/dev/null || echo "No log files yet"
 
 .PHONY: status
-status: ## Check complete system status
-	@make check
-	@echo ""
-	@echo "Docker services:"
-	@make docker-status
-	@echo ""
-	@echo "Agent sessions:"
-	@make agent-list
+status: ## Check complete system status (using new hive CLI)
+	@python -m src.cli.main system status
 
 .PHONY: api-test
 api-test: ## Test API endpoints
-	@curl -s http://localhost:8000/health | jq . || echo "API not responding"
+	@curl -s http://localhost:9000/health | jq . || echo "API not responding"
 
 .PHONY: submit-task
 submit-task: ## Submit a test task to the queue
@@ -195,9 +207,9 @@ clean: agent-killall docker-clean ## Full cleanup and reset
 .PHONY: monitor
 monitor: ## Open monitoring tools
 	@echo "Opening monitoring tools..."
-	@echo "pgAdmin: http://localhost:5050 (admin@leanvibe.com / admin)"
-	@echo "Redis Commander: http://localhost:8081"
-	@echo "API Docs: http://localhost:8000/docs"
+	@echo "pgAdmin: http://localhost:9050 (admin@leanvibe.com / admin)"
+	@echo "Redis Commander: http://localhost:9081"
+	@echo "API Docs: http://localhost:9000/docs"
 
 .PHONY: watch
 watch: ## Watch system activity (split screen)
@@ -240,8 +252,8 @@ tools: ## Check available CLI agentic coding tools
 tools-up: ## Start optional tools (pgAdmin, Redis Commander)
 	docker-compose --profile tools up -d
 	@echo "Tools started:"
-	@echo "pgAdmin: http://localhost:5050"
-	@echo "Redis Commander: http://localhost:8081"
+	@echo "pgAdmin: http://localhost:9050"
+	@echo "Redis Commander: http://localhost:9081"
 
 .PHONY: tools-down
 tools-down: ## Stop optional tools

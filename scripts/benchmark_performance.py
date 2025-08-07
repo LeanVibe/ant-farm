@@ -8,14 +8,15 @@ import asyncio
 import statistics
 import time
 from dataclasses import dataclass
-from typing import List, Dict, Any
-import numpy as np
+from typing import Any
 
+import numpy as np
 import structlog
-from src.core.caching import get_cache_manager, CacheConfig, CacheLevel
+
+from src.core.caching import get_cache_manager
 from src.core.context_engine import get_context_engine
-from src.core.task_queue import TaskQueue
 from src.core.enhanced_performance_optimizer import get_enhanced_performance_optimizer
+from src.core.task_queue import TaskQueue
 
 logger = structlog.get_logger()
 
@@ -104,7 +105,7 @@ class PerformanceBenchmark:
             # Collect successful results
             for result in batch_results:
                 if isinstance(result, Exception):
-                    logger.warning(f"Operation failed", error=str(result))
+                    logger.warning("Operation failed", error=str(result))
                 else:
                     response_times.append(result)
 
@@ -171,7 +172,7 @@ class PerformanceBenchmark:
             logger.debug(f"Operation failed for request {request_id}", error=str(e))
             raise
 
-    async def benchmark_cache_operations(self) -> Dict[str, BenchmarkResult]:
+    async def benchmark_cache_operations(self) -> dict[str, BenchmarkResult]:
         """Benchmark cache operations."""
         results = {}
 
@@ -210,7 +211,7 @@ class PerformanceBenchmark:
 
         return results
 
-    async def benchmark_context_operations(self) -> Dict[str, BenchmarkResult]:
+    async def benchmark_context_operations(self) -> dict[str, BenchmarkResult]:
         """Benchmark context engine operations."""
         results = {}
 
@@ -260,7 +261,7 @@ class PerformanceBenchmark:
 
         return results
 
-    async def benchmark_task_queue_operations(self) -> Dict[str, BenchmarkResult]:
+    async def benchmark_task_queue_operations(self) -> dict[str, BenchmarkResult]:
         """Benchmark task queue operations."""
         results = {}
 
@@ -300,7 +301,7 @@ class PerformanceBenchmark:
 
         return results
 
-    async def benchmark_performance_optimizer(self) -> Dict[str, BenchmarkResult]:
+    async def benchmark_performance_optimizer(self) -> dict[str, BenchmarkResult]:
         """Benchmark performance optimizer operations."""
         results = {}
 
@@ -328,7 +329,7 @@ class PerformanceBenchmark:
 
         return results
 
-    async def run_full_benchmark_suite(self) -> Dict[str, Any]:
+    async def run_full_benchmark_suite(self) -> dict[str, Any]:
         """Run the complete benchmark suite."""
         logger.info("Starting full benchmark suite")
 
@@ -407,7 +408,7 @@ class PerformanceBenchmark:
             "target_p95_ms": self.target_p95_ms,
         }
 
-    def print_benchmark_results(self, results: Dict[str, Any]):
+    def print_benchmark_results(self, results: dict[str, Any]):
         """Print formatted benchmark results."""
         print("\n" + "=" * 80)
         print("LEANVIBE AGENT HIVE 2.0 - PERFORMANCE BENCHMARK RESULTS")
@@ -416,7 +417,7 @@ class PerformanceBenchmark:
         summary = results["summary"]
         target_ms = results["target_p95_ms"]
 
-        print(f"\nOVERALL PERFORMANCE SUMMARY:")
+        print("\nOVERALL PERFORMANCE SUMMARY:")
         print(f"  Target: <{target_ms}ms p95 response time")
         print(f"  Total Operations: {summary['total_operations']}")
         print(f"  Operations Meeting Target: {summary['operations_meeting_target']}")
@@ -425,21 +426,21 @@ class PerformanceBenchmark:
             f"  Overall Target Met: {'✅ YES' if summary['overall_target_met'] else '❌ NO'}"
         )
 
-        print(f"\nSLOWEST OPERATIONS:")
+        print("\nSLOWEST OPERATIONS:")
         for op in summary["slowest_operations"]:
             status = "✅" if op["p95_time_ms"] <= target_ms else "❌"
             print(
                 f"  {status} {op['name']}: {op['p95_time_ms']:.1f}ms p95 ({op['throughput']:.1f} ops/sec)"
             )
 
-        print(f"\nFASTEST OPERATIONS:")
+        print("\nFASTEST OPERATIONS:")
         for op in summary["fastest_operations"]:
             status = "✅" if op["p95_time_ms"] <= target_ms else "❌"
             print(
                 f"  {status} {op['name']}: {op['p95_time_ms']:.1f}ms p95 ({op['throughput']:.1f} ops/sec)"
             )
 
-        print(f"\nDETAILED RESULTS BY CATEGORY:")
+        print("\nDETAILED RESULTS BY CATEGORY:")
         for category, category_results in results["results"].items():
             print(f"\n  {category.upper()}:")
 

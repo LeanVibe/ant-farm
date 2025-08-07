@@ -1,20 +1,16 @@
 """CLI commands for agent coordination system."""
 
 import asyncio
-import json
 from datetime import datetime, timedelta
-from typing import Optional
 
 import typer
-from rich import print
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from ..core.agent_coordination import (
-    coordination_system,
     CollaborationType,
-    TaskPhase,
+    coordination_system,
 )
 from ..core.message_broker import message_broker
 

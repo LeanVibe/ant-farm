@@ -9,17 +9,15 @@ This module provides:
 Performance Target: <50ms p95 response time
 """
 
-import asyncio
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from .models import get_database_manager
 from .caching import get_cache_manager
+from .models import get_database_manager
 
 logger = structlog.get_logger()
 
@@ -41,10 +39,10 @@ class QueryMetrics:
 class PerformanceReport:
     """Comprehensive performance report."""
 
-    database_health: Dict[str, Any]
-    cache_health: Dict[str, Any]
-    slow_queries: List[QueryMetrics]
-    performance_recommendations: List[str]
+    database_health: dict[str, Any]
+    cache_health: dict[str, Any]
+    slow_queries: list[QueryMetrics]
+    performance_recommendations: list[str]
     overall_score: float
     meets_target: bool
 
@@ -58,7 +56,7 @@ class QueryAnalyzer:
         self.slow_query_threshold_ms = 50.0
 
     async def analyze_query(
-        self, query: str, params: Optional[Dict] = None
+        self, query: str, params: dict | None = None
     ) -> QueryMetrics:
         """Analyze a query's performance."""
 
@@ -101,14 +99,14 @@ class QueryAnalyzer:
         finally:
             session.close()
 
-    def get_slow_queries(self, limit: int = 10) -> List[QueryMetrics]:
+    def get_slow_queries(self, limit: int = 10) -> list[QueryMetrics]:
         """Get the slowest queries."""
         sorted_queries = sorted(
             self.query_log, key=lambda q: q.execution_time_ms, reverse=True
         )
         return sorted_queries[:limit]
 
-    def generate_recommendations(self) -> List[str]:
+    def generate_recommendations(self) -> list[str]:
         """Generate performance recommendations based on query analysis."""
         recommendations = []
 
@@ -165,7 +163,7 @@ class DatabaseHealthMonitor:
     def __init__(self, db_manager):
         self.db_manager = db_manager
 
-    async def check_health(self) -> Dict[str, Any]:
+    async def check_health(self) -> dict[str, Any]:
         """Perform comprehensive database health check."""
 
         health_data = {
@@ -193,12 +191,12 @@ class DatabaseHealthMonitor:
             # Check table sizes (PostgreSQL specific)
             try:
                 size_query = """
-                SELECT 
+                SELECT
                     schemaname,
                     tablename,
                     pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size,
                     pg_total_relation_size(schemaname||'.'||tablename) as size_bytes
-                FROM pg_tables 
+                FROM pg_tables
                 WHERE schemaname = 'public'
                 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
                 LIMIT 10
@@ -226,7 +224,7 @@ class DatabaseHealthMonitor:
                 LEFT JOIN information_schema.key_column_usage kcu
                     ON t.constraint_name = kcu.constraint_name
                 LEFT JOIN pg_stat_user_indexes i
-                    ON i.relname = t.table_name 
+                    ON i.relname = t.table_name
                     AND i.indexrelname LIKE '%' || kcu.column_name || '%'
                 WHERE t.constraint_type = 'FOREIGN KEY'
                     AND t.table_schema = 'public'
@@ -396,7 +394,7 @@ class EnhancedPerformanceOptimizer:
 
         return report
 
-    async def optimize_system(self) -> Dict[str, Any]:
+    async def optimize_system(self) -> dict[str, Any]:
         """Perform automatic system optimizations."""
 
         optimizations_applied = []
@@ -448,12 +446,12 @@ class EnhancedPerformanceOptimizer:
             }
 
     async def monitor_query(
-        self, query: str, params: Optional[Dict] = None
+        self, query: str, params: dict | None = None
     ) -> QueryMetrics:
         """Monitor a specific query's performance."""
         return await self.query_analyzer.analyze_query(query, params)
 
-    def get_performance_summary(self) -> Dict[str, Any]:
+    def get_performance_summary(self) -> dict[str, Any]:
         """Get a quick performance summary."""
         slow_queries_count = len(
             [

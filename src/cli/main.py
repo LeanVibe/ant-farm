@@ -1,294 +1,144 @@
-#!/usr/bin/env python3
-"""Unified CLI for LeanVibe Agent Hive 2.0.
-
-This consolidates all startup scripts into a single `hive` command with subcommands:
-- hive run-agent: Start an agent instance
-- hive bootstrap: Bootstrap the entire system
-- hive start-api: Start the API server
-- hive init-db: Initialize database
-- hive tools: Check available CLI tools
-- hive status: System status
-- hive coordination: Agent coordination commands
+"""
+LeanVibe Hive CLI - Main entry point for the hive command
 """
 
 import asyncio
-import subprocess
-import sys
-import uuid
-from pathlib import Path
 
 import typer
 from rich.console import Console
 
-# Add src to Python path for imports
-src_path = Path(__file__).parent.parent
-sys.path.insert(0, str(src_path))
+from .commands import agent, context, system, task
+from .utils import error_handler
 
-from core.config import settings
-
-console = Console()
-app = typer.Typer(
-    name="hive",
-    help="LeanVibe Agent Hive 2.0 - Self-improving multi-agent development platform",
-    no_args_is_help=True,
-)
-
-# Add coordination subcommands
+# Try to import coordination - may not be available
 try:
     from .coordination import app as coordination_app
 
+    COORDINATION_AVAILABLE = True
+except ImportError:
+    COORDINATION_AVAILABLE = False
+
+app = typer.Typer(
+    name="hive",
+    help="LeanVibe Agent Hive - Autonomous Multi-Agent System CLI",
+    rich_markup_mode="rich",
+    no_args_is_help=True,
+)
+
+console = Console()
+
+# Add command groups
+app.add_typer(system.app, name="system", help="System management commands")
+app.add_typer(agent.app, name="agent", help="Agent management commands")
+app.add_typer(task.app, name="task", help="Task management commands")
+app.add_typer(context.app, name="context", help="Context engine commands")
+
+# Add coordination if available
+if COORDINATION_AVAILABLE:
     app.add_typer(
         coordination_app,
         name="coordination",
         help="Agent coordination and collaboration",
     )
-except ImportError:
+else:
     console.print(
         "[yellow]Warning: Coordination commands not available (missing dependencies)[/yellow]"
     )
 
 
-@app.command("run-agent")
-def run_agent(
-    agent_type: str = typer.Argument(
-        ..., help="Type of agent to run (meta, developer, qa, architect, research)"
-    ),
-    name: str | None = typer.Option(None, "--name", "-n", help="Agent name"),
-    log_level: str = typer.Option("INFO", "--log-level", "-l", help="Logging level"),
-) -> None:
-    """Start an agent instance."""
-    console.print(f"[cyan]Starting {agent_type} agent...[/cyan]")
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", "-v", help="Show version"),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug mode"),
+):
+    """
+    LeanVibe Agent Hive CLI
 
-    if not name:
-        name = f"{agent_type}-{uuid.uuid4().hex[:8]}"
+    A powerful command-line interface for managing the autonomous agent system.
+    """
+    if version:
+        console.print("LeanVibe Hive CLI v2.0.0", style="bold green")
+        raise typer.Exit()
 
-    try:
-        # Import and run agent runner
-        from agents.runner import AgentRunner
+    if debug:
+        import logging
 
-        runner = AgentRunner(agent_type, name)
-        asyncio.run(runner.start())
+        logging.basicConfig(level=logging.DEBUG)
 
-    except KeyboardInterrupt:
-        console.print(f"\n[yellow]Agent {name} stopped by user[/yellow]")
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        console.print("Make sure all dependencies are installed: uv sync")
-        sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]Error starting agent: {e}[/red]")
-        sys.exit(1)
+    # If no command was provided, show help
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit()
 
 
-@app.command("bootstrap")
-def bootstrap() -> None:
-    """Bootstrap the LeanVibe Agent Hive system."""
-    console.print("[cyan]Bootstrapping LeanVibe Agent Hive 2.0...[/cyan]")
+@app.command()
+def init():
+    """Initialize the hive system (database, migrations, setup)"""
 
-    try:
-        # Import bootstrap functionality
-        from bootstrap import BootstrapAgent
+    async def _init():
+        from ..core.config import get_settings
 
-        agent = BootstrapAgent()
-        agent.bootstrap_system()
+        settings = get_settings()
 
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        console.print("Make sure all dependencies are installed: uv sync")
-        sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]Bootstrap failed: {e}[/red]")
-        sys.exit(1)
+        console.print("🚀 Initializing LeanVibe Hive...", style="bold blue")
 
-
-@app.command("start-api")
-def start_api(
-    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
-    port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
-    reload: bool = typer.Option(False, "--reload", "-r", help="Auto-reload on changes"),
-) -> None:
-    """Start the FastAPI server."""
-    console.print(f"[cyan]Starting API server on {host}:{port}...[/cyan]")
-
-    try:
-        cmd = [
-            "uvicorn",
-            "src.api.main:app",
-            "--host",
-            host,
-            "--port",
-            str(port),
-        ]
-
-        if reload:
-            cmd.append("--reload")
-
-        subprocess.run(cmd, check=True)
-
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]Failed to start API server: {e}[/red]")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        console.print("\n[yellow]API server stopped[/yellow]")
-
-
-@app.command("init-db")
-def init_db() -> None:
-    """Initialize database tables."""
-    console.print("[cyan]Initializing database...[/cyan]")
-
-    try:
-        from core.models import get_database_manager
-
-        db_manager = get_database_manager(settings.database_url)
-        db_manager.create_tables()
-
-        console.print("[green]✓ Database tables created successfully![/green]")
-
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        console.print("Make sure all dependencies are installed: uv sync")
-        sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]Database initialization failed: {e}[/red]")
-        console.print("Make sure PostgreSQL is running and accessible")
-        sys.exit(1)
-
-
-@app.command("tools")
-def tools() -> None:
-    """Check available CLI agentic coding tools."""
-    console.print("[cyan]Checking available CLI tools...[/cyan]")
-
-    try:
-        from bootstrap import BootstrapAgent
-
-        agent = BootstrapAgent()
-
-        if not agent.available_tools:
-            console.print("[red]No CLI agentic coding tools found![/red]")
-            console.print("\nInstall options:")
-            console.print("• opencode: curl -fsSL https://opencode.ai/install | bash")
-            console.print("• Claude Code CLI: https://claude.ai/cli")
-            console.print("• Gemini CLI: https://ai.google.dev/gemini-api/docs/cli")
-            return
-
-        console.print(
-            f"\n[bold]Available CLI Tools ({len(agent.available_tools)}):[/bold]"
-        )
-        for tool_key, tool_config in agent.available_tools.items():
-            status = (
-                "✓ [green]PREFERRED[/green]"
-                if tool_key == agent.preferred_tool
-                else "✓"
-            )
-            console.print(
-                f"  {status} {tool_config['name']} ({tool_config['command']})"
-            )
-
-        console.print(
-            f"\nPreferred tool: {agent.available_tools[agent.preferred_tool]['name']}"
-            if agent.preferred_tool
-            else "No preferred tool"
-        )
-
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
-
-
-@app.command("status")
-def status() -> None:
-    """Check system status."""
-    console.print("[cyan]Checking system status...[/cyan]")
-
-    try:
-        from bootstrap import BootstrapAgent
-
-        agent = BootstrapAgent()
-
-        console.print("\n[bold]CLI Agentic Coding Tools:[/bold]")
-
-        # Check each tool
-        agent.check_opencode()
-        agent.check_claude_code()
-        agent.check_gemini_cli()
-
-        # Check tmux
-        agent.check_tmux()
-
-        # Check Docker services
         try:
-            agent.connect_services()
-            console.print("\n[bold green]System is ready![/bold green]")
-            if agent.preferred_tool:
-                console.print(
-                    f"Preferred tool: {agent.available_tools[agent.preferred_tool]['name']}"
-                )
-        except:
-            console.print(
-                "\n[bold red]System not ready - start Docker services[/bold red]"
+            # Initialize database
+            console.print("📊 Setting up database...", style="yellow")
+
+            # Run database migrations
+            import subprocess
+
+            result = subprocess.run(
+                ["alembic", "upgrade", "head"], capture_output=True, text=True, cwd="."
             )
-            console.print("Run: docker compose up -d")
-        finally:
-            agent.cleanup()
 
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
-
-
-@app.command("spawn")
-def spawn(
-    agent_type: str = typer.Argument(..., help="Type of agent to spawn"),
-    name: str | None = typer.Option(None, "--name", "-n", help="Agent name"),
-) -> None:
-    """Spawn a new agent in tmux session."""
-    console.print(f"[cyan]Spawning {agent_type} agent...[/cyan]")
-
-    try:
-        from bootstrap import BootstrapAgent
-
-        agent = BootstrapAgent()
-        agent.connect_services()
-        session_name = agent.spawn_agent(agent_type, name)
-
-        console.print(f"[green]✓ Agent spawned in session: {session_name}[/green]")
-        console.print(f"Attach with: tmux attach -t {session_name}")
-
-    except ImportError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]Failed to spawn agent: {e}[/red]")
-        sys.exit(1)
-
-
-@app.command("list")
-def list_agents() -> None:
-    """List all active agent sessions."""
-    console.print("[cyan]Active agent sessions:[/cyan]")
-
-    try:
-        result = subprocess.run(["tmux", "ls"], capture_output=True, text=True)
-
-        if result.returncode == 0:
-            sessions = result.stdout.strip().split("\n")
-            agent_sessions = [s for s in sessions if "agent" in s]
-
-            if agent_sessions:
-                for session in agent_sessions:
-                    console.print(f"  • {session}")
+            if result.returncode == 0:
+                console.print("✅ Database migrations applied", style="green")
             else:
-                console.print("  No agent sessions found")
-        else:
-            console.print("  No active tmux sessions")
+                console.print(
+                    f"❌ Database migration failed: {result.stderr}", style="red"
+                )
+                return
 
-    except FileNotFoundError:
-        console.print("[red]tmux not found - install with: brew install tmux[/red]")
+            # Start Docker services if not running
+            console.print("🐳 Checking Docker services...", style="yellow")
+            result = subprocess.run(
+                ["docker", "compose", "up", "-d", "postgres", "redis"],
+                capture_output=True,
+                text=True,
+                cwd=".",
+            )
+
+            if result.returncode == 0:
+                console.print("✅ Docker services started", style="green")
+            else:
+                console.print(
+                    "⚠️  Docker services may already be running", style="yellow"
+                )
+
+            console.print("🎉 Hive initialization complete!", style="bold green")
+            console.print("\n💡 [dim]Next steps:[/dim]")
+            console.print("  • Run 'hive system start' to start the API server")
+            console.print("  • Run 'hive system status' to check system health")
+            console.print("  • Run 'hive agent spawn meta' to start your first agent")
+
+        except Exception as e:
+            console.print(f"❌ Initialization failed: {e}", style="red")
+
+    asyncio.run(_init())
+
+
+def cli_main():
+    """Entry point for the CLI"""
+    try:
+        app()
+    except KeyboardInterrupt:
+        console.print("\n👋 Goodbye!", style="yellow")
     except Exception as e:
-        console.print(f"[red]Error listing sessions: {e}[/red]")
+        error_handler(e)
 
 
 if __name__ == "__main__":
-    app()
+    cli_main()

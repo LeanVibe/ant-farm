@@ -5,13 +5,16 @@ Demonstrates task processing by echoing 'Hello from autonomous agent!'
 """
 
 import asyncio
+import sys
 import time
 from pathlib import Path
 
-# Add src to path for imports
-src_path = Path(__file__).parent / "src"
 from agents.base_agent import BaseAgent, TaskResult
 from core.task_queue import Task, TaskPriority
+
+# Add src to path for imports
+src_path = Path(__file__).parent / "src"
+sys.path.insert(0, str(src_path))
 
 
 class EchoAgent(BaseAgent):

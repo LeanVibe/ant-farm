@@ -1,17 +1,13 @@
 """DevOps Agent for LeanVibe Agent Hive 2.0."""
 
 import asyncio
-import json
-import subprocess
 import time
-from pathlib import Path
 from typing import Any
 
 import structlog
 
-from .base_agent import BaseAgent, HealthStatus, TaskResult, ToolResult
-from ..core.config import settings
 from ..core.task_queue import Task
+from .base_agent import BaseAgent, HealthStatus, TaskResult
 
 logger = structlog.get_logger()
 
@@ -168,15 +164,15 @@ class DevOpsAgent(BaseAgent):
 
         prompt = f"""
         As a Senior DevOps Engineer, execute a deployment to {environment} environment.
-        
+
         Service: {service_name}
         Environment: {environment}
         Strategy: {deployment_strategy}
         Task Details: {task.description}
-        
+
         Previous Deployment Context:
         {context_text}
-        
+
         Please execute the deployment with these steps:
         1. Pre-deployment health checks
         2. Create deployment artifacts
@@ -186,7 +182,7 @@ class DevOpsAgent(BaseAgent):
         6. Rollback plan if needed
         7. Update monitoring and alerting
         8. Document deployment details
-        
+
         Use Docker and Kubernetes best practices.
         Ensure zero-downtime deployment where possible.
         """
@@ -230,11 +226,11 @@ class DevOpsAgent(BaseAgent):
 
         prompt = f"""
         As a Senior DevOps Engineer, set up infrastructure for the LeanVibe Agent Hive.
-        
+
         Infrastructure Type: {infrastructure_type}
         Cloud Provider: {cloud_provider}
         Requirements: {task.description}
-        
+
         Please create:
         1. Infrastructure as Code (Terraform/Helm charts)
         2. Network configuration and security groups
@@ -246,7 +242,7 @@ class DevOpsAgent(BaseAgent):
         8. Security hardening
         9. Cost optimization strategies
         10. Documentation and runbooks
-        
+
         Focus on reliability, security, and cost efficiency.
         """
 
@@ -286,11 +282,11 @@ class DevOpsAgent(BaseAgent):
 
         prompt = f"""
         As a Senior DevOps Engineer, configure comprehensive monitoring and alerting.
-        
+
         Scope: {monitoring_scope}
         Tools: {tools}
         Requirements: {task.description}
-        
+
         Please configure:
         1. Metrics collection (Prometheus/custom)
         2. Dashboards (Grafana/custom)
@@ -302,7 +298,7 @@ class DevOpsAgent(BaseAgent):
         8. SLA/SLO definitions
         9. Incident response procedures
         10. Monitoring documentation
-        
+
         Ensure comprehensive observability across the system.
         """
 
@@ -337,11 +333,11 @@ class DevOpsAgent(BaseAgent):
 
         prompt = f"""
         As a Senior DevOps Engineer, set up a comprehensive CI/CD pipeline.
-        
+
         Platform: {platform}
         Pipeline Type: {pipeline_type}
         Requirements: {task.description}
-        
+
         Please create:
         1. Source code management integration
         2. Automated build process
@@ -353,7 +349,7 @@ class DevOpsAgent(BaseAgent):
         8. Rollback mechanisms
         9. Pipeline monitoring
         10. Documentation and best practices
-        
+
         Focus on reliability, security, and developer experience.
         """
 
@@ -391,12 +387,12 @@ class DevOpsAgent(BaseAgent):
 
         prompt = f"""
         As a Senior DevOps Engineer, scale the {service_name} service.
-        
+
         Service: {service_name}
         Direction: {scale_direction}
         Target Instances: {target_instances}
         Current Status: {current_status}
-        
+
         Please execute scaling with:
         1. Pre-scaling health checks
         2. Gradual scaling to avoid resource spikes
@@ -406,7 +402,7 @@ class DevOpsAgent(BaseAgent):
         6. Cost impact assessment
         7. Auto-scaling rule updates
         8. Documentation updates
-        
+
         Ensure service availability during scaling operations.
         """
 
@@ -445,12 +441,12 @@ class DevOpsAgent(BaseAgent):
 
         prompt = f"""
         As a Senior DevOps Engineer, respond to a {severity} severity {incident_type} incident.
-        
+
         Incident Type: {incident_type}
         Severity: {severity}
         Affected Services: {affected_services}
         Description: {task.description}
-        
+
         Please execute incident response:
         1. Immediate assessment and triage
         2. Impact analysis and scope determination
@@ -462,7 +458,7 @@ class DevOpsAgent(BaseAgent):
         8. Prevention measures
         9. Documentation updates
         10. Lessons learned capture
-        
+
         Prioritize service restoration and customer impact minimization.
         """
 

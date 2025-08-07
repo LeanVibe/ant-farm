@@ -2,50 +2,25 @@
 
 import asyncio
 import json
+import logging
 import sys
 import time
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
-import structlog
-from fastapi import (
-    BackgroundTasks,
-    Depends,
-    FastAPI,
-    HTTPException,
-    Request,
-    WebSocket,
-    WebSocketDisconnect,
-)
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Handle both module and direct execution imports
+
 try:
-    from ..core.analytics import (
-        PerformanceMiddleware,
-        get_performance_collector,
-        start_performance_monitoring,
-        stop_performance_monitoring,
-    )
-    from ..core.auth import (
-        AuthenticationError,
-        Permissions,
-        SecurityMiddleware,
-        get_current_user,
-        rate_limit,
-        require_admin,
-    )
     from ..core.config import settings
     from ..core.message_broker import MessageType, message_broker
-    from ..core.models import SystemMetric, get_database_manager
     from ..core.orchestrator import get_orchestrator
     from ..core.security import User, create_default_admin, security_manager
     from ..core.task_queue import Task, TaskPriority, task_queue
-except ImportError:
-    # Direct execution - add src to path
+except ImportError:  # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
     from core.analytics import (
@@ -68,7 +43,17 @@ except ImportError:
     from core.security import User, create_default_admin, security_manager
     from core.task_queue import Task, TaskPriority, task_queue
 
-logger = structlog.get_logger()
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 
 # WebSocket connection manager
@@ -847,6 +832,41 @@ async def health_check():
     )
 
 
+@app.get(
+    "/api/v1/health",
+    response_model=APIResponse,
+    tags=["System"],
+    summary="Detailed Health Check",
+    description="Detailed health check for CLI tools and monitoring.",
+)
+async def detailed_health_check():
+    """Detailed health check for CLI tools."""
+    try:
+        # Test database connection
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+
+        # Test Redis connection
+        await message_broker.redis.ping()
+
+        return APIResponse(
+            success=True,
+            data={
+                "status": "healthy",
+                "service": "agent-hive-api",
+                "database": "connected",
+                "redis": "connected",
+                "uptime": time.time() - startup_time,
+            },
+        )
+    except Exception as e:
+        return APIResponse(
+            success=False,
+            data={"status": "unhealthy", "service": "agent-hive-api", "error": str(e)},
+        )
+
+
 @app.get("/api/v1/status", response_model=APIResponse)
 async def get_system_status():
     """Get comprehensive system status."""
@@ -1510,7 +1530,7 @@ async def get_performance_stats(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def _generate_performance_recommendations(collector) -> List[Dict[str, Any]]:
+def _generate_performance_recommendations(collector) -> list[dict[str, Any]]:
     """Generate performance recommendations based on current metrics."""
     recommendations = []
     alerts = collector.get_performance_alerts()

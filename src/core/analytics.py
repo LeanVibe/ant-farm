@@ -383,7 +383,6 @@ class PerformanceCollector:
         self, time_window_minutes: int = 60
     ) -> dict[str, APIPerformance]:
         """Get API performance summary for the specified time window."""
-        cutoff_time = time.time() - (time_window_minutes * 60)
         summary = {}
 
         for endpoint_key, response_times in self.request_times.items():

@@ -791,9 +791,9 @@ class BaseAgent(ABC):
 
         # Import here to avoid circular imports
         try:
-            from ..core.agent_coordination import coordination_system, CollaborationType
+            from core.agent_coordination import CollaborationType, coordination_system
         except ImportError:
-            from core.agent_coordination import coordination_system, CollaborationType
+            from ..core.agent_coordination import CollaborationType, coordination_system
 
         collaboration_id = await coordination_system.start_collaboration(
             title=title,
@@ -989,8 +989,6 @@ class BaseAgent(ABC):
     async def _process_collaborative_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Process a collaborative task."""
         # Default implementation - subclasses should override
-
-        description = task.get("description", "")
         dependencies = task.get("depends_on", [])
 
         # Wait for dependencies if any
@@ -1088,12 +1086,14 @@ class BaseAgent(ABC):
 
         return {"status": "acknowledged"}
 
+    @abstractmethod
     async def _on_collaboration_completed(self, result: dict[str, Any]) -> None:
         """Called when a collaboration is completed."""
         # Default implementation does nothing
         # Subclasses can override for learning or cleanup
         pass
 
+    @abstractmethod
     async def _on_collaboration_failed(self, failure_info: dict[str, Any]) -> None:
         """Called when a collaboration fails."""
         # Default implementation does nothing

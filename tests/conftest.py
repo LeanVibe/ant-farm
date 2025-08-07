@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Test configuration
 TEST_DATABASE_URL = (
-    "postgresql+asyncpg://test_user:test_pass@localhost:5433/test_leanvibe_hive"
+    "postgresql+asyncpg://hive_user:hive_pass@localhost:5433/leanvibe_hive"
 )
 TEST_REDIS_URL = "redis://localhost:6381"
 
@@ -32,7 +32,7 @@ async def redis_client() -> AsyncGenerator[redis.Redis, None]:
         yield client
     finally:
         await client.flushdb()  # Clean up after test
-        await client.close()
+        await client.aclose()
 
 
 @pytest.fixture

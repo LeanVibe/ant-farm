@@ -12,7 +12,6 @@ from pathlib import Path
 # Add src to path for imports
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
-
 from core.task_queue import Task, TaskPriority, task_queue
 
 

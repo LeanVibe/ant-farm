@@ -1,18 +1,16 @@
 """Advanced inter-agent coordination and collaboration protocols."""
 
-import asyncio
-import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
 from .message_broker import MessageBroker, MessageType, message_broker
-from .orchestrator import AgentInfo, orchestrator
+from .orchestrator import orchestrator
 
 logger = structlog.get_logger()
 
@@ -49,13 +47,13 @@ class CollaborationContext:
     collaboration_type: CollaborationType
     phase: TaskPhase
     coordinator_agent: str
-    participating_agents: List[str] = field(default_factory=list)
-    sub_tasks: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)
-    results: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    participating_agents: list[str] = field(default_factory=list)
+    sub_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    dependencies: dict[str, list[str]] = field(default_factory=dict)
+    results: dict[str, dict[str, Any]] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
-    deadline: Optional[float] = None
+    deadline: float | None = None
     priority: int = 5
 
 
@@ -64,11 +62,11 @@ class AgentCapabilityMap:
     """Maps agent capabilities to task requirements."""
 
     agent_name: str
-    capabilities: List[str]
-    specializations: List[str]
+    capabilities: list[str]
+    specializations: list[str]
     load_factor: float
     availability: bool
-    performance_metrics: Dict[str, float] = field(default_factory=dict)
+    performance_metrics: dict[str, float] = field(default_factory=dict)
 
 
 class TaskDecomposer:
@@ -85,8 +83,8 @@ class TaskDecomposer:
         }
 
     async def decompose_task(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose a task based on collaboration type and available agents."""
 
         strategy = self.decomposition_strategies.get(context.collaboration_type)
@@ -98,8 +96,8 @@ class TaskDecomposer:
         return await strategy(context, available_agents)
 
     async def _decompose_sequential(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for sequential execution."""
 
         sub_tasks = {}
@@ -189,8 +187,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_parallel(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for parallel execution."""
 
         sub_tasks = {}
@@ -259,8 +257,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_parallel(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for parallel execution."""
 
         sub_tasks = {}
@@ -312,8 +310,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_pipeline(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for pipeline execution."""
 
         sub_tasks = {}
@@ -353,8 +351,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_consensus(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for consensus-based execution."""
 
         sub_tasks = {}
@@ -401,8 +399,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_competitive(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for competitive execution."""
 
         sub_tasks = {}
@@ -463,8 +461,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_competitive(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for competitive execution."""
 
         sub_tasks = {}
@@ -512,8 +510,8 @@ class TaskDecomposer:
         return sub_tasks
 
     async def _decompose_delegation(
-        self, context: CollaborationContext, available_agents: List[AgentCapabilityMap]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, context: CollaborationContext, available_agents: list[AgentCapabilityMap]
+    ) -> dict[str, dict[str, Any]]:
         """Decompose task for delegation pattern."""
 
         sub_tasks = {}
@@ -562,7 +560,7 @@ class CollaborationCoordinator:
 
     def __init__(self, message_broker: MessageBroker):
         self.message_broker = message_broker
-        self.active_collaborations: Dict[str, CollaborationContext] = {}
+        self.active_collaborations: dict[str, CollaborationContext] = {}
         self.task_decomposer = TaskDecomposer()
         self.coordination_handlers = {
             "collaboration_request": self._handle_collaboration_request,
@@ -598,10 +596,10 @@ class CollaborationCoordinator:
         description: str,
         collaboration_type: CollaborationType,
         coordinator_agent: str,
-        required_capabilities: List[str] = None,
-        deadline: Optional[datetime] = None,
+        required_capabilities: list[str] = None,
+        deadline: datetime | None = None,
         priority: int = 5,
-        metadata: Dict[str, Any] = None,
+        metadata: dict[str, Any] = None,
     ) -> str:
         """Start a new collaborative task."""
 
@@ -630,11 +628,9 @@ class CollaborationCoordinator:
         # Extract participating agents
         context.participating_agents = list(
             set(
-                [
-                    task["assigned_agent"]
-                    for task in sub_tasks.values()
-                    if "assigned_agent" in task
-                ]
+                task["assigned_agent"]
+                for task in sub_tasks.values()
+                if "assigned_agent" in task
             )
         )
 
@@ -656,7 +652,7 @@ class CollaborationCoordinator:
 
         return context.id
 
-    async def _get_available_agents(self) -> List[AgentCapabilityMap]:
+    async def _get_available_agents(self) -> list[AgentCapabilityMap]:
         """Get list of available agents with their capabilities."""
 
         # This would typically query the orchestrator
@@ -970,7 +966,7 @@ class CollaborationCoordinator:
 
         return {"status": "updated"}
 
-    async def get_collaboration_status(self, collaboration_id: str) -> Dict[str, Any]:
+    async def get_collaboration_status(self, collaboration_id: str) -> dict[str, Any]:
         """Get status of a collaboration."""
 
         if collaboration_id not in self.active_collaborations:

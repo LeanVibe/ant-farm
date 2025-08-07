@@ -1,7 +1,6 @@
 """Test configuration for running tests without coverage on placeholder files."""
 
 
-
 def pytest_configure(config):
     """Configure pytest to handle our current development state."""
     # Add custom markers

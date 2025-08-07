@@ -1,21 +1,22 @@
 """Comprehensive tests for the caching system."""
 
 import asyncio
-import pytest
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.core.caching import (
+    CONTEXT_CACHE_CONFIG,
+    TASK_QUEUE_CACHE_CONFIG,
     CacheConfig,
+    CacheInvalidator,
+    CacheKey,
     CacheLevel,
     CacheManager,
     CacheStrategy,
     MultiLevelCache,
-    CacheKey,
-    CacheInvalidator,
     get_cache_manager,
-    CONTEXT_CACHE_CONFIG,
-    TASK_QUEUE_CACHE_CONFIG,
 )
 
 

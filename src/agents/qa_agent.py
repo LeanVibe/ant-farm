@@ -147,14 +147,14 @@ class QAAgent(BaseAgent):
 
         prompt = f"""
         As a QA Engineer, analyze the code at {code_path} and create comprehensive {test_type} tests.
-        
+
         Task: {task.description}
         Code Path: {code_path}
         Test Type: {test_type}
-        
+
         Context:
         {context_text}
-        
+
         Please:
         1. Analyze the code structure and functionality
         2. Generate appropriate test cases
@@ -162,7 +162,7 @@ class QAAgent(BaseAgent):
         4. Include edge cases and error conditions
         5. Ensure proper test organization and naming
         6. Run the tests and report results
-        
+
         Focus on testing coverage, edge cases, and maintainability.
         """
         result = await self.execute_with_cli_tool(prompt)
@@ -207,14 +207,14 @@ class QAAgent(BaseAgent):
 
         prompt = f"""
         As a Senior QA Engineer, perform a comprehensive code review of {code_path}.
-        
+
         Task: {task.description}
         Code Path: {code_path}
         Review Focus: {review_focus}
-        
+
         Previous Context:
         {context_text}
-        
+
         Please review the code for:
         1. Code quality and maintainability
         2. Security vulnerabilities
@@ -224,7 +224,7 @@ class QAAgent(BaseAgent):
         6. Error handling
         7. Code consistency and standards
         8. Potential bugs or issues
-        
+
         Provide specific recommendations and severity levels for each issue found.
         Format the output as a structured review report.
         """
@@ -367,17 +367,17 @@ class QAAgent(BaseAgent):
 
         prompt = f"""
         As a QA Engineer, design and execute performance tests for the system.
-        
+
         Task: {task.description}
         Target: {task.metadata.get("target", "API endpoints")}
-        
+
         Please:
         1. Identify performance test scenarios
         2. Set up performance test framework
         3. Execute load tests
         4. Analyze performance metrics
         5. Provide recommendations for optimization
-        
+
         Focus on response times, throughput, and resource utilization.
         """
         result = await self.execute_with_cli_tool(prompt)
@@ -575,7 +575,7 @@ class QAAgent(BaseAgent):
         """Calculate overall quality score from tool results."""
         total_score = 100.0
 
-        for tool, result in results.items():
+        for _tool, result in results.items():
             if isinstance(result, dict) and "issues" in result:
                 # Deduct points for issues
                 issues = result["issues"]

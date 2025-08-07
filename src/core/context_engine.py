@@ -9,8 +9,8 @@ from typing import Any
 import structlog
 from sqlalchemy.orm import Session
 
+from .caching import CONTEXT_CACHE_CONFIG, CacheKey, get_cache_manager
 from .models import Context, get_database_manager
-from .caching import get_cache_manager, CONTEXT_CACHE_CONFIG, CacheKey
 
 logger = structlog.get_logger()
 
@@ -188,7 +188,7 @@ class EmbeddingService:
     async def _generate_sentence_transformers_embedding(self, text: str) -> list[float]:
         """Generate embedding using sentence transformers."""
         try:
-            embedding = await asyncio.to_thread(lambda: self.model.encode([text]))
+            embedding = await asyncio.to_thread(self.model.encode, [text])
             return embedding[0].tolist()
         except Exception as e:
             logger.error(
@@ -384,9 +384,8 @@ class SemanticSearch:
     def _calculate_relevance(self, context: Context, similarity: float) -> float:
         """Calculate relevance score combining similarity and importance."""
         # Combine similarity with importance score and recency
-        age_penalty = min(
-            1.0, (time.time() - context.created_at.timestamp()) / (7 * 24 * 3600)
-        )  # Week decay
+        age_in_seconds = time.time() - context.created_at.timestamp()
+        age_penalty = min(1.0, age_in_seconds / (7 * 24 * 3600))  # Week decay
 
         relevance = (
             similarity * 0.6  # 60% similarity
@@ -718,7 +717,6 @@ class ContextEngine:
                 )
                 return True
             return False
-
         except Exception as e:
             db_session.rollback()
             logger.error(

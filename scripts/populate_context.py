@@ -7,18 +7,17 @@ ContextEngine to store their contents for the initial knowledge base.
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 import structlog
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from src.core.context_engine import get_context_engine
 from src.core.config import get_settings
+from src.core.context_engine import get_context_engine
+
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 logger = structlog.get_logger()
 
@@ -29,7 +28,10 @@ class ContextPopulator:
     def __init__(self, context_engine, base_path: Path):
         self.context_engine = context_engine
         self.base_path = base_path
-        self.agent_id = "system-bootstrap"  # Special agent ID for bootstrap
+        # Use a proper UUID for the bootstrap agent
+        import uuid
+
+        self.agent_id = str(uuid.uuid4())  # Generate a valid UUID
 
     async def populate_codebase_context(self) -> dict:
         """Scan codebase and populate context engine."""
@@ -63,7 +65,7 @@ class ContextPopulator:
         logger.info("Context population completed", stats=stats)
         return stats
 
-    def _find_python_files(self) -> List[Path]:
+    def _find_python_files(self) -> list[Path]:
         """Find all Python files in the src directory."""
         python_files = []
 
@@ -86,7 +88,7 @@ class ContextPopulator:
     async def _process_file(self, file_path: Path, stats: dict):
         """Process a single Python file and add to context."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             if not content.strip():
@@ -139,7 +141,7 @@ class ContextPopulator:
             logger.error("Error processing file", file=str(file_path), error=str(e))
             raise
 
-    def _categorize_file(self, rel_path: Path, content: str) -> Tuple[str, float]:
+    def _categorize_file(self, rel_path: Path, content: str) -> tuple[str, float]:
         """Categorize file and assign importance score."""
         path_str = str(rel_path).lower()
 

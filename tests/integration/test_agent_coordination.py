@@ -1,21 +1,20 @@
 """Tests for advanced agent coordination system."""
 
-import asyncio
-import pytest
 import time
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.core.agent_coordination import (
-    CollaborationType,
-    CollaborationCoordinator,
-    TaskDecomposer,
     AgentCapabilityMap,
     CollaborationContext,
+    CollaborationCoordinator,
+    CollaborationType,
+    TaskDecomposer,
     TaskPhase,
-    coordination_system,
 )
-from src.core.message_broker import MessageBroker, MessageType, Message
+from src.core.message_broker import Message, MessageBroker, MessageType
 
 
 @pytest.fixture

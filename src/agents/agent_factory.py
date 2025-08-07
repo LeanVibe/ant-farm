@@ -1,14 +1,14 @@
 """Agent Factory for creating and managing specialized agents."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
-from .base_agent import BaseAgent
-from .qa_agent import QAAgent
 from .architect_agent import ArchitectAgent
+from .base_agent import BaseAgent
 from .devops_agent import DevOpsAgent
 from .meta_agent import MetaAgent
+from .qa_agent import QAAgent
 
 logger = structlog.get_logger()
 
@@ -75,8 +75,8 @@ class AgentFactory:
     def create_agent(
         cls,
         agent_type: str,
-        name: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
+        name: str | None = None,
+        config: dict[str, Any] | None = None,
     ) -> BaseAgent:
         """
         Create an agent of the specified type.
@@ -141,7 +141,7 @@ class AgentFactory:
         return cls.AGENT_CAPABILITIES.get(agent_type, [])
 
     @classmethod
-    def get_agent_info(cls, agent_type: str) -> Dict[str, Any]:
+    def get_agent_info(cls, agent_type: str) -> dict[str, Any]:
         """Get detailed information about an agent type."""
         if agent_type not in cls.AGENT_TYPES:
             raise ValueError(f"Unknown agent type: {agent_type}")
@@ -157,8 +157,8 @@ class AgentFactory:
 
     @classmethod
     def create_agent_team(
-        cls, team_config: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, BaseAgent]:
+        cls, team_config: dict[str, dict[str, Any]]
+    ) -> dict[str, BaseAgent]:
         """
         Create a team of agents based on configuration.
 
@@ -207,7 +207,7 @@ class AgentFactory:
         return team
 
     @classmethod
-    def create_balanced_team(cls, team_size: int = 4) -> Dict[str, BaseAgent]:
+    def create_balanced_team(cls, team_size: int = 4) -> dict[str, BaseAgent]:
         """
         Create a balanced team with different agent types.
 
@@ -237,7 +237,7 @@ class AgentFactory:
 
     @classmethod
     def validate_agent_config(
-        cls, agent_type: str, config: Dict[str, Any]
+        cls, agent_type: str, config: dict[str, Any]
     ) -> tuple[bool, list[str]]:
         """
         Validate agent configuration.
@@ -287,7 +287,7 @@ def create_meta_agent(name: str = None) -> MetaAgent:
     return AgentFactory.create_agent("meta", name)
 
 
-def create_development_team() -> Dict[str, BaseAgent]:
+def create_development_team() -> dict[str, BaseAgent]:
     """Create a typical development team with all agent types."""
     return AgentFactory.create_agent_team(
         {
@@ -303,11 +303,11 @@ def create_development_team() -> Dict[str, BaseAgent]:
 class AgentCoordinator:
     """Coordinates communication and task distribution between agents."""
 
-    def __init__(self, agents: Dict[str, BaseAgent]):
+    def __init__(self, agents: dict[str, BaseAgent]):
         self.agents = agents
         self.task_assignments = {}
 
-    async def assign_task_to_best_agent(self, task: Any) -> Optional[BaseAgent]:
+    async def assign_task_to_best_agent(self, task: Any) -> BaseAgent | None:
         """
         Assign a task to the most suitable agent based on capabilities.
 
@@ -357,7 +357,7 @@ class AgentCoordinator:
         return best_agent
 
     async def broadcast_message(
-        self, topic: str, content: Dict[str, Any], exclude_agents: list[str] = None
+        self, topic: str, content: dict[str, Any], exclude_agents: list[str] = None
     ) -> None:
         """
         Broadcast a message to all agents in the team.
@@ -384,7 +384,7 @@ class AgentCoordinator:
                         error=str(e),
                     )
 
-    def get_team_status(self) -> Dict[str, Any]:
+    def get_team_status(self) -> dict[str, Any]:
         """Get status of all agents in the team."""
         status = {"team_size": len(self.agents), "agents": {}, "task_distribution": {}}
 

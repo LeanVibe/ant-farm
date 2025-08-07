@@ -1,6 +1,5 @@
 """Unit tests for message broker functionality."""
 
-
 import pytest
 
 # Import the classes we'll be testing (when they exist)

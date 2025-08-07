@@ -1,7 +1,6 @@
 """Agent orchestrator for lifecycle management and coordination."""
 
 import asyncio
-import json
 import subprocess
 import time
 import uuid

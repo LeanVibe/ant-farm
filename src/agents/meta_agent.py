@@ -116,14 +116,14 @@ class MetaAgent(BaseAgent):
 
     async def initialize(self):
         """Initialize MetaAgent with required components."""
-        # Initialize base agent
-        await super().initialize()
-
         # Initialize context engine
+        from ..core.config import get_settings
+
+        settings = get_settings()
         self.context_engine = await get_context_engine(settings.database_url)
 
-        # Initialize self modifier
-        self.self_modifier = SelfModifier()
+        # Initialize self modifier with workspace path
+        self.self_modifier = SelfModifier(workspace_path=str(settings.project_root))
 
         logger.info("MetaAgent components initialized", name=self.name)
 
@@ -645,7 +645,10 @@ class MetaAgent(BaseAgent):
         try:
             # Step 1: Use ContextEngine to retrieve relevant context
             context_results = await self.context_engine.retrieve_context(
-                query=task.description, agent_id=self.name, limit=10, min_importance=0.4
+                query=task.description,
+                agent_id=self.agent_uuid,
+                limit=10,
+                min_importance=0.4,
             )
 
             logger.info("Retrieved context", results_count=len(context_results))
@@ -673,10 +676,10 @@ class MetaAgent(BaseAgent):
 
                 change_description = f"""
                 Task: {task.description}
-                
+
                 Relevant Context:
                 {context_text}
-                
+
                 Please implement the requested changes to {target_file}.
                 """
 

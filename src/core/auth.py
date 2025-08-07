@@ -1,6 +1,5 @@
 """Authentication and authorization middleware for FastAPI."""
 
-
 import structlog
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer

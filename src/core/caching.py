@@ -6,17 +6,16 @@ system, focusing on optimizing database queries and improving response times.
 Performance Target: <50ms p95 response time for cached operations.
 """
 
-import asyncio
 import hashlib
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 import redis.asyncio as redis
 import structlog
-from pydantic import BaseModel
 
 logger = structlog.get_logger()
 
@@ -128,7 +127,7 @@ class MultiLevelCache:
         self.stats = CacheStats()
         self.invalidator = CacheInvalidator(redis_client)
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache with L1/L2 fallback."""
         start_time = time.time()
         self.stats.total_requests += 1
@@ -175,8 +174,8 @@ class MultiLevelCache:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        dependencies: Optional[list[str]] = None,
+        ttl: int | None = None,
+        dependencies: list[str] | None = None,
     ):
         """Set value in cache with optional TTL and dependencies."""
         try:
@@ -257,7 +256,7 @@ class MultiLevelCache:
         try:
             memory_info = await self.redis_client.memory_usage("hive:cache:*")
             self.stats.cache_size_bytes = memory_info if memory_info else 0
-        except:
+        except Exception:
             # Fallback estimation
             self.stats.cache_size_bytes = len(self.l1_cache) * 1024  # Rough estimate
 
@@ -330,7 +329,7 @@ class CacheManager:
             raise
 
     def get_cache(
-        self, namespace: str, config: Optional[CacheConfig] = None
+        self, namespace: str, config: CacheConfig | None = None
     ) -> MultiLevelCache:
         """Get or create a cache for a namespace."""
         if namespace not in self.caches:
@@ -342,9 +341,9 @@ class CacheManager:
     async def cached(
         self,
         namespace: str,
-        ttl: Optional[int] = None,
-        dependencies: Optional[list[str]] = None,
-        key_generator: Optional[Callable] = None,
+        ttl: int | None = None,
+        dependencies: list[str] | None = None,
+        key_generator: Callable | None = None,
     ):
         """Decorator for automatic caching of function results."""
 
@@ -412,7 +411,7 @@ class CacheManager:
                 memory_info = await self.redis_client.info("memory")
                 memory_usage = memory_info.get("used_memory", 0)
                 memory_peak = memory_info.get("used_memory_peak", 0)
-            except:
+            except Exception:
                 memory_usage = memory_peak = 0
 
             # Get cache statistics
@@ -466,10 +465,14 @@ SESSION_CACHE_CONFIG = CacheConfig(
 cache_manager = None
 
 
-async def get_cache_manager(redis_url: str = "redis://localhost:6379") -> CacheManager:
+async def get_cache_manager(redis_url: str = None) -> CacheManager:
     """Get the global cache manager instance."""
     global cache_manager
     if cache_manager is None:
+        if redis_url is None:
+            from .config import get_settings
+
+            redis_url = get_settings().redis_url
         cache_manager = CacheManager(redis_url)
         await cache_manager.initialize()
     return cache_manager
@@ -481,7 +484,7 @@ async def cache_database_query(
     query_func: Callable,
     *args,
     ttl: int = 300,
-    dependencies: Optional[list[str]] = None,
+    dependencies: list[str] | None = None,
     **kwargs,
 ):
     """Cache a database query result."""
@@ -502,7 +505,7 @@ async def cache_database_query(
     return result
 
 
-async def invalidate_model_cache(model_name: str, model_id: Optional[str] = None):
+async def invalidate_model_cache(model_name: str, model_id: str | None = None):
     """Invalidate cache entries for a specific model."""
     manager = await get_cache_manager()
 

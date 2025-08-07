@@ -1,6 +1,5 @@
 """End-to-end system tests."""
 
-
 import pytest
 
 # These tests verify the complete system works end-to-end

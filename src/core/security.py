@@ -298,13 +298,6 @@ class SecurityManager:
         api_key = f"hive_{key_id}_{key_secret}"
 
         # Store API key metadata (in production, store in database)
-        api_key_data = {
-            "user_id": user.id,
-            "name": name or f"API Key {datetime.utcnow().isoformat()}",
-            "created_at": datetime.utcnow(),
-            "last_used": None,
-            "is_active": True,
-        }
 
         logger.info("API key generated", user_id=user.id, key_id=key_id)
         return api_key

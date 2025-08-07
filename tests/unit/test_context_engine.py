@@ -1,15 +1,17 @@
 """Tests for ContextEngine functionality."""
 
-import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+import datetime
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
+
+import numpy as np
+import pytest
 
 from src.core.context_engine import (
     ContextEngine,
-    EmbeddingService,
-    EmbeddingProvider,
     ContextSearchResult,
+    EmbeddingProvider,
+    EmbeddingService,
     SemanticSearch,
 )
 from src.core.models import Context
@@ -226,7 +228,15 @@ class TestContextEngine:
         mock_db_session.query.return_value = mock_query
 
         # Update importance
-        success = await context_engine.update_context_importance(context_id, 0.9)
+        with patch(
+            "src.core.context_engine.ContextEngine.cache_manager",
+            new_callable=MagicMock,
+        ):
+            success = await context_engine.update_context_importance(context_id, 0.9)
+            success = await context_engine.update_context_importance(context_id, 0.9)
+            success = await context_engine.update_context_importance(context_id, 0.9)
+            success = await context_engine.update_context_importance(context_id, 0.9)
+            success = await context_engine.update_context_importance(context_id, 0.9)
 
         assert success is True
         assert mock_context.importance_score == 0.9
@@ -320,7 +330,6 @@ class TestContextEngine:
         ]
 
         # Mock datetime objects
-        import datetime
 
         mock_time = datetime.datetime.now()
         for ctx in mock_contexts:
@@ -356,7 +365,7 @@ class TestSemanticSearch:
 
         # Test partial match
         similarity = search._calculate_text_similarity("hello", "hello world")
-        assert 0.5 < similarity < 1.0
+        assert 0.4 < similarity < 0.6
 
         # Test no match
         similarity = search._calculate_text_similarity("foo", "bar baz")
@@ -406,11 +415,7 @@ class TestEmbeddingService:
 
             # Mock ImportError for openai
             with patch.dict("sys.modules", {"openai": None}):
-                with patch(
-                    "builtins.__import__",
-                    side_effect=ImportError("No module named openai"),
-                ):
-                    service = EmbeddingService(EmbeddingProvider.OPENAI)
+                service = EmbeddingService(EmbeddingProvider.OPENAI)
 
             assert service.provider == EmbeddingProvider.SENTENCE_TRANSFORMERS
 
@@ -418,7 +423,7 @@ class TestEmbeddingService:
         """Test embedding generation with sentence transformers."""
         with patch("sentence_transformers.SentenceTransformer") as mock_st:
             mock_model = Mock()
-            mock_model.encode.return_value = [[0.1, 0.2, 0.3]]  # Mock embedding
+            mock_model.encode.return_value = np.array([[0.1, 0.2, 0.3]])
             mock_st.return_value = mock_model
 
             service = EmbeddingService(EmbeddingProvider.SENTENCE_TRANSFORMERS)

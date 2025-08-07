@@ -17,10 +17,7 @@ of the self-improvement loop via POST /api/v1/tasks/self-improvement
 """
 
 import asyncio
-import os
-import subprocess
 import sys
-import time
 from pathlib import Path
 
 import structlog
@@ -44,8 +41,8 @@ async def main():
     try:
         # Step 1: Initialize database
         print("\\n1. Database initialization...")
-        from src.core.models import get_database_manager
         from src.core.config import get_settings
+        from src.core.models import get_database_manager
 
         settings = get_settings()
         db_manager = get_database_manager(settings.database_url)
@@ -132,6 +129,7 @@ async def main():
 
         # Start the server
         import uvicorn
+
         from src.api.main import app
 
         config = uvicorn.Config(app=app, host="0.0.0.0", port=8000, log_level="info")

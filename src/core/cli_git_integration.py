@@ -376,7 +376,6 @@ class EnhancedCLIExecutor:
                 )
 
             # Record initial state
-            initial_status = await self._get_git_status()
             initial_files = await self._get_tracked_files()
 
             # Execute CLI tool
@@ -509,7 +508,7 @@ class EnhancedCLIExecutor:
         try:
             result = await self._run_git_command(["status", "--porcelain"])
             return result.stdout
-        except:
+        except Exception:
             return ""
 
     async def _get_tracked_files(self) -> set[str]:
@@ -521,7 +520,7 @@ class EnhancedCLIExecutor:
                 if result.stdout.strip()
                 else set()
             )
-        except:
+        except Exception:
             return set()
 
     async def _get_changed_files(
@@ -541,7 +540,7 @@ class EnhancedCLIExecutor:
             # Combine and deduplicate
             all_changed = set(modified_files) | new_files
             return [f for f in all_changed if f]
-        except:
+        except Exception:
             return []
 
     async def _commit_changes(self, commit_message: str) -> str | None:

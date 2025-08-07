@@ -114,7 +114,11 @@ class MessageHandler:
 class MessageBroker:
     """Redis-based message broker with pub/sub and persistence."""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
+    def __init__(self, redis_url: str = None):
+        if redis_url is None:
+            from .config import get_settings
+
+            redis_url = get_settings().redis_url
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
         self.pubsub = None
         self.message_handlers: dict[str, MessageHandler] = {}

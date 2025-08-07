@@ -12,7 +12,7 @@ import redis.asyncio as redis
 import structlog
 from pydantic import BaseModel, Field
 
-from .caching import get_cache_manager, TASK_QUEUE_CACHE_CONFIG, CacheKey
+from .caching import TASK_QUEUE_CACHE_CONFIG, CacheKey, get_cache_manager
 
 logger = structlog.get_logger()
 
@@ -77,7 +77,11 @@ class QueueStats:
 class TaskQueue:
     """Redis-based priority task queue with advanced features."""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
+    def __init__(self, redis_url: str = None):
+        if redis_url is None:
+            from .config import get_settings
+
+            redis_url = get_settings().redis_url
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
         self.queue_prefix = "hive:queue"
         self.task_prefix = "hive:task"

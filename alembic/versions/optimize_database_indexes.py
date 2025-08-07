@@ -6,11 +6,20 @@ This module contains database optimizations including:
 - Performance monitoring utilities
 
 Target: <50ms p95 database response time
+
+Revision ID: optimize_indexes
+Revises: 7b71b9a0ac9e
+Create Date: 2024-01-01 12:00:00.000000
 """
 
 from alembic import op
-import sqlalchemy as sa
 from sqlalchemy import text
+
+# revision identifiers, used by Alembic.
+revision = "optimize_indexes"
+down_revision = "7b71b9a0ac9e"
+branch_labels = None
+depends_on = None
 
 
 def upgrade():

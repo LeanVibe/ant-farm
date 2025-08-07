@@ -258,9 +258,9 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As an expert system architect, create a comprehensive system design for:
-        
+
         Task: {task.get("description", "")}
-        
+
         Please provide:
         1. High-level architecture overview
         2. Component breakdown and responsibilities
@@ -270,7 +270,7 @@ class ArchitectAgent(BaseAgent):
         6. Security architecture
         7. Deployment strategy
         8. Monitoring and observability
-        
+
         Focus on enterprise-grade, production-ready design patterns.
         """
 
@@ -290,9 +290,9 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As an expert system architect, conduct a comprehensive architecture review:
-        
+
         Task: {task.get("description", "")}
-        
+
         Please analyze:
         1. Current architecture strengths and weaknesses
         2. Scalability bottlenecks
@@ -302,7 +302,7 @@ class ArchitectAgent(BaseAgent):
         6. Technical debt
         7. Compliance with best practices
         8. Recommendations for improvement
-        
+
         Provide specific, actionable recommendations with priority levels.
         """
 
@@ -322,9 +322,9 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As an expert system architect, create a comprehensive refactoring plan:
-        
+
         Task: {task.get("description", "")}
-        
+
         Please provide:
         1. Current state analysis
         2. Target state definition
@@ -334,7 +334,7 @@ class ArchitectAgent(BaseAgent):
         6. Rollback procedures
         7. Timeline and milestones
         8. Success metrics
-        
+
         Ensure minimal disruption to existing functionality.
         """
 
@@ -354,9 +354,9 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As an expert system architect, make informed technology decisions:
-        
+
         Task: {task.get("description", "")}
-        
+
         Please evaluate:
         1. Current technology stack assessment
         2. Alternative technology options
@@ -366,7 +366,7 @@ class ArchitectAgent(BaseAgent):
         6. Team expertise requirements
         7. Cost implications
         8. Final recommendations
-        
+
         Provide evidence-based recommendations with reasoning.
         """
 
@@ -393,16 +393,16 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As an expert system architect, analyze the following:
-        
+
         Task: {task.get("description", "")}
-        
+
         Please provide:
         1. Comprehensive analysis
         2. Key findings and insights
         3. Recommendations
         4. Best practices
         5. Implementation guidance
-        
+
         Focus on architectural excellence and long-term sustainability.
         """
 
@@ -606,14 +606,14 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As a Senior System Architect, design a {scope} system based on the following requirements.
-        
+
         Requirements: {requirements}
         Scope: {scope}
         Constraints: {constraints}
-        
+
         Existing Architecture Context:
         {context_text}
-        
+
         Please provide:
         1. High-level system architecture diagram (text-based)
         2. Component breakdown and responsibilities
@@ -625,7 +625,7 @@ class ArchitectAgent(BaseAgent):
         8. Monitoring and observability approach
         9. Risk assessment and mitigation strategies
         10. Implementation roadmap with phases
-        
+
         Format the output as a comprehensive architecture document with clear sections.
         Consider maintainability, scalability, and operational requirements.
         """
@@ -675,16 +675,16 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As a Senior System Architect, review the current architecture and identify improvements.
-        
+
         Target: {target_path}
         Focus Areas: {focus_areas}
-        
+
         Current Structure Analysis:
         {json.dumps(structure_analysis, indent=2)}
-        
+
         Historical Context:
         {context_text}
-        
+
         Please analyze:
         1. Current architecture strengths and weaknesses
         2. Design pattern usage and appropriateness
@@ -696,7 +696,7 @@ class ArchitectAgent(BaseAgent):
         8. Maintainability concerns
         9. Technical debt assessment
         10. Specific improvement recommendations with priorities
-        
+
         Provide actionable recommendations with implementation effort estimates.
         """
 
@@ -738,13 +738,13 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As a Senior System Architect, create a comprehensive refactoring plan.
-        
+
         Target: {target_path}
         Goals: {refactoring_goals}
-        
+
         Current Structure:
         {json.dumps(structure_analysis, indent=2)}
-        
+
         Please create:
         1. Refactoring objectives and success criteria
         2. Phase-by-phase refactoring plan
@@ -756,7 +756,7 @@ class ArchitectAgent(BaseAgent):
         8. Code migration strategies
         9. Communication plan for team
         10. Metrics to track progress
-        
+
         Ensure minimal disruption to ongoing development.
         """
 
@@ -795,11 +795,11 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As a Senior API Architect, design a comprehensive API solution.
-        
+
         Purpose: {api_purpose}
         API Type: {api_type}
         Requirements: {requirements}
-        
+
         Please design:
         1. API architecture and patterns
         2. Endpoint specifications with HTTP methods
@@ -813,7 +813,7 @@ class ArchitectAgent(BaseAgent):
         10. Performance optimization strategies
         11. Testing approach
         12. Monitoring and observability
-        
+
         Provide OpenAPI/Swagger specifications where applicable.
         """
 
@@ -851,10 +851,10 @@ class ArchitectAgent(BaseAgent):
 
         prompt = f"""
         As a Senior Database Architect, design a comprehensive database solution.
-        
+
         Requirements: {requirements}
         Database Type: {database_type}
-        
+
         Please design:
         1. Database schema with tables/collections
         2. Relationships and constraints
@@ -866,7 +866,7 @@ class ArchitectAgent(BaseAgent):
         8. Security and access control
         9. Migration strategy
         10. Monitoring and maintenance
-        
+
         Include SQL DDL statements or NoSQL schema definitions.
         """
 
