@@ -12,6 +12,8 @@ import redis.asyncio as redis
 import structlog
 from pydantic import BaseModel, Field
 
+from .caching import get_cache_manager, TASK_QUEUE_CACHE_CONFIG, CacheKey
+
 logger = structlog.get_logger()
 
 
@@ -81,6 +83,7 @@ class TaskQueue:
         self.task_prefix = "hive:task"
         self.dependency_prefix = "hive:dep"
         self.stats_key = "hive:stats"
+        self.cache_manager = None
 
     async def initialize(self) -> None:
         """Initialize the task queue system."""
@@ -101,7 +104,12 @@ class TaskQueue:
                     }
                 )
 
-            logger.info("Task queue initialized with optimized connection settings")
+            # Initialize cache manager
+            self.cache_manager = await get_cache_manager()
+
+            logger.info(
+                "Task queue initialized with optimized connection settings and caching"
+            )
         except TimeoutError:
             logger.error("Redis connection timeout during task queue initialization")
             raise
@@ -155,8 +163,13 @@ class TaskQueue:
                 dependencies=task.dependencies,
             )
 
-        # Update stats
+        # Update stats and invalidate cache
         await self._update_stats("submitted")
+        if self.cache_manager:
+            await self.cache_manager.invalidate_dependency("task_queue_stats")
+            if task.agent_id:
+                await self.cache_manager.invalidate_dependency(f"agent:{task.agent_id}")
+
         return task.id
 
     async def get_task(
@@ -248,6 +261,13 @@ class TaskQueue:
         # Process dependent tasks
         await self._process_dependent_tasks(task_id)
 
+        # Invalidate related caches
+        if self.cache_manager:
+            await self.cache_manager.invalidate_dependency("task_queue_stats")
+            agent_id = task_data.get("agent_id")
+            if agent_id:
+                await self.cache_manager.invalidate_dependency(f"agent:{agent_id}")
+
         logger.info("Task completed", task_id=task_id)
         await self._update_stats("completed")
         return True
@@ -331,9 +351,25 @@ class TaskQueue:
         return await self._dict_to_task(task_data)
 
     async def get_queue_stats(self) -> QueueStats:
-        """Get comprehensive queue statistics."""
-        # Count tasks by status
-        all_task_keys = await self.redis_client.keys(f"{self.task_prefix}:*")
+        """Get comprehensive queue statistics with caching."""
+
+        # Generate cache key
+        cache_key = CacheKey.generate("queue_stats")
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache(
+                "task_queue_stats", TASK_QUEUE_CACHE_CONFIG
+            )
+            cached_stats = await cache.get(cache_key)
+            if cached_stats is not None:
+                logger.debug("Queue stats cache hit")
+                return cached_stats
+
+        # Count tasks by status - using SCAN for better performance
+        all_task_keys = []
+        async for key in self.redis_client.scan_iter(match=f"{self.task_prefix}:*"):
+            all_task_keys.append(key)
 
         status_counts = {
             TaskStatus.PENDING: 0,
@@ -345,20 +381,34 @@ class TaskQueue:
 
         completion_times = []
 
-        for task_key in all_task_keys:
-            task_data = await self.redis_client.hgetall(task_key)
-            if not task_data:
-                continue
+        # Process tasks in batches for better performance
+        batch_size = 100
+        for i in range(0, len(all_task_keys), batch_size):
+            batch_keys = all_task_keys[i : i + batch_size]
 
-            status = task_data.get("status", TaskStatus.PENDING)
-            status_counts[status] = status_counts.get(status, 0) + 1
+            # Use pipeline for batch processing
+            pipe = self.redis_client.pipeline()
+            for task_key in batch_keys:
+                pipe.hgetall(task_key)
 
-            # Calculate completion time for completed tasks
-            if status == TaskStatus.COMPLETED:
-                started = task_data.get("started_at")
-                completed = task_data.get("completed_at")
-                if started and completed:
-                    completion_times.append(float(completed) - float(started))
+            batch_results = await pipe.execute()
+
+            for task_data in batch_results:
+                if not task_data:
+                    continue
+
+                status = task_data.get("status", TaskStatus.PENDING)
+                status_counts[status] = status_counts.get(status, 0) + 1
+
+                # Calculate completion time for completed tasks
+                if status == TaskStatus.COMPLETED:
+                    started = task_data.get("started_at")
+                    completed = task_data.get("completed_at")
+                    if started and completed:
+                        try:
+                            completion_times.append(float(completed) - float(started))
+                        except (ValueError, TypeError):
+                            pass  # Skip invalid timestamps
 
         # Count queue sizes by priority
         queue_sizes = {}
@@ -371,7 +421,7 @@ class TaskQueue:
             sum(completion_times) / len(completion_times) if completion_times else 0.0
         )
 
-        return QueueStats(
+        stats = QueueStats(
             pending_tasks=status_counts[TaskStatus.PENDING],
             assigned_tasks=status_counts[TaskStatus.ASSIGNED],
             in_progress_tasks=status_counts[TaskStatus.IN_PROGRESS],
@@ -381,6 +431,12 @@ class TaskQueue:
             average_completion_time=avg_completion_time,
             queue_size_by_priority=queue_sizes,
         )
+
+        # Cache the results
+        if self.cache_manager:
+            await cache.set(cache_key, stats, dependencies=["task_queue_stats"])
+
+        return stats
 
     async def cleanup_expired_tasks(self) -> int:
         """Clean up expired tasks and reassign them."""
@@ -531,47 +587,127 @@ class TaskQueue:
         return unassigned_tasks
 
     async def get_agent_active_task_count(self, agent_id: str) -> int:
-        """Get count of active tasks for a specific agent."""
+        """Get count of active tasks for a specific agent with caching."""
+
+        # Generate cache key
+        cache_key = CacheKey.generate("agent_task_count", agent_id=agent_id)
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache(
+                "task_queue_stats", TASK_QUEUE_CACHE_CONFIG
+            )
+            cached_count = await cache.get(cache_key)
+            if cached_count is not None:
+                logger.debug("Agent task count cache hit", agent_id=agent_id)
+                return cached_count
+
         count = 0
 
-        # Search through all tasks to find active ones for this agent
+        # Search through all tasks to find active ones for this agent using SCAN
         pattern = f"{self.task_prefix}:*"
         async for task_key in self.redis_client.scan_iter(match=pattern):
             task_data = await self.redis_client.hgetall(task_key)
 
             if task_data and task_data.get("agent_id") == agent_id:
                 status = task_data.get("status")
-                if status in [TaskStatus.ASSIGNED, TaskStatus.RUNNING]:
+                if status in [TaskStatus.ASSIGNED, TaskStatus.IN_PROGRESS]:
                     count += 1
+
+        # Cache the result with short TTL since this can change frequently
+        if self.cache_manager:
+            await cache.set(
+                cache_key,
+                count,
+                ttl=30,  # 30 seconds
+                dependencies=[f"agent:{agent_id}"],
+            )
 
         return count
 
     async def get_total_tasks(self) -> int:
-        """Get total number of tasks in the system."""
+        """Get total number of tasks in the system with caching."""
+
+        # Generate cache key
+        cache_key = CacheKey.generate("total_tasks")
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache(
+                "task_queue_stats", TASK_QUEUE_CACHE_CONFIG
+            )
+            cached_count = await cache.get(cache_key)
+            if cached_count is not None:
+                logger.debug("Total tasks cache hit")
+                return cached_count
+
         count = 0
         pattern = f"{self.task_prefix}:*"
         async for _task_key in self.redis_client.scan_iter(match=pattern):
             count += 1
+
+        # Cache the result
+        if self.cache_manager:
+            await cache.set(cache_key, count, dependencies=["task_queue_stats"])
+
         return count
 
     async def get_completed_tasks_count(self) -> int:
-        """Get count of completed tasks."""
+        """Get count of completed tasks with caching."""
+
+        # Generate cache key
+        cache_key = CacheKey.generate("completed_tasks")
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache(
+                "task_queue_stats", TASK_QUEUE_CACHE_CONFIG
+            )
+            cached_count = await cache.get(cache_key)
+            if cached_count is not None:
+                logger.debug("Completed tasks cache hit")
+                return cached_count
+
         count = 0
         pattern = f"{self.task_prefix}:*"
         async for task_key in self.redis_client.scan_iter(match=pattern):
             task_data = await self.redis_client.hgetall(task_key)
             if task_data and task_data.get("status") == TaskStatus.COMPLETED:
                 count += 1
+
+        # Cache the result
+        if self.cache_manager:
+            await cache.set(cache_key, count, dependencies=["task_queue_stats"])
+
         return count
 
     async def get_failed_tasks_count(self) -> int:
-        """Get count of failed tasks."""
+        """Get count of failed tasks with caching."""
+
+        # Generate cache key
+        cache_key = CacheKey.generate("failed_tasks")
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache(
+                "task_queue_stats", TASK_QUEUE_CACHE_CONFIG
+            )
+            cached_count = await cache.get(cache_key)
+            if cached_count is not None:
+                logger.debug("Failed tasks cache hit")
+                return cached_count
+
         count = 0
         pattern = f"{self.task_prefix}:*"
         async for task_key in self.redis_client.scan_iter(match=pattern):
             task_data = await self.redis_client.hgetall(task_key)
             if task_data and task_data.get("status") == TaskStatus.FAILED:
                 count += 1
+
+        # Cache the result
+        if self.cache_manager:
+            await cache.set(cache_key, count, dependencies=["task_queue_stats"])
+
         return count
 
 

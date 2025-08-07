@@ -10,6 +10,7 @@ import structlog
 from sqlalchemy.orm import Session
 
 from .models import Context, get_database_manager
+from .caching import get_cache_manager, CONTEXT_CACHE_CONFIG, CacheKey
 
 logger = structlog.get_logger()
 
@@ -538,12 +539,17 @@ class ContextEngine:
         self.embedding_service = EmbeddingService(embedding_provider)
         self.semantic_search = SemanticSearch(self.embedding_service)
         self.memory_consolidator = MemoryConsolidator(self)
+        self.cache_manager = None
 
     async def initialize(self):
         """Initialize the context engine."""
         # Ensure database tables exist
         self.db_manager.create_tables()
-        logger.info("Context engine initialized")
+
+        # Initialize cache manager
+        self.cache_manager = await get_cache_manager()
+
+        logger.info("Context engine initialized with caching support")
 
     async def store_context(
         self,
@@ -582,6 +588,18 @@ class ContextEngine:
 
             context_id = str(context.id)
 
+            # Invalidate related caches
+            if self.cache_manager:
+                cache_deps = [
+                    f"agent:{agent_id}",
+                    f"category:{category}",
+                    "context_stats",
+                ]
+                if session_id:
+                    cache_deps.append(f"session:{session_id}")
+
+                await self.cache_manager.invalidate_dependency(f"agent:{agent_id}")
+
             logger.info(
                 "Context stored",
                 context_id=context_id,
@@ -606,7 +624,25 @@ class ContextEngine:
         category_filter: str = None,
         min_importance: float = 0.0,
     ) -> list[ContextSearchResult]:
-        """Retrieve relevant contexts for a query."""
+        """Retrieve relevant contexts for a query with caching."""
+
+        # Generate cache key
+        cache_key = CacheKey.generate(
+            "context_search",
+            query=query,
+            agent_id=agent_id,
+            limit=limit,
+            category_filter=category_filter,
+            min_importance=min_importance,
+        )
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache("context_search", CONTEXT_CACHE_CONFIG)
+            cached_results = await cache.get(cache_key)
+            if cached_results is not None:
+                logger.debug("Context search cache hit", query=query[:50])
+                return cached_results
 
         db_session = self.db_manager.get_session()
         try:
@@ -629,6 +665,14 @@ class ContextEngine:
                 result.context.last_accessed = time.time()
 
             db_session.commit()
+
+            # Cache the results with dependencies
+            if self.cache_manager:
+                cache_deps = [f"agent:{agent_id}"]
+                if category_filter:
+                    cache_deps.append(f"category:{category_filter}")
+
+                await cache.set(cache_key, filtered_results, dependencies=cache_deps)
 
             logger.info(
                 "Context retrieved",
@@ -657,6 +701,15 @@ class ContextEngine:
             if context:
                 context.importance_score = max(0.0, min(1.0, new_importance))
                 db_session.commit()
+
+                # Invalidate related caches
+                if self.cache_manager:
+                    await self.cache_manager.invalidate_dependency(
+                        f"agent:{context.agent_id}"
+                    )
+                    await self.cache_manager.invalidate_dependency(
+                        f"context:{context_id}"
+                    )
 
                 logger.info(
                     "Context importance updated",
@@ -709,6 +762,15 @@ class ContextEngine:
             db_session.add(shared_context)
             db_session.commit()
 
+            # Invalidate caches for both agents
+            if self.cache_manager:
+                await self.cache_manager.invalidate_dependency(
+                    f"agent:{target_agent_id}"
+                )
+                await self.cache_manager.invalidate_dependency(
+                    f"agent:{original_context.agent_id}"
+                )
+
             logger.info(
                 "Context shared", context_id=context_id, target_agent_id=target_agent_id
             )
@@ -723,7 +785,18 @@ class ContextEngine:
             db_session.close()
 
     async def get_memory_stats(self, agent_id: str) -> MemoryStats:
-        """Get memory statistics for an agent."""
+        """Get memory statistics for an agent with caching."""
+
+        # Cache key for memory stats
+        cache_key = CacheKey.generate("memory_stats", agent_id=agent_id)
+
+        # Try cache first
+        if self.cache_manager:
+            cache = self.cache_manager.get_cache("memory_stats", CONTEXT_CACHE_CONFIG)
+            cached_stats = await cache.get(cache_key)
+            if cached_stats is not None:
+                logger.debug("Memory stats cache hit", agent_id=agent_id)
+                return cached_stats
 
         db_session = self.db_manager.get_session()
         try:
@@ -732,18 +805,30 @@ class ContextEngine:
             )
 
             if not contexts:
-                return MemoryStats(
+                empty_stats = MemoryStats(
                     total_contexts=0,
                     contexts_by_importance={},
                     contexts_by_category={},
+                    contexts_by_layer={},
+                    contexts_by_type={},
                     storage_size_mb=0.0,
                     oldest_context_age_days=0.0,
                     most_accessed_context_id="",
+                    compression_ratio=1.0,
+                    search_performance_ms=0.0,
                 )
+
+                # Cache empty results briefly
+                if self.cache_manager:
+                    await cache.set(cache_key, empty_stats, ttl=60)  # 1 minute
+
+                return empty_stats
 
             # Calculate statistics
             importance_buckets = {"high": 0, "medium": 0, "low": 0}
             category_counts = {}
+            layer_counts = {"working": 0, "short_term": 0, "long_term": 0}
+            type_counts = {}
             total_size = 0
             most_accessed = contexts[0]
 
@@ -760,6 +845,19 @@ class ContextEngine:
                 category = context.category or "uncategorized"
                 category_counts[category] = category_counts.get(category, 0) + 1
 
+                # Layer counts (simplified classification)
+                age_hours = (time.time() - context.created_at.timestamp()) / 3600
+                if age_hours < 24:
+                    layer_counts["working"] += 1
+                elif age_hours < 168:  # 1 week
+                    layer_counts["short_term"] += 1
+                else:
+                    layer_counts["long_term"] += 1
+
+                # Type counts
+                content_type = context.content_type or "text"
+                type_counts[content_type] = type_counts.get(content_type, 0) + 1
+
                 # Size calculation
                 total_size += len(context.content.encode("utf-8"))
 
@@ -773,14 +871,24 @@ class ContextEngine:
                 24 * 3600
             )
 
-            return MemoryStats(
+            stats = MemoryStats(
                 total_contexts=len(contexts),
                 contexts_by_importance=importance_buckets,
                 contexts_by_category=category_counts,
+                contexts_by_layer=layer_counts,
+                contexts_by_type=type_counts,
                 storage_size_mb=total_size / (1024 * 1024),
                 oldest_context_age_days=oldest_age_days,
                 most_accessed_context_id=str(most_accessed.id),
+                compression_ratio=1.0,  # Default, would be calculated in production
+                search_performance_ms=5.0,  # Default, would be measured
             )
+
+            # Cache the results
+            if self.cache_manager:
+                await cache.set(cache_key, stats, dependencies=[f"agent:{agent_id}"])
+
+            return stats
 
         except Exception as e:
             logger.error("Failed to get memory stats", agent_id=agent_id, error=str(e))
@@ -793,9 +901,15 @@ class ContextEngine:
 
         db_session = self.db_manager.get_session()
         try:
-            return await self.memory_consolidator.consolidate_memory(
+            result = await self.memory_consolidator.consolidate_memory(
                 agent_id, db_session
             )
+
+            # Invalidate all caches for this agent after consolidation
+            if self.cache_manager:
+                await self.cache_manager.invalidate_dependency(f"agent:{agent_id}")
+
+            return result
         finally:
             db_session.close()
 
