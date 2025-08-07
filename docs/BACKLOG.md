@@ -1,416 +1,261 @@
-# Project Backlog: LeanVibe Agent Hive
+# Project Backlog: LeanVibe Agent Hive 2.0
 
 This document provides a comprehensive, prioritized backlog for the LeanVibe Agent Hive project using the MoSCoW method. Each task is detailed enough to serve as a prompt for coding agents.
 
 ## Current Project Status
 
-**Reality Check**: Despite extensive documentation claiming advanced features, the codebase consists primarily of placeholder files. The project is in Phase 0 - foundational scaffolding with significant implementation gaps.
+**Reality Check**: The project has evolved significantly beyond the initial scaffolding phase. We have successfully implemented:
+
+- ✅ **Phase 4 Complete**: Production deployment infrastructure, specialized agents, and advanced coordination
+- ✅ **Core Infrastructure**: Message broker, task queue, orchestrator, and database models
+- ✅ **Specialized Agents**: QA Agent, Architect Agent, DevOps Agent with advanced capabilities  
+- ✅ **Agent Coordination**: Advanced multi-agent collaboration protocols
+- ✅ **Production Ready**: Docker containerization, CI/CD pipelines, monitoring
+- ✅ **CLI Interface**: Unified command-line interface with coordination commands
 
 ---
 
-## Phase 0: Foundation & Technical Debt (Immediate Priority)
+## Phase 5: Advanced Optimization & Intelligence (Must Have)
 
-### Task T1: Consolidate Startup Scripts into Unified CLI
+### Task M1: Implement Advanced Caching and Performance Optimization
 **Priority**: Must Have  
 **Status**: Not Started  
-**Files**: Create `src/cli/main.py`, modify `pyproject.toml`, remove old scripts
-
-**Problem**: Multiple confusing startup scripts (`bootstrap.py`, `start_agent.py`, `agent:runner.py`, etc.) clutter the root directory.
+**Files**: `src/core/caching.py`, `src/core/performance_optimizer.py`
 
 **Implementation**:
-1. Create directory `src/cli/`
-2. Create `src/cli/main.py` using Typer library
-3. Add script entry in `pyproject.toml`: `hive = "src.cli.main:app"`
-4. Implement commands:
-   - `hive run-agent`: Replace `start_agent.py` and `src/agents/runner.py`
-   - `hive bootstrap`: Replace `bootstrap.py` and `autonomous_bootstrap.py`
-   - `hive start-api`: Replace `start_api.py`
-   - `hive init-db`: Replace `init_db.py`
-5. Delete redundant root scripts
-
-**Acceptance Criteria**: Single `hive` command manages all operations, clean root directory.
-
-### Task T2: Reconcile Documentation with Reality
-**Priority**: Must Have  
-**Status**: Not Started  
-**Files**: `README.md`, various markdown files
-
-**Problem**: Documentation falsely claims "Phase 3 Complete" and advanced features that don't exist.
-
-**Implementation**:
-1. Review and edit `README.md` to remove false completion claims
-2. Update status to "Phase 0: Foundational Scaffolding"
-3. Correct Quick Start instructions to use new CLI
-4. Remove or qualify claims about non-existent features
-
-**Acceptance Criteria**: Documentation accurately reflects current development stage.
-
-### Task T3: Define Monorepo Structure
-**Priority**: Must Have  
-**Status**: Not Started  
-**Files**: Consolidate `leanvibe-hive/` contents
-
-**Problem**: Unclear relationship between root project and `leanvibe-hive/` subdirectory.
-
-**Implementation**:
-1. Review `leanvibe-hive/` directory contents
-2. Merge relevant code into primary `src/` directory
-3. Remove or clearly document separate concerns
-4. Ensure single source of truth for configuration
-
-**Acceptance Criteria**: Clear, unambiguous project structure.
-
-### Task T4: Establish Testing Foundation
-**Priority**: Must Have  
-**Status**: Not Started  
-**Files**: Create `tests/unit/`, `tests/integration/`, configure pytest
-
-**Problem**: Minimal testing despite >90% coverage requirement.
-
-**Implementation**:
-1. Create structured test directories
-2. Configure pytest in `pyproject.toml`
-3. Set up coverage reporting
-4. Create test templates for core components
-
-**Acceptance Criteria**: Testing infrastructure ready for >90% coverage target.
-
----
-
-## Phase 1: Core Infrastructure (Must Have)
-
-### Task M1: Implement Task Queue System
-**Priority**: Must Have  
-**Status**: Placeholder exists  
-**Files**: `src/core/task_queue.py`, `src/core/models.py`, `tests/unit/test_task_queue.py`
-
-**Problem**: `task_queue.py` is placeholder lacking priority, dependencies, retries, timeouts.
-
-**Implementation**:
-1. Define `Task`, `TaskStatus`, `TaskPriority` models in `models.py`
-2. Implement `TaskQueue` class with Redis backend
-3. Use separate Redis lists for priorities (`queue:p1`, `queue:p3`, etc.)
-4. Implement dependency logic using Redis hashes
-5. Add exponential backoff retry mechanism
-6. Implement timeout monitoring for in-progress tasks
-7. Write comprehensive unit tests
+1. Implement Redis-based caching for context retrieval and task results
+2. Add intelligent cache invalidation strategies
+3. Implement query optimization for PostgreSQL with proper indexing
+4. Add connection pooling and async database optimizations
+5. Implement task result memoization for repeated operations
+6. Add performance metrics collection and analysis
 
 **Acceptance Criteria**: 
-- Tasks handled by priority
-- Dependencies respected
-- Failed tasks retry with backoff
-- All tests pass with >90% coverage
+- 50% improvement in context retrieval speed
+- Database query response time <50ms p95
+- Intelligent cache hit rates >80%
 
-### Task M2: Implement Agent Orchestrator
+### Task M2: Implement GitHub/GitLab Integration
 **Priority**: Must Have  
-**Status**: Placeholder exists  
-**Files**: `src/core/orchestrator.py`, `tests/integration/test_orchestrator.py`
-
-**Problem**: No agent lifecycle management or task assignment logic.
+**Status**: Not Started  
+**Files**: `src/integrations/github_integration.py`, `src/integrations/gitlab_integration.py`
 
 **Implementation**:
-1. Implement `AgentOrchestrator` class
-2. Add `spawn`, `monitor`, `terminate` methods
-3. Create health check mechanism
-4. Use SQLAlchemy for persistent agent registry
-5. Implement capability-based task assignment
-6. Write integration tests for full lifecycle
+1. Implement GitHub API integration for repository management
+2. Add automated PR creation and management
+3. Implement GitLab CI/CD integration
+4. Add code review automation through agents
+5. Implement issue tracking and management
+6. Add webhook handling for real-time updates
 
 **Acceptance Criteria**:
-- Agents can be spawned, monitored, terminated
-- Tasks assigned based on capabilities
-- Health monitoring functional
+- Agents can create and manage PRs automatically
+- Code review automation functional
+- Issue tracking integrated with task queue
 
-### Task M3: Implement Message Broker
+### Task M3: Enhance Self-Modification Engine
 **Priority**: Must Have  
-**Status**: Placeholder exists  
-**Files**: `src/core/message_broker.py`, `tests/unit/test_message_broker.py`
-
-**Problem**: No messaging implementation for inter-agent communication.
-
-**Implementation**:
-1. Implement `MessageBroker` using Redis Pub/Sub
-2. Add persistence layer with Redis Streams
-3. Create dead-letter queue for failed messages
-4. Implement topic-based routing
-5. Add message history and replay
-6. Write unit tests for all functionality
-
-**Acceptance Criteria**:
-- Real-time messaging between agents
-- Offline agent support
-- Message persistence and replay
-
-### Task M4: Complete Database Models
-**Priority**: Must Have  
-**Status**: Incomplete implementation  
-**Files**: `src/core/models.py`, `alembic/versions/`
-
-**Problem**: SQLAlchemy models incomplete, missing relationships and pgvector.
-
-**Implementation**:
-1. Define all tables as complete SQLAlchemy models:
-   - `agents` (id, name, type, capabilities, status, etc.)
-   - `tasks` (id, title, description, priority, dependencies, etc.)
-   - `sessions` (id, name, agents, state, etc.)
-   - `contexts` (id, content, embedding vector, importance, etc.)
-   - `conversations` (id, from/to agents, content, embedding, etc.)
-   - `system_checkpoints` (id, state, git_commit_hash, etc.)
-2. Add pgvector support for embedding columns
-3. Define all relationships and foreign keys
-4. Add performance indexes
-5. Create Alembic migration
-
-**Acceptance Criteria**:
-- Complete schema matches documentation
-- pgvector integration working
-- Migration applies successfully
-
-### Task M5: Implement Base Agent Logic
-**Priority**: Must Have  
-**Status**: Placeholder exists  
-**Files**: `src/agents/base_agent.py`
-
-**Problem**: Abstract methods not implemented, no task processing.
-
-**Implementation**:
-1. Implement task processing loop (claim/process/complete)
-2. Integrate with MessageBroker for communication
-3. Integrate with ContextEngine for memory
-4. Add tool execution framework
-5. Implement health reporting
-6. Add graceful shutdown handling
-
-**Acceptance Criteria**:
-- Agents can process tasks end-to-end
-- Inter-agent communication working
-- Context storage/retrieval functional
-
-### Task M6: Implement CLI Tool Execution
-**Priority**: Must Have  
-**Status**: Configuration exists, no implementation  
-**Files**: `src/agents/base_agent.py`, `src/core/config.py`
-
-**Problem**: No actual CLI tool execution despite configuration for opencode/claude/gemini.
-
-**Implementation**:
-1. Implement tool selection logic in BaseAgent
-2. Add subprocess execution for CLI tools
-3. Implement smart fallback mechanism
-4. Handle stdin/stdout/stderr properly
-5. Add rate limiting and error handling
-6. Write unit tests for tool execution
-
-**Acceptance Criteria**:
-- Agents can execute configured CLI tools
-- Fallback works when preferred tool fails
-- Proper error handling and logging
-
-### Task M7: Implement Core API Endpoints
-**Priority**: Must Have  
-**Status**: Placeholder exists  
-**Files**: `src/api/main.py`
-
-**Problem**: Missing most required endpoints for system control.
-
-**Implementation**:
-1. Implement agent CRUD endpoints:
-   - `POST /api/v1/agents` - Create agent
-   - `GET /api/v1/agents` - List agents
-   - `GET /api/v1/agents/{id}` - Get agent details
-   - `PUT /api/v1/agents/{id}` - Update agent
-   - `DELETE /api/v1/agents/{id}` - Terminate agent
-2. Implement task endpoints:
-   - `POST /api/v1/tasks` - Submit task
-   - `GET /api/v1/tasks` - List tasks
-   - `GET /api/v1/tasks/{id}` - Get status
-   - `PUT /api/v1/tasks/{id}/cancel` - Cancel task
-3. Add Pydantic models for validation
-4. Implement JWT authentication
-5. Add error handling middleware
-
-**Acceptance Criteria**:
-- All CRUD operations functional
-- Proper validation and authentication
-- Error handling implemented
-
-### Task M8: Implement WebSocket Service
-**Priority**: Must Have  
-**Status**: Empty files  
-**Files**: `src/api/main.py`, `src/web/dashboard/services/websocket-service.js`
-
-**Problem**: Dashboard claims real-time updates but WebSocket not implemented.
-
-**Implementation**:
-1. Add `/ws/events` endpoint in FastAPI
-2. Integrate with MessageBroker for event streaming
-3. Implement client-side WebSocket connection
-4. Add reconnection logic and error handling
-5. Create event filtering and routing
-
-**Acceptance Criteria**:
-- Real-time events stream to dashboard
-- Robust connection handling
-- Event filtering working
-
----
-
-## Phase 2: Autonomous Capabilities (Should Have)
-
-### Task S1: Implement Context Engine
-**Priority**: Should Have  
-**Status**: Placeholder exists  
-**Files**: `src/core/context_engine.py`, `src/core/advanced_context_engine.py`
-
-**Problem**: No semantic search or context compression implementation.
-
-**Implementation**:
-1. Implement semantic search using pgvector cosine similarity
-2. Add OpenAI embedding generation
-3. Implement context compression using LLM
-4. Create hierarchical memory system
-5. Add importance scoring
-6. Implement context sharing between agents
-
-**Acceptance Criteria**:
-- Semantic search functional
-- Context compression working
-- Memory hierarchy implemented
-
-### Task S2: Implement Meta-Agent
-**Priority**: Should Have  
-**Status**: Placeholder exists  
-**Files**: `src/agents/meta_agent.py`
-
-**Problem**: No self-improvement capabilities implemented.
-
-**Implementation**:
-1. Inherit from BaseAgent
-2. Implement system performance analysis
-3. Add improvement proposal generation
-4. Integrate with SelfModifier
-5. Add safety checks for changes
-6. Implement A/B testing for prompts
-
-**Acceptance Criteria**:
-- System can analyze its own performance
-- Improvement proposals generated
-- Safe testing implemented
-
-### Task S3: Implement Self-Modifier
-**Priority**: Should Have  
-**Status**: Empty file  
+**Status**: Partial (basic structure exists)  
 **Files**: `src/core/self_modifier.py`
 
-**Problem**: Core self-improvement feature completely missing.
-
 **Implementation**:
-1. Integrate GitPython for branch management
-2. Create Docker-based sandbox environment
-3. Implement automated testing in sandbox
-4. Add performance validation
-5. Create rollback mechanism
-6. Add human approval gates
+1. Complete sandboxed testing environment
+2. Add comprehensive safety checks and validation
+3. Implement rollback mechanisms for failed modifications
+4. Add human approval workflows for critical changes
+5. Implement A/B testing for system improvements
+6. Add performance impact analysis
 
 **Acceptance Criteria**:
-- Code changes tested safely
-- Git integration working
-- Rollback mechanism functional
+- Safe self-modification with rollback capability
+- Human oversight for critical system changes
+- Performance validation before applying changes
 
-### Task S4: Implement Sleep-Wake Manager
+---
+
+## Phase 5: Intelligence & Learning (Should Have)
+
+### Task S1: Implement Advanced AI Agent Capabilities
 **Priority**: Should Have  
-**Status**: Empty file  
-**Files**: `src/core/sleep_wake_manager.py`
-
-**Problem**: Sleep-wake cycles claimed but not implemented.
+**Status**: Not Started  
+**Files**: `src/agents/learning_agent.py`, `src/core/learning_engine.py`
 
 **Implementation**:
-1. Add configurable sleep scheduling
-2. Implement context consolidation
-3. Create state checkpointing
-4. Add graceful handoff between cycles
-5. Implement wake restoration
-6. Add performance optimization during sleep
+1. Add machine learning for task optimization
+2. Implement agent performance analysis and improvement
+3. Add predictive task routing based on historical data
+4. Implement collaborative learning between agents
+5. Add natural language understanding for complex requests
+6. Implement adaptive behavior based on success metrics
 
 **Acceptance Criteria**:
-- Sleep cycles functional
-- Context consolidation working
-- State preservation across cycles
+- Agents learn from past performance
+- Task routing improves over time
+- Success rates increase through learning
+
+### Task S2: Implement Advanced Monitoring and Observability
+**Priority**: Should Have  
+**Status**: Basic monitoring exists  
+**Files**: `monitoring/`, `src/core/observability.py`
+
+**Implementation**:
+1. Complete Prometheus/Grafana integration
+2. Add distributed tracing for agent interactions
+3. Implement anomaly detection for system health
+4. Add predictive alerts for potential issues
+5. Implement comprehensive logging aggregation
+6. Add performance benchmarking and regression detection
+
+**Acceptance Criteria**:
+- Full observability stack operational
+- Proactive issue detection and alerting
+- Performance regression detection
+
+### Task S3: Implement Advanced Context Engine
+**Priority**: Should Have  
+**Status**: Basic implementation exists  
+**Files**: `src/core/advanced_context_engine.py`
+
+**Implementation**:
+1. Enhance semantic search with better embeddings
+2. Implement hierarchical memory structures
+3. Add context compression and summarization
+4. Implement cross-agent context sharing
+5. Add long-term memory persistence
+6. Implement context relevance scoring
+
+**Acceptance Criteria**:
+- Semantic search accuracy >90%
+- Efficient context sharing between agents
+- Intelligent memory management
 
 ---
 
-## Phase 3: User Interface (Could Have)
+## Phase 5: User Experience (Could Have)
 
-### Task C1: Implement Dashboard Components
+### Task C1: Complete Web Dashboard
 **Priority**: Could Have  
-**Status**: Static files exist  
-**Files**: `src/web/dashboard/components/*.js`
-
-**Problem**: Dashboard components are static, not connected to backend.
+**Status**: Basic components exist  
+**Files**: `src/web/dashboard/`
 
 **Implementation**:
-1. Connect AgentStatus to live agent data
-2. Implement TaskBoard with real task data
-3. Add MessageFlow visualization
-4. Create SystemMetrics dashboard
-5. Implement ContextExplorer
-6. Add LogViewer with streaming
+1. Complete all dashboard components with real data
+2. Add real-time collaboration visualization
+3. Implement interactive agent management
+4. Add system metrics and performance dashboards
+5. Implement PWA features for offline support
+6. Add mobile-responsive design
 
 **Acceptance Criteria**:
-- All components show live data
-- Real-time updates working
-- Interactive functionality implemented
+- Full-featured web dashboard operational
+- Real-time updates and visualizations
+- PWA features functional
 
-### Task C2: Implement PWA Features
+### Task C2: Implement Advanced API Features
 **Priority**: Could Have  
-**Status**: Empty service worker  
-**Files**: `src/web/dashboard/sw.js`, `src/web/dashboard/manifest.json`
-
-**Problem**: Claims PWA support but service worker empty.
+**Status**: Basic API exists  
+**Files**: `src/api/main.py`, `src/api/advanced.py`
 
 **Implementation**:
-1. Implement service worker for offline support
-2. Add caching strategies
-3. Implement push notifications
-4. Add install prompts
-5. Create offline functionality
+1. Add GraphQL API for complex queries
+2. Implement API versioning and deprecation
+3. Add advanced authentication and authorization
+4. Implement rate limiting and throttling
+5. Add API documentation with OpenAPI 3.0
+6. Implement webhook support for external integrations
 
 **Acceptance Criteria**:
-- Offline support working
-- Push notifications functional
-- Installable as PWA
+- GraphQL API functional
+- Comprehensive API documentation
+- Advanced security features
+
+### Task C3: Implement External Integrations
+**Priority**: Could Have  
+**Status**: Not Started  
+**Files**: `src/integrations/`
+
+**Implementation**:
+1. Add Slack/Discord integration for notifications
+2. Implement Jira/Asana integration for project management
+3. Add email notification system
+4. Implement cloud storage integrations (AWS S3, GCS)
+5. Add monitoring service integrations (PagerDuty, Datadog)
+6. Implement CI/CD platform integrations
+
+**Acceptance Criteria**:
+- Key external services integrated
+- Notification systems functional
+- Project management tools connected
 
 ---
 
-## Phase 4: Advanced Features (Won't Have - Current Phase)
+## Phase 6: Advanced Features (Won't Have - Future)
 
-### Task W1: Advanced Observability
+### Task W1: Multi-Region Deployment
 **Priority**: Won't Have (for now)  
 **Status**: Not started
 
-**Implementation**: Prometheus/Grafana integration for advanced metrics.
+**Implementation**: Support for multi-region agent deployment and coordination.
 
-### Task W2: Additional Specialized Agents
+### Task W2: Advanced Machine Learning Pipeline
 **Priority**: Won't Have (for now)  
 **Status**: Not started
 
-**Implementation**: ArchitectAgent, QAAgent, DeveloperAgent classes.
+**Implementation**: Full MLOps pipeline for agent behavior optimization.
 
-### Task W3: Prompt Optimization System
+### Task W3: Enterprise Security Features
 **Priority**: Won't Have (for now)  
 **Status**: Not started
 
-**Implementation**: A/B testing framework for prompt optimization.
+**Implementation**: Advanced security features like RBAC, audit logging, compliance reporting.
+
+---
+
+## Completed Tasks (✅ Phase 4 Achievements)
+
+### ✅ Production Infrastructure
+- Docker containerization with multi-stage builds
+- Production-grade CI/CD pipeline with GitHub Actions
+- Nginx reverse proxy configuration
+- Environment-specific configurations
+- Deployment automation scripts
+
+### ✅ Specialized Agent System
+- QA Agent with testing and validation capabilities
+- Architect Agent with system design expertise
+- DevOps Agent with infrastructure management
+- Agent Factory for dynamic agent creation and management
+
+### ✅ Advanced Agent Coordination
+- Multi-agent collaboration protocols (sequential, parallel, pipeline, consensus, competitive, delegation)
+- Task decomposition and intelligent assignment
+- Inter-agent communication and coordination
+- Collaboration lifecycle management
+- Agent coordination CLI commands
+
+### ✅ Core Infrastructure
+- Redis-based message broker with pub/sub and persistence
+- Priority-based task queue with dependencies
+- Agent orchestrator with lifecycle management
+- SQLAlchemy database models with pgvector support
+- Context engine with semantic search capabilities
+
+### ✅ Development Tools
+- Unified CLI interface (`hive` command)
+- Comprehensive testing framework
+- Production deployment workflows
+- Monitoring and logging infrastructure
 
 ---
 
 ## Testing Requirements
 
-All tasks must include:
+All new tasks must include:
 - Unit tests with >90% coverage
 - Integration tests for component interactions
 - End-to-end tests for complete workflows
 - Performance benchmarks where applicable
+- Security testing for external-facing components
 
 ## Definition of Done
 
@@ -420,8 +265,10 @@ Each task is complete when:
 3. Documentation updated
 4. Code review completed
 5. Integration with existing components verified
+6. Performance requirements met
+7. Security review passed (for security-sensitive components)
 
 ---
 
-*Last Updated*: Current analysis based on codebase evaluation  
-*Next Review*: After Phase 0 completion
+*Last Updated*: Phase 4 completion analysis  
+*Next Review*: After Phase 5 planning

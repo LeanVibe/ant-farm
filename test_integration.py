@@ -6,21 +6,21 @@ Tests core system components and their interactions.
 
 import asyncio
 import sys
-import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import redis.asyncio as redis
-from src.core.task_queue import TaskQueue, Task, TaskPriority
-from src.core.models import get_database_manager
+
 from src.core.config import settings
+from src.core.models import get_database_manager
+from src.core.task_queue import Task, TaskPriority, TaskQueue
 
 
 class IntegrationTester:
     """Integration test runner for the system."""
 
     def __init__(self):
-        self.results: Dict[str, Any] = {}
+        self.results: dict[str, Any] = {}
         self.failures = 0
         self.successes = 0
 
@@ -160,7 +160,6 @@ class IntegrationTester:
             # Test imports
             from src.api.main import app
             from src.core.orchestrator import get_orchestrator
-            from src.core.message_broker import message_broker
 
             print("  ✓ API components import successfully")
 

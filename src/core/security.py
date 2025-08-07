@@ -1,14 +1,11 @@
 """Security module for authentication, authorization, and security hardening."""
 
-import hashlib
-import hmac
 import secrets
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import bcrypt
 import jwt
 import structlog
 from passlib.context import CryptContext
@@ -29,11 +26,11 @@ class User(BaseModel):
     hashed_password: str
     is_active: bool = True
     is_admin: bool = False
-    permissions: List[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     failed_login_attempts: int = 0
-    locked_until: Optional[datetime] = None
+    locked_until: datetime | None = None
 
 
 class Permission:
@@ -95,8 +92,8 @@ class SecurityConfig:
     API_RATE_LIMIT_WEBSOCKET: int = 50
 
     # Security headers
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
 
     # Content Security Policy
     CSP_DIRECTIVES = {
@@ -114,9 +111,9 @@ class SecurityManager:
 
     def __init__(self, config: SecurityConfig = None):
         self.config = config or SecurityConfig()
-        self.users: Dict[str, User] = {}
-        self.sessions: Dict[str, Dict] = {}
-        self.rate_limits: Dict[str, List[float]] = {}
+        self.users: dict[str, User] = {}
+        self.sessions: dict[str, dict] = {}
+        self.rate_limits: dict[str, list[float]] = {}
 
     # Password management
     def hash_password(self, password: str) -> str:
@@ -134,7 +131,7 @@ class SecurityManager:
         email: str,
         password: str,
         is_admin: bool = False,
-        permissions: List[str] = None,
+        permissions: list[str] = None,
     ) -> User:
         """Create a new user with hashed password."""
         user = User(
@@ -148,14 +145,14 @@ class SecurityManager:
         logger.info("User created", username=username, user_id=user.id)
         return user
 
-    def get_user_by_username(self, username: str) -> Optional[User]:
+    def get_user_by_username(self, username: str) -> User | None:
         """Get user by username."""
         for user in self.users.values():
             if user.username == username:
                 return user
         return None
 
-    def authenticate_user(self, username: str, password: str) -> Optional[User]:
+    def authenticate_user(self, username: str, password: str) -> User | None:
         """Authenticate user credentials."""
         user = self.get_user_by_username(username)
         if not user:
@@ -237,7 +234,7 @@ class SecurityManager:
             payload, self.config.SECRET_KEY, algorithm=self.config.ALGORITHM
         )
 
-    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
+    def verify_token(self, token: str) -> dict[str, Any] | None:
         """Verify and decode JWT token."""
         try:
             payload = jwt.decode(
@@ -258,7 +255,7 @@ class SecurityManager:
             return True
         return permission in user.permissions
 
-    def require_permissions(self, user: User, permissions: List[str]) -> bool:
+    def require_permissions(self, user: User, permissions: list[str]) -> bool:
         """Check if user has all required permissions."""
         if user.is_admin:
             return True
@@ -313,7 +310,7 @@ class SecurityManager:
         return api_key
 
     # Security headers
-    def get_security_headers(self) -> Dict[str, str]:
+    def get_security_headers(self) -> dict[str, str]:
         """Get security headers for HTTP responses."""
         csp = "; ".join(
             [

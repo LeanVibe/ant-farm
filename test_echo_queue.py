@@ -13,7 +13,7 @@ from pathlib import Path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-from core.task_queue import Task, TaskPriority, TaskStatus, task_queue
+from core.task_queue import Task, TaskPriority, task_queue
 
 
 async def test_echo_task_queue():
@@ -57,7 +57,7 @@ async def test_echo_task_queue():
 
             # Start task processing
             await task_queue.start_task(retrieved_task.id)
-            print(f"🏃 Task marked as in progress")
+            print("🏃 Task marked as in progress")
 
             # Simulate processing (echo the message)
             message = retrieved_task.payload.get(
@@ -74,7 +74,7 @@ async def test_echo_task_queue():
             }
 
             await task_queue.complete_task(retrieved_task.id, result_data)
-            print(f"✅ Task completed successfully")
+            print("✅ Task completed successfully")
             print(f"   Echo Result: {echo_response}")
 
             # Get final task status
@@ -88,7 +88,7 @@ async def test_echo_task_queue():
 
         # Get queue statistics
         stats = await task_queue.get_queue_stats()
-        print(f"\n📈 Queue Statistics:")
+        print("\n📈 Queue Statistics:")
         print(f"   Total tasks: {stats.total_tasks}")
         print(f"   Completed: {stats.completed_tasks}")
         print(f"   Failed: {stats.failed_tasks}")

@@ -8,6 +8,7 @@ This consolidates all startup scripts into a single `hive` command with subcomma
 - hive init-db: Initialize database
 - hive tools: Check available CLI tools
 - hive status: System status
+- hive coordination: Agent coordination commands
 """
 
 import asyncio
@@ -15,7 +16,6 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -33,13 +33,27 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+# Add coordination subcommands
+try:
+    from .coordination import app as coordination_app
+
+    app.add_typer(
+        coordination_app,
+        name="coordination",
+        help="Agent coordination and collaboration",
+    )
+except ImportError:
+    console.print(
+        "[yellow]Warning: Coordination commands not available (missing dependencies)[/yellow]"
+    )
+
 
 @app.command("run-agent")
 def run_agent(
     agent_type: str = typer.Argument(
         ..., help="Type of agent to run (meta, developer, qa, architect, research)"
     ),
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Agent name"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Agent name"),
     log_level: str = typer.Option("INFO", "--log-level", "-l", help="Logging level"),
 ) -> None:
     """Start an agent instance."""
@@ -115,7 +129,7 @@ def start_api(
         console.print(f"[red]Failed to start API server: {e}[/red]")
         sys.exit(1)
     except KeyboardInterrupt:
-        console.print(f"\n[yellow]API server stopped[/yellow]")
+        console.print("\n[yellow]API server stopped[/yellow]")
 
 
 @app.command("init-db")
@@ -227,7 +241,7 @@ def status() -> None:
 @app.command("spawn")
 def spawn(
     agent_type: str = typer.Argument(..., help="Type of agent to spawn"),
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Agent name"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Agent name"),
 ) -> None:
     """Spawn a new agent in tmux session."""
     console.print(f"[cyan]Spawning {agent_type} agent...[/cyan]")

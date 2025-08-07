@@ -1,0 +1,88 @@
+name: Performance Tests
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run daily at 2 AM
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/api/**'
+      - 'src/core/**'
+
+jobs:
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_DB: leanvibe_hive_perf
+          POSTGRES_USER: perf_user
+          POSTGRES_PASSWORD: perf_pass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+          uv add locust
+
+      - name: Start API server
+        env:
+          DATABASE_URL: postgresql://perf_user:perf_pass@localhost:5432/leanvibe_hive_perf
+          REDIS_URL: redis://localhost:6379
+          ENVIRONMENT: testing
+        run: |
+          uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
+          sleep 10
+
+      - name: Run performance tests with Locust
+        run: |
+          uv run locust -f tests/performance/locustfile.py --headless -u 10 -r 2 -t 30s --host http://localhost:8000
+
+      - name: Generate performance report
+        if: always()
+        run: |
+          echo "Performance test completed" > performance-report.txt
+          cat locust-report.html >> performance-report.txt
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-report
+          path: |
+            locust-report.html
+            performance-report.txt

@@ -5,20 +5,18 @@ This polls tasks from Redis and executes them using Claude Code CLI.
 No API key needed - uses the host's Claude Code installation.
 """
 
-import asyncio
 import json
 import subprocess
-import sys
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
-import redis
 import psycopg2
-from psycopg2.extras import RealDictCursor
+import redis
 import typer
+from psycopg2.extras import RealDictCursor
 
 app = typer.Typer()
 
@@ -58,7 +56,7 @@ class AgentRunner:
         with self.db_conn.cursor() as cursor:
             cursor.execute(
                 """
-                UPDATE agents 
+                UPDATE agents
                 SET status = %s, last_heartbeat = NOW()
                 WHERE name = %s
             """,
@@ -66,7 +64,7 @@ class AgentRunner:
             )
             self.db_conn.commit()
 
-    def get_next_task(self) -> Optional[Dict[str, Any]]:
+    def get_next_task(self) -> dict[str, Any] | None:
         """Get next task from Redis queue."""
         # Check priority queues in order
         for priority in ["critical", "high", "normal", "low", "background"]:
@@ -86,7 +84,7 @@ class AgentRunner:
 
         return None
 
-    def execute_claude_code(self, prompt: str) -> Dict[str, Any]:
+    def execute_claude_code(self, prompt: str) -> dict[str, Any]:
         """Execute Claude Code CLI command."""
         print(f"[{self.agent_name}] Executing: {prompt[:100]}...")
 
@@ -126,7 +124,7 @@ class AgentRunner:
                 "timestamp": datetime.now().isoformat(),
             }
 
-    def process_task(self, task: Dict[str, Any]):
+    def process_task(self, task: dict[str, Any]):
         """Process a single task."""
         task_id = task.get("id", str(uuid.uuid4()))
 
@@ -162,9 +160,9 @@ class AgentRunner:
                 """
                 INSERT INTO tasks (id, title, type, status, assigned_agent_id, result, completed_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                ON CONFLICT (id) DO UPDATE 
-                SET status = EXCLUDED.status, 
-                    result = EXCLUDED.result, 
+                ON CONFLICT (id) DO UPDATE
+                SET status = EXCLUDED.status,
+                    result = EXCLUDED.result,
                     completed_at = EXCLUDED.completed_at
             """,
                 (
@@ -182,7 +180,7 @@ class AgentRunner:
             f"[{self.agent_name}] Task {task_id} {'completed' if result['success'] else 'failed'}"
         )
 
-    def build_prompt(self, task: Dict[str, Any]) -> str:
+    def build_prompt(self, task: dict[str, Any]) -> str:
         """Build Claude prompt based on task type and agent specialization."""
         base_prompt = f"""You are {self.agent_name}, a {self.agent_type} agent in the LeanVibe Agent Hive system.
 
@@ -249,7 +247,7 @@ Use pytest for testing and aim for >90% coverage.
                 """
                 INSERT INTO agents (name, type, status, capabilities)
                 VALUES (%s, %s, 'active', %s)
-                ON CONFLICT (name) DO UPDATE 
+                ON CONFLICT (name) DO UPDATE
                 SET status = 'active', last_heartbeat = NOW()
             """,
                 (self.agent_name, self.agent_type, json.dumps(self.get_capabilities())),

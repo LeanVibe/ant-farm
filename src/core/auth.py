@@ -1,7 +1,5 @@
 """Authentication and authorization middleware for FastAPI."""
 
-import time
-from typing import Optional
 
 import structlog
 from fastapi import Depends, HTTPException, Request, status
@@ -59,7 +57,7 @@ def get_client_ip(request: Request) -> str:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
 ) -> User:
     """Get current authenticated user from JWT token."""
 
@@ -95,8 +93,8 @@ async def get_current_user(
 
 async def get_optional_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
-) -> Optional[User]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+) -> User | None:
     """Get current user if authenticated, otherwise None."""
     try:
         return await get_current_user(request, credentials)

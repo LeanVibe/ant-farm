@@ -7,7 +7,7 @@ import time
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 import structlog
 from fastapi import (
@@ -18,10 +18,8 @@ from fastapi import (
     Request,
     WebSocket,
     WebSocketDisconnect,
-    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 
 # Handle both module and direct execution imports
@@ -34,14 +32,9 @@ try:
     )
     from ..core.auth import (
         AuthenticationError,
-        AuthorizationError,
         Permissions,
-        RateLimitError,
         SecurityMiddleware,
         get_current_user,
-        get_optional_user,
-        rate_limit,
-        require_admin,
     )
     from ..core.config import settings
     from ..core.message_broker import MessageType, message_broker
@@ -61,18 +54,12 @@ except ImportError:
     )
     from core.auth import (
         AuthenticationError,
-        AuthorizationError,
         Permissions,
-        RateLimitError,
         SecurityMiddleware,
         get_current_user,
-        get_optional_user,
-        rate_limit,
-        require_admin,
     )
     from core.config import settings
     from core.message_broker import MessageType, message_broker
-    from core.models import SystemMetric, get_database_manager
     from core.orchestrator import get_orchestrator
     from core.security import User, create_default_admin, security_manager
     from core.task_queue import Task, TaskPriority, task_queue
@@ -612,11 +599,11 @@ async def handle_websocket_message(websocket: WebSocket, message: dict):
     summary="User Login",
     description="""
           Authenticate a user and receive JWT access and refresh tokens.
-          
-          The access token expires in 30 minutes and should be included in the 
+
+          The access token expires in 30 minutes and should be included in the
           Authorization header as 'Bearer <token>' for subsequent requests.
-          
-          The refresh token expires in 7 days and can be used to obtain new 
+
+          The refresh token expires in 7 days and can be used to obtain new
           access tokens without re-entering credentials.
           """,
     responses={
@@ -826,11 +813,10 @@ async def broadcast_event(event_type: str, payload: dict):
     tags=["System"],
     summary="Basic Health Check",
     description="""
-         Simple health check endpoint that returns system status.
-         
-         This endpoint does not require authentication and can be used for:
-         - Load balancer health checks
-         - Monitoring system availability
+          Simple health check endpoint that returns system status.
+
+          This endpoint does not require authentication and can be used for:
+          - Load balancer health checks         - Monitoring system availability
          - Service discovery health probes
          - Basic connectivity testing
          """,
@@ -1646,7 +1632,7 @@ async def create_modification_proposal(
 ):
     """Create a new modification proposal."""
     try:
-        from ..core.self_modifier import get_self_modifier, ModificationType, CodeChange
+        from ..core.self_modifier import CodeChange, ModificationType, get_self_modifier
 
         modifier = get_self_modifier()
 
@@ -1750,7 +1736,7 @@ async def create_workflow(
 ):
     """Create a new development workflow."""
     try:
-        from ..core.cli_git_integration import get_enhanced_cli_executor, WorkflowType
+        from ..core.cli_git_integration import WorkflowType, get_enhanced_cli_executor
 
         cli_executor = get_enhanced_cli_executor()
         workflow = await cli_executor.git_manager.create_workflow(

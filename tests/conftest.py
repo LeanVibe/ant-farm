@@ -1,10 +1,10 @@
 """Test fixtures and configuration for LeanVibe Agent Hive tests."""
 
 import asyncio
-import pytest
-import pytest_asyncio
+from collections.abc import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
-from typing import Generator, AsyncGenerator
+
+import pytest
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker

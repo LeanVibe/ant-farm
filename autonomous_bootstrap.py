@@ -2,14 +2,14 @@
 
 import asyncio
 import time
+
 from bootstrap import BootstrapAgent, console
-from src.core.self_bootstrap import self_bootstrapper
-from src.core.task_coordinator import task_coordinator
-from src.core.orchestrator import orchestrator
 from src.core.advanced_context_engine import get_advanced_context_engine
-from src.core.self_modifier import get_self_modifier
-from src.core.sleep_wake_manager import get_sleep_wake_manager, SleepSchedule
 from src.core.performance_optimizer import get_performance_optimizer
+from src.core.self_bootstrap import self_bootstrapper
+from src.core.self_modifier import get_self_modifier
+from src.core.sleep_wake_manager import SleepSchedule, get_sleep_wake_manager
+from src.core.task_coordinator import task_coordinator
 
 
 class AutonomousBootstrap(BootstrapAgent):
@@ -82,7 +82,7 @@ class AutonomousBootstrap(BootstrapAgent):
         self.console.print("[cyan]Initializing Phase 3 advanced intelligence...[/cyan]")
 
         # Initialize advanced context engine
-        context_engine = await get_advanced_context_engine(
+        await get_advanced_context_engine(
             database_url=self.settings.database_url,
             embedding_provider="sentence_transformers",  # Use local embeddings
         )
@@ -91,7 +91,7 @@ class AutonomousBootstrap(BootstrapAgent):
         )
 
         # Initialize self-modifier
-        self_modifier = get_self_modifier(workspace_path=".")
+        get_self_modifier(workspace_path=".")
         self.console.print("[green]✓[/green] Safe self-modification system")
 
         # Initialize sleep-wake manager with custom schedule
@@ -100,11 +100,11 @@ class AutonomousBootstrap(BootstrapAgent):
             sleep_duration_hours=1.5,  # 1.5 hours
             enable_adaptive_scheduling=True,
         )
-        sleep_wake_manager = get_sleep_wake_manager(sleep_schedule)
+        get_sleep_wake_manager(sleep_schedule)
         self.console.print("[green]✓[/green] Sleep-wake cycle manager")
 
         # Initialize performance optimizer
-        performance_optimizer = get_performance_optimizer()
+        get_performance_optimizer()
         self.console.print("[green]✓[/green] Predictive performance optimizer")
 
         self.console.print(
@@ -114,7 +114,7 @@ class AutonomousBootstrap(BootstrapAgent):
     async def _start_api_server(self):
         """Start the API server."""
         # Create API server startup task
-        api_task = self.execute_claude_task(
+        self.execute_claude_task(
             "Start the API server: cd src/api && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
             session_name="api-server",
         )
@@ -166,10 +166,9 @@ class AutonomousBootstrap(BootstrapAgent):
             Type: {task_data["type"]}
             Priority: {task_data["priority"]}
             Assigned to: {task_data["assigned_to"]}
-            
-            Use the advanced task queue system with dependency tracking and predictive scheduling.
-            """
 
+             Use the advanced task queue system with dependency tracking and predictive scheduling.
+             """
             self.execute_claude_task(task_prompt)
 
         # Start autonomous cycles
@@ -224,7 +223,7 @@ class AutonomousBootstrap(BootstrapAgent):
         while True:
             try:
                 # Analyze current performance
-                metrics = await performance_optimizer.analyze_performance()
+                await performance_optimizer.analyze_performance()
 
                 # Identify optimization opportunities
                 opportunities = (
@@ -258,7 +257,7 @@ class AutonomousBootstrap(BootstrapAgent):
             )
 
             # Get all active agents
-            from src.core.models import get_database_manager, Agent
+            from src.core.models import Agent, get_database_manager
 
             db_manager = get_database_manager(self.settings.database_url)
             db_session = db_manager.get_session()
@@ -338,13 +337,12 @@ if __name__ == "__main__":
                 print(f"Uptime: {data['data']['uptime'] / 3600:.1f} hours")
             else:
                 print("System not responding")
-        except:
+        except Exception:
             print("System not running")
 
     @app.command()
     def memory():
         """Check memory and pattern statistics."""
-        import requests
 
         try:
             # Would call advanced context engine endpoints

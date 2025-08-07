@@ -367,6 +367,21 @@ class BaseAgent(ABC):
         self.message_handler.register_handler("health_check", self._handle_health_check)
         self.message_handler.register_handler("shutdown", self._handle_shutdown)
 
+        # Collaboration message handlers
+        self.message_handler.register_handler(
+            "collaboration_invitation", self._handle_collaboration_invitation
+        )
+        self.message_handler.register_handler("task_ready", self._handle_task_ready)
+        self.message_handler.register_handler(
+            "task_reassigned", self._handle_task_reassigned
+        )
+        self.message_handler.register_handler(
+            "collaboration_completed", self._handle_collaboration_completed
+        )
+        self.message_handler.register_handler(
+            "collaboration_failed", self._handle_collaboration_failed
+        )
+
     async def start(self) -> None:
         """Start the agent."""
         self.status = "active"
@@ -761,6 +776,100 @@ class BaseAgent(ABC):
         finally:
             db_session.close()
 
+    # Collaboration support
+    async def initiate_collaboration(
+        self,
+        title: str,
+        description: str,
+        collaboration_type: str,
+        required_capabilities: list[str] = None,
+        deadline: datetime = None,
+        priority: int = 5,
+        metadata: dict[str, Any] = None,
+    ) -> str:
+        """Initiate a new collaboration with other agents."""
+
+        # Import here to avoid circular imports
+        try:
+            from ..core.agent_coordination import coordination_system, CollaborationType
+        except ImportError:
+            from core.agent_coordination import coordination_system, CollaborationType
+
+        collaboration_id = await coordination_system.start_collaboration(
+            title=title,
+            description=description,
+            collaboration_type=CollaborationType(collaboration_type),
+            coordinator_agent=self.name,
+            required_capabilities=required_capabilities,
+            deadline=deadline,
+            priority=priority,
+            metadata=metadata or {},
+        )
+
+        logger.info(
+            "Collaboration initiated",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            type=collaboration_type,
+        )
+
+        return collaboration_id
+
+    async def request_collaboration(
+        self,
+        title: str,
+        description: str,
+        collaboration_type: str,
+        required_capabilities: list[str] = None,
+        deadline: datetime = None,
+        priority: int = 5,
+    ) -> dict[str, Any]:
+        """Request a collaboration through the coordination system."""
+
+        message_id = await message_broker.send_message(
+            from_agent=self.name,
+            to_agent="coordination_system",
+            topic="collaboration_request",
+            payload={
+                "title": title,
+                "description": description,
+                "collaboration_type": collaboration_type,
+                "required_capabilities": required_capabilities,
+                "deadline": deadline.isoformat() if deadline else None,
+                "priority": priority,
+                "metadata": {"requester": self.name},
+            },
+            message_type=MessageType.REQUEST,
+        )
+
+        # In a real implementation, we would wait for the response
+        return {"request_id": message_id, "status": "requested"}
+
+    async def complete_collaborative_task(
+        self, collaboration_id: str, task_id: str, result: dict[str, Any]
+    ) -> None:
+        """Complete a collaborative task and notify the coordination system."""
+
+        await message_broker.send_message(
+            from_agent=self.name,
+            to_agent="coordination_system",
+            topic="sub_task_completed",
+            payload={
+                "collaboration_id": collaboration_id,
+                "task_id": task_id,
+                "result": result,
+                "completed_at": time.time(),
+            },
+            message_type=MessageType.NOTIFICATION,
+        )
+
+        logger.info(
+            "Collaborative task completed",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            task_id=task_id,
+        )
+
     # Message handlers
     async def _handle_ping(self, message: Message) -> dict[str, Any]:
         """Handle ping message."""
@@ -785,6 +894,211 @@ class BaseAgent(ABC):
             }
         else:
             return {"error": "No task data provided"}
+
+    async def _handle_collaboration_invitation(
+        self, message: Message
+    ) -> dict[str, Any]:
+        """Handle collaboration invitation."""
+        payload = message.payload
+        collaboration_id = payload["collaboration_id"]
+
+        logger.info(
+            "Received collaboration invitation",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            title=payload["title"],
+            type=payload["collaboration_type"],
+        )
+
+        # Accept the invitation (subclasses can override this logic)
+        accepted = await self._evaluate_collaboration_invitation(payload)
+
+        if accepted:
+            # Process assigned tasks
+            your_tasks = payload.get("your_tasks", [])
+            for task in your_tasks:
+                await self._handle_collaborative_task(collaboration_id, task)
+
+        return {"accepted": accepted}
+
+    async def _evaluate_collaboration_invitation(
+        self, invitation: dict[str, Any]
+    ) -> bool:
+        """Evaluate whether to accept a collaboration invitation."""
+        # Default implementation accepts all invitations
+        # Subclasses can override with more sophisticated logic
+
+        required_capabilities = invitation.get("required_capabilities", [])
+        my_capabilities = self.capabilities
+
+        # Check if we have required capabilities
+        if required_capabilities:
+            has_capabilities = any(
+                cap in my_capabilities for cap in required_capabilities
+            )
+            if not has_capabilities:
+                logger.warning(
+                    "Declining collaboration - missing capabilities",
+                    agent=self.name,
+                    required=required_capabilities,
+                    available=my_capabilities,
+                )
+                return False
+
+        # Check current load
+        if self.status == "busy":
+            logger.info("Declining collaboration - currently busy", agent=self.name)
+            return False
+
+        return True
+
+    async def _handle_collaborative_task(
+        self, collaboration_id: str, task: dict[str, Any]
+    ) -> None:
+        """Handle a collaborative task assignment."""
+
+        task_id = f"{collaboration_id}_{task.get('description', 'task')}"
+
+        logger.info(
+            "Processing collaborative task",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            task_description=task.get("description", ""),
+        )
+
+        try:
+            # Process the collaborative task
+            result = await self._process_collaborative_task(task)
+
+            # Report completion
+            await self.complete_collaborative_task(collaboration_id, task_id, result)
+
+        except Exception as e:
+            logger.error(
+                "Collaborative task failed",
+                agent=self.name,
+                collaboration_id=collaboration_id,
+                error=str(e),
+            )
+
+            # Report failure
+            await self.complete_collaborative_task(
+                collaboration_id, task_id, {"success": False, "error": str(e)}
+            )
+
+    async def _process_collaborative_task(self, task: dict[str, Any]) -> dict[str, Any]:
+        """Process a collaborative task."""
+        # Default implementation - subclasses should override
+
+        description = task.get("description", "")
+        dependencies = task.get("depends_on", [])
+
+        # Wait for dependencies if any
+        if dependencies:
+            logger.info(
+                "Waiting for task dependencies",
+                agent=self.name,
+                dependencies=dependencies,
+            )
+            # In a real implementation, we would wait for dependency completion
+
+        # Simulate task processing
+        await asyncio.sleep(1)
+
+        return {
+            "success": True,
+            "output": f"Collaborative task completed by {self.name}",
+            "agent": self.name,
+            "timestamp": time.time(),
+        }
+
+    async def _handle_task_ready(self, message: Message) -> dict[str, Any]:
+        """Handle notification that a task is ready (dependencies met)."""
+        payload = message.payload
+        collaboration_id = payload["collaboration_id"]
+        task_id = payload["task_id"]
+        task = payload["task"]
+
+        logger.info(
+            "Task ready for execution",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            task_id=task_id,
+        )
+
+        # Start processing the task
+        await self._handle_collaborative_task(collaboration_id, task)
+
+        return {"status": "processing"}
+
+    async def _handle_task_reassigned(self, message: Message) -> dict[str, Any]:
+        """Handle task reassignment notification."""
+        payload = message.payload
+        collaboration_id = payload["collaboration_id"]
+        task_id = payload["task_id"]
+        task = payload["task"]
+        reason = payload.get("reason", "unknown")
+
+        logger.info(
+            "Task reassigned to agent",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            task_id=task_id,
+            reason=reason,
+        )
+
+        # Accept the reassigned task
+        await self._handle_collaborative_task(collaboration_id, task)
+
+        return {"status": "accepted"}
+
+    async def _handle_collaboration_completed(self, message: Message) -> dict[str, Any]:
+        """Handle collaboration completion notification."""
+        payload = message.payload
+        collaboration_id = payload["collaboration_id"]
+
+        logger.info(
+            "Collaboration completed",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            duration=payload.get("duration", 0),
+            success=payload.get("success", False),
+        )
+
+        # Subclasses can override to perform cleanup or learning
+        await self._on_collaboration_completed(payload)
+
+        return {"status": "acknowledged"}
+
+    async def _handle_collaboration_failed(self, message: Message) -> dict[str, Any]:
+        """Handle collaboration failure notification."""
+        payload = message.payload
+        collaboration_id = payload["collaboration_id"]
+        reason = payload.get("reason", "unknown")
+
+        logger.warning(
+            "Collaboration failed",
+            agent=self.name,
+            collaboration_id=collaboration_id,
+            reason=reason,
+        )
+
+        # Subclasses can override to handle failure recovery
+        await self._on_collaboration_failed(payload)
+
+        return {"status": "acknowledged"}
+
+    async def _on_collaboration_completed(self, result: dict[str, Any]) -> None:
+        """Called when a collaboration is completed."""
+        # Default implementation does nothing
+        # Subclasses can override for learning or cleanup
+        pass
+
+    async def _on_collaboration_failed(self, failure_info: dict[str, Any]) -> None:
+        """Called when a collaboration fails."""
+        # Default implementation does nothing
+        # Subclasses can override for failure handling
+        pass
 
     async def _handle_health_check(self, message: Message) -> dict[str, Any]:
         """Handle health check message."""

@@ -44,7 +44,7 @@ class Task(BaseModel):
     description: str
     task_type: str
     payload: dict[str, Any] = Field(default_factory=dict)
-    priority: int = TaskPriority.NORMAL
+    priority: TaskPriority = TaskPriority.NORMAL
     status: str = TaskStatus.PENDING
     agent_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
@@ -114,6 +114,7 @@ class TaskQueue:
         # Store task data
         task_key = f"{self.task_prefix}:{task.id}"
         task_data = task.model_dump()
+        task_data["priority"] = task.priority.value
 
         # Convert timestamp fields to strings for Redis
         for field in ["created_at", "started_at", "completed_at"]:
@@ -166,19 +167,28 @@ class TaskQueue:
             priorities = [1, 3, 5, 7, 9]  # All priorities
 
         # Check queues in priority order
-        for priority in sorted(priorities):
-            queue_key = f"{self.queue_prefix}:p{priority}"
+        queue_keys = [f"{self.queue_prefix}:p{p}" for p in sorted(priorities)]
 
-            # Try to pop a task (non-blocking first check)
-            task_id = await self.redis_client.rpop(queue_key)
-            if not task_id:
-                continue
+        if not queue_keys:
+            return None
+
+        # Blocking pop from the highest priority queue that has tasks
+        try:
+            queue_name, task_id = await self.redis_client.brpop(
+                queue_keys, timeout=timeout
+            )
+        except (TimeoutError, TypeError):
+            # brpop returns None on timeout, which can cause TypeError if not handled
+            return None
+
+        if not task_id:
+            return None
 
             # Get task data
             task_data = await self.redis_client.hgetall(f"{self.task_prefix}:{task_id}")
             if not task_data:
                 logger.warning("Task data not found", task_id=task_id)
-                continue
+                return None
 
             # Convert back to Task object
             task = await self._dict_to_task(task_data)
@@ -192,12 +202,15 @@ class TaskQueue:
             await self._update_task(task)
 
             logger.info(
-                "Task assigned", task_id=task_id, agent_id=agent_id, priority=priority
+                "Task assigned",
+                task_id=task_id,
+                agent_id=agent_id,
+                priority=task.priority,
             )
             await self._update_stats("assigned")
             return task
 
-        # No tasks available in any priority queue
+        # No tasks available in any priority queue after timeout
         return None
 
     async def start_task(self, task_id: str) -> bool:
@@ -389,6 +402,9 @@ class TaskQueue:
             if status == TaskStatus.IN_PROGRESS and started_at:
                 if current_time - float(started_at) > timeout:
                     task_id = task_key.split(":")[-1]
+                    task = await self._dict_to_task(task_data)
+                    task.error_message = "Task timeout"
+                    await self._update_task(task)
                     await self.fail_task(task_id, "Task timeout", retry=True)
                     cleaned_count += 1
 
@@ -442,10 +458,12 @@ class TaskQueue:
         # Convert string fields back to appropriate types
         data = dict(task_data)
 
-        # Handle numeric fields
-        for field in ["priority", "retry_count", "max_retries", "timeout_seconds"]:
-            if field in data and data[field]:
-                data[field] = int(data[field])
+        # Handle priority separately
+        if "priority" in data and data["priority"]:
+            try:
+                data["priority"] = TaskPriority(int(data["priority"]))
+            except (ValueError, TypeError):
+                data["priority"] = TaskPriority.NORMAL
 
         # Handle float fields
         for field in ["created_at", "started_at", "completed_at"]:
@@ -470,6 +488,7 @@ class TaskQueue:
         """Update task data in Redis."""
         task_key = f"{self.task_prefix}:{task.id}"
         task_data = task.model_dump()
+        task_data["priority"] = task.priority.value
 
         # Convert fields for Redis storage
         for field in ["created_at", "started_at", "completed_at"]:
@@ -500,21 +519,15 @@ class TaskQueue:
     async def get_unassigned_tasks(self) -> list[Task]:
         """Get all unassigned tasks for coordination."""
         unassigned_tasks = []
-
-        # Check all priority queues
-        for priority in range(1, 10):
-            queue_key = f"{self.queue_prefix}:p{priority}"
-            task_ids = await self.redis_client.lrange(queue_key, 0, -1)
-
-            for task_id in task_ids:
-                task_key = f"{self.task_prefix}:{task_id}"
-                task_data = await self.redis_client.hgetall(task_key)
-
-                if task_data:
-                    task = await self._dict_to_task(task_data)
-                    if task.status == TaskStatus.PENDING and not task.agent_id:
-                        unassigned_tasks.append(task)
-
+        all_task_keys = await self.redis_client.keys(f"{self.task_prefix}:*")
+        for task_key in all_task_keys:
+            task_data = await self.redis_client.hgetall(task_key)
+            if (
+                task_data
+                and task_data.get("status") == TaskStatus.PENDING
+                and not task_data.get("agent_id")
+            ):
+                unassigned_tasks.append(await self._dict_to_task(task_data))
         return unassigned_tasks
 
     async def get_agent_active_task_count(self, agent_id: str) -> int:

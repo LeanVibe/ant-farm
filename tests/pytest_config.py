@@ -1,6 +1,5 @@
 """Test configuration for running tests without coverage on placeholder files."""
 
-import pytest
 
 
 def pytest_configure(config):

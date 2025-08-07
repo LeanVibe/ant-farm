@@ -2,6 +2,7 @@
 """Simple test to check Redis task queue status."""
 
 import asyncio
+
 from src.core.task_queue import task_queue
 
 

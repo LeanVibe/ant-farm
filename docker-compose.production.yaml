@@ -1,0 +1,289 @@
+version: '3.8'
+
+# Production Docker Compose for LeanVibe Agent Hive 2.0
+# This configuration is optimized for production deployment
+
+services:
+  # PostgreSQL with pgvector for persistent storage
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: hive-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leanvibe_hive
+      POSTGRES_USER: hive_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hive_secure_pass}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - hive-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive_user -d leanvibe_hive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Redis for task queue and messaging with persistence
+  redis:
+    image: redis:7-alpine
+    container_name: hive-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory-policy allkeys-lru 
+      --maxmemory 512mb
+      --requirepass ${REDIS_PASSWORD:-redis_secure_pass}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hive-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redis_secure_pass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.production
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        - VCS_REF=${VCS_REF:-$(git rev-parse --short HEAD)}
+    container_name: hive-api
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://hive_user:${POSTGRES_PASSWORD:-hive_secure_pass}@postgres:5432/leanvibe_hive
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass}@redis:6379
+      - SECRET_KEY=${SECRET_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - PYTHONUNBUFFERED=1
+      - PYTHONOPTIMIZE=1
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - api_logs:/app/logs
+      - api_workspace:/app/workspace
+      - api_tmp:/app/tmp
+    networks:
+      - hive-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hive-api.rule=Host(`api.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.hive-api.loadbalancer.server.port=8000"
+
+  # Agent Runner
+  agent-runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        - VCS_REF=${VCS_REF:-$(git rev-parse --short HEAD)}
+    container_name: hive-agent-runner
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://hive_user:${POSTGRES_PASSWORD:-hive_secure_pass}@postgres:5432/leanvibe_hive
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass}@redis:6379
+      - SECRET_KEY=${SECRET_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - PYTHONUNBUFFERED=1
+      - PYTHONOPTIMIZE=1
+    volumes:
+      - agent_logs:/app/logs
+      - agent_workspace:/app/workspace
+      - agent_tmp:/app/tmp
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # For Docker-in-Docker if needed
+    networks:
+      - hive-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: hive-nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./src/web/dashboard:/usr/share/nginx/html:ro
+      - nginx_logs:/var/log/nginx
+      - ssl_certs:/etc/nginx/ssl:ro
+    networks:
+      - hive-network
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hive-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - hive-network
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Grafana for metrics visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hive-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - hive-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+
+networks:
+  hive-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  api_logs:
+    driver: local
+  api_workspace:
+    driver: local
+  api_tmp:
+    driver: local
+  agent_logs:
+    driver: local
+  agent_workspace:
+    driver: local
+  agent_tmp:
+    driver: local
+  nginx_logs:
+    driver: local
+  ssl_certs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Secrets for production deployment
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  secret_key:
+    file: ./secrets/secret_key.txt

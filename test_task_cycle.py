@@ -2,9 +2,9 @@
 """Test script for end-to-end task processing cycle."""
 
 import asyncio
-import json
 import time
-from src.core.task_queue import task_queue, Task, TaskPriority
+
+from src.core.task_queue import Task, TaskPriority, task_queue
 
 
 async def test_task_cycle():
@@ -37,7 +37,7 @@ async def test_task_cycle():
     retrieved_task = await task_queue.get_task("test-agent")
 
     if retrieved_task:
-        print(f"✅ Task retrieved successfully!")
+        print("✅ Task retrieved successfully!")
         print(f"   Task ID: {retrieved_task.id}")
         print(f"   Title: {retrieved_task.title}")
         print(f"   Status: {retrieved_task.status}")
@@ -58,7 +58,7 @@ async def test_task_cycle():
 
     # Get queue stats
     stats = await task_queue.get_queue_stats()
-    print(f"\nQueue stats:")
+    print("\nQueue stats:")
     print(f"   Total tasks: {stats.total_tasks}")
     print(f"   Pending tasks: {stats.pending_tasks}")
     print(f"   Completed tasks: {stats.completed_tasks}")

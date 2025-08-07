@@ -2,14 +2,13 @@
 
 import asyncio
 import json
-import time
-import psutil
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
-from collections import defaultdict, deque
 import statistics
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from typing import Any
 
+import psutil
 import structlog
 
 logger = structlog.get_logger()
@@ -23,9 +22,9 @@ class PerformanceMetric:
     value: float
     unit: str
     timestamp: float
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -42,7 +41,7 @@ class SystemResource:
     disk_free_gb: float
     network_bytes_sent: int
     network_bytes_recv: int
-    load_average: List[float]
+    load_average: list[float]
     process_count: int
     thread_count: int
     timestamp: float
@@ -59,12 +58,12 @@ class AgentPerformance:
     tasks_failed: int
     average_task_duration: float
     last_heartbeat: float
-    response_times: List[float]
+    response_times: list[float]
     error_rate: float
     uptime: float
     load_factor: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -82,9 +81,9 @@ class APIPerformance:
     p99_response_time: float
     requests_per_minute: float
     error_rate: float
-    status_code_distribution: Dict[int, int]
+    status_code_distribution: dict[int, int]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -95,15 +94,15 @@ class PerformanceCollector:
         self.max_history = max_history
         self.metrics_history: deque = deque(maxlen=max_history)
         self.system_resources: deque = deque(maxlen=max_history)
-        self.agent_metrics: Dict[str, deque] = defaultdict(
+        self.agent_metrics: dict[str, deque] = defaultdict(
             lambda: deque(maxlen=max_history)
         )
-        self.api_metrics: Dict[str, deque] = defaultdict(
+        self.api_metrics: dict[str, deque] = defaultdict(
             lambda: deque(maxlen=max_history)
         )
-        self.request_times: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
-        self.error_counts: Dict[str, int] = defaultdict(int)
-        self.request_counts: Dict[str, int] = defaultdict(int)
+        self.request_times: dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
+        self.error_counts: dict[str, int] = defaultdict(int)
+        self.request_counts: dict[str, int] = defaultdict(int)
 
         # Performance thresholds
         self.thresholds = {
@@ -118,7 +117,7 @@ class PerformanceCollector:
         }
 
         # Start background collection
-        self.collection_task: Optional[asyncio.Task] = None
+        self.collection_task: asyncio.Task | None = None
         self.is_collecting = False
 
     async def start_collection(self, interval: float = 30.0):
@@ -286,7 +285,7 @@ class PerformanceCollector:
         method: str,
         status_code: int,
         response_time: float,
-        error: Optional[str] = None,
+        error: str | None = None,
     ):
         """Record API request performance data."""
         request_key = f"{method}:{endpoint}"
@@ -382,7 +381,7 @@ class PerformanceCollector:
 
     def get_api_performance_summary(
         self, time_window_minutes: int = 60
-    ) -> Dict[str, APIPerformance]:
+    ) -> dict[str, APIPerformance]:
         """Get API performance summary for the specified time window."""
         cutoff_time = time.time() - (time_window_minutes * 60)
         summary = {}
@@ -436,7 +435,7 @@ class PerformanceCollector:
 
         return summary
 
-    def get_performance_alerts(self) -> List[Dict[str, Any]]:
+    def get_performance_alerts(self) -> list[dict[str, Any]]:
         """Get current performance alerts based on thresholds."""
         alerts = []
 
@@ -536,7 +535,7 @@ class PerformanceCollector:
 
         return alerts
 
-    def get_metrics_summary(self, time_window_minutes: int = 60) -> Dict[str, Any]:
+    def get_metrics_summary(self, time_window_minutes: int = 60) -> dict[str, Any]:
         """Get comprehensive metrics summary."""
         cutoff_time = time.time() - (time_window_minutes * 60)
 

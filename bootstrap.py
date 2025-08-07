@@ -7,23 +7,19 @@ This runs on the host machine and:
 3. Coordinates with Docker services (PostgreSQL, Redis)
 """
 
-import asyncio
 import json
-import os
 import subprocess
 import sys
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any
 
-import redis
 import psycopg2
-from psycopg2.extras import RealDictCursor
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+import redis
 import typer
+from rich.console import Console
 
 console = Console()
 app = typer.Typer()
@@ -72,7 +68,7 @@ class BootstrapAgent:
             console.print("Make sure Docker services are running: docker-compose up -d")
             sys.exit(1)
 
-    def detect_cli_tools(self) -> Dict[str, Dict[str, Any]]:
+    def detect_cli_tools(self) -> dict[str, dict[str, Any]]:
         """Detect available CLI agentic coding tools."""
         tools = {}
 
@@ -108,7 +104,7 @@ class BootstrapAgent:
 
         return tools
 
-    def select_preferred_tool(self) -> Optional[str]:
+    def select_preferred_tool(self) -> str | None:
         """Select preferred tool based on availability and priority."""
         # Priority order: opencode > claude > gemini
         priority = ["opencode", "claude", "gemini"]
@@ -238,7 +234,7 @@ class BootstrapAgent:
 
     def execute_claude_task(
         self, task: str, session_name: str = None, tool_override: str = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a task using available CLI tools in a tmux session."""
         if not session_name:
             session_name = self.session_name
@@ -246,7 +242,7 @@ class BootstrapAgent:
         # Select tool to use
         tool_name = tool_override or self.preferred_tool
         if not tool_name or tool_name not in self.available_tools:
-            console.print(f"[red]✗[/red] No available tool for task execution")
+            console.print("[red]✗[/red] No available tool for task execution")
             return {"error": "No available CLI tool"}
 
         tool_config = self.available_tools[tool_name]
@@ -486,7 +482,7 @@ def bootstrap():
 @app.command()
 def spawn(
     agent_type: str = typer.Argument(..., help="Type of agent to spawn"),
-    name: Optional[str] = typer.Option(None, help="Agent name"),
+    name: str | None = typer.Option(None, help="Agent name"),
 ):
     """Spawn a new agent."""
     agent = BootstrapAgent()
@@ -554,7 +550,7 @@ def status():
             console.print(
                 f"Preferred tool: {agent.available_tools[agent.preferred_tool]['name']}"
             )
-    except:
+    except Exception:
         console.print("\n[bold red]System not ready - start Docker services[/bold red]")
     finally:
         agent.cleanup()

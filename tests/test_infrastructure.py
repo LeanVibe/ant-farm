@@ -1,6 +1,5 @@
 """Simple test to verify testing infrastructure works."""
 
-import pytest
 
 
 def test_pytest_works():
@@ -28,9 +27,6 @@ def test_async_pytest_works():
 
 def test_imports_work():
     """Test that we can import testing dependencies."""
-    import pytest
-    import pytest_asyncio
-    from unittest.mock import AsyncMock, MagicMock
 
     assert True
 

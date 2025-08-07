@@ -2,10 +2,10 @@
 """Test complete task processing cycle."""
 
 import asyncio
-import time
-import subprocess
 import signal
-from src.core.task_queue import task_queue, Task, TaskPriority
+import subprocess
+
+from src.core.task_queue import Task, TaskPriority, task_queue
 
 
 async def test_complete_cycle():
@@ -65,7 +65,7 @@ async def test_complete_cycle():
                 print(f"[{i + 1:2d}s] Status: {status:12s} | Agent: {agent}")
 
                 if status == "completed":
-                    print(f"✅ Task completed successfully!")
+                    print("✅ Task completed successfully!")
                     print(f"   Result: {task_status.result}")
                     break
                 elif status == "failed":

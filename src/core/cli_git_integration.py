@@ -12,8 +12,6 @@ from typing import Any
 
 import structlog
 
-from .config import settings
-
 logger = structlog.get_logger()
 
 
@@ -640,7 +638,7 @@ class EnhancedCLIExecutor:
 
                     break  # Found working test command
 
-                except (FileNotFoundError, asyncio.TimeoutError):
+                except (TimeoutError, FileNotFoundError):
                     continue  # Try next command
 
         except Exception as e:

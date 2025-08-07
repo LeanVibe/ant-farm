@@ -1,9 +1,8 @@
 """Unit tests for base agent functionality."""
 
+from unittest.mock import patch
+
 import pytest
-import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-import subprocess
 
 # Import the classes we'll be testing (when they exist)
 # from src.agents.base_agent import BaseAgent

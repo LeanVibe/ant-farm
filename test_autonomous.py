@@ -2,11 +2,11 @@
 """Test autonomous task execution with real agent."""
 
 import asyncio
-import json
-import time
-import subprocess
 import signal
-from src.core.task_queue import task_queue, Task, TaskPriority
+import subprocess
+import time
+
+from src.core.task_queue import Task, TaskPriority, task_queue
 
 
 async def test_autonomous_execution():
@@ -63,7 +63,7 @@ async def test_autonomous_execution():
             # Check task status
             completed_task = await task_queue.get_task_status(task_id)
             if completed_task and completed_task.status == "completed":
-                print(f"✅ Task completed by agent!")
+                print("✅ Task completed by agent!")
                 print(f"   Result: {completed_task.result}")
                 break
             elif completed_task and completed_task.status == "failed":
@@ -78,7 +78,7 @@ async def test_autonomous_execution():
 
         # Get final stats
         stats = await task_queue.get_queue_stats()
-        print(f"\nFinal queue stats:")
+        print("\nFinal queue stats:")
         print(f"   Total tasks: {stats.total_tasks}")
         print(f"   Completed tasks: {stats.completed_tasks}")
         print(f"   Failed tasks: {stats.failed_tasks}")

@@ -5,16 +5,13 @@ Demonstrates task processing by echoing 'Hello from autonomous agent!'
 """
 
 import asyncio
-import sys
 import time
 from pathlib import Path
 
 # Add src to path for imports
 src_path = Path(__file__).parent / "src"
-sys.path.insert(0, str(src_path))
-
-from core.task_queue import Task, TaskPriority, TaskStatus, task_queue
 from agents.base_agent import BaseAgent, TaskResult
+from core.task_queue import Task, TaskPriority
 
 
 class EchoAgent(BaseAgent):
@@ -44,7 +41,7 @@ class EchoAgent(BaseAgent):
             payload={"message": "Hello from autonomous agent!"},
         )
 
-        print(f"\n📋 Processing Echo Task:")
+        print("\n📋 Processing Echo Task:")
         print(f"   Title: {echo_task.title}")
         print(f"   Description: {echo_task.description}")
         print(f"   Type: {echo_task.task_type}")
@@ -55,7 +52,7 @@ class EchoAgent(BaseAgent):
         result = await self._process_echo_task_implementation(echo_task)
 
         # Display results
-        print(f"\n✅ Task Processing Result:")
+        print("\n✅ Task Processing Result:")
         print(f"   Success: {result.success}")
         if result.success:
             print(f"   Echo Message: {result.data.get('echo_message')}")

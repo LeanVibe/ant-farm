@@ -7,23 +7,19 @@ This runs on the host machine and:
 3. Coordinates with Docker services (PostgreSQL, Redis)
 """
 
-import asyncio
 import json
-import os
 import subprocess
 import sys
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any
 
-import redis
 import psycopg2
-from psycopg2.extras import RealDictCursor
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+import redis
 import typer
+from rich.console import Console
 
 console = Console()
 app = typer.Typer()
@@ -123,7 +119,7 @@ class BootstrapAgent:
 
     def execute_claude_task(
         self, task: str, session_name: str = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a task using Claude Code in a tmux session."""
         if not session_name:
             session_name = self.session_name
@@ -337,7 +333,7 @@ def bootstrap():
 @app.command()
 def spawn(
     agent_type: str = typer.Argument(..., help="Type of agent to spawn"),
-    name: Optional[str] = typer.Option(None, help="Agent name"),
+    name: str | None = typer.Option(None, help="Agent name"),
 ):
     """Spawn a new agent."""
     agent = BootstrapAgent()
@@ -370,7 +366,7 @@ def status():
     try:
         agent.connect_services()
         console.print("\n[bold green]System is ready![/bold green]")
-    except:
+    except Exception:
         console.print("\n[bold red]System not ready - start Docker services[/bold red]")
     finally:
         agent.cleanup()
