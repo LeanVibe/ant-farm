@@ -12,29 +12,57 @@ from typing import Any
 import structlog
 from fastapi import (
     BackgroundTasks,
+    Depends,
     FastAPI,
     HTTPException,
+    Request,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 
 # Handle both module and direct execution imports
 try:
+    from ..core.auth import (
+        AuthenticationError,
+        AuthorizationError,
+        Permissions,
+        RateLimitError,
+        SecurityMiddleware,
+        get_current_user,
+        get_optional_user,
+        rate_limit,
+        require_admin,
+    )
     from ..core.config import settings
     from ..core.message_broker import MessageType, message_broker
     from ..core.models import SystemMetric, get_database_manager
     from ..core.orchestrator import get_orchestrator
+    from ..core.security import User, create_default_admin, security_manager
     from ..core.task_queue import Task, TaskPriority, task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
+    from core.auth import (
+        AuthenticationError,
+        AuthorizationError,
+        Permissions,
+        RateLimitError,
+        SecurityMiddleware,
+        get_current_user,
+        get_optional_user,
+        rate_limit,
+        require_admin,
+    )
     from core.config import settings
     from core.message_broker import MessageType, message_broker
     from core.models import SystemMetric, get_database_manager
     from core.orchestrator import get_orchestrator
+    from core.security import User, create_default_admin, security_manager
     from core.task_queue import Task, TaskPriority, task_queue
 
 logger = structlog.get_logger()
@@ -165,6 +193,9 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
+# Add security middleware
+app.add_middleware(SecurityMiddleware)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -247,6 +278,37 @@ class APIResponse(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: dict
+
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+    permissions: list[str] = Field(default_factory=list)
+
+
+class UserInfo(BaseModel):
+    id: str
+    username: str
+    email: str
+    is_active: bool
+    is_admin: bool
+    permissions: list[str]
+    created_at: str
+    last_login: str | None = None
+
+
 # Startup and shutdown events
 startup_time = time.time()
 
@@ -272,6 +334,10 @@ async def startup_event():
 
         # Start background event broadcaster
         asyncio.create_task(system_event_broadcaster())
+
+        # Create default admin user if none exists
+        if not security_manager.users:
+            create_default_admin()
 
         logger.info("API server started successfully")
 
@@ -435,7 +501,158 @@ async def handle_websocket_message(websocket: WebSocket, message: dict):
         )
 
 
-# Helper function to broadcast events to WebSocket clients
+# Authentication endpoints
+@app.post("/api/v1/auth/login", response_model=APIResponse)
+@rate_limit(10)  # Limit login attempts
+async def login(request: Request, login_request: LoginRequest):
+    """Authenticate user and return JWT tokens."""
+    try:
+        # Authenticate user
+        user = security_manager.authenticate_user(
+            login_request.username, login_request.password
+        )
+
+        if not user:
+            raise AuthenticationError("Invalid username or password")
+
+        # Generate tokens
+        access_token = security_manager.create_access_token(user)
+        refresh_token = security_manager.create_refresh_token(user)
+
+        # Create response
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "is_admin": user.is_admin,
+            "permissions": user.permissions,
+        }
+
+        login_response = LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=security_manager.config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            user=user_data,
+        )
+
+        return APIResponse(success=True, data=login_response.dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Login failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Login failed") from e
+
+
+@app.post("/api/v1/auth/refresh", response_model=APIResponse)
+@rate_limit(20)
+async def refresh_token(request: Request, refresh_token: str):
+    """Refresh access token using refresh token."""
+    try:
+        # Verify refresh token
+        payload = security_manager.verify_token(refresh_token)
+        if not payload or payload.get("type") != "refresh":
+            raise AuthenticationError("Invalid refresh token")
+
+        # Get user
+        user_id = payload.get("sub")
+        if not user_id or user_id not in security_manager.users:
+            raise AuthenticationError("User not found")
+
+        user = security_manager.users[user_id]
+        if not user.is_active:
+            raise AuthenticationError("User account is disabled")
+
+        # Generate new access token
+        access_token = security_manager.create_access_token(user)
+
+        return APIResponse(
+            success=True,
+            data={
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": security_manager.config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Token refresh failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Token refresh failed") from e
+
+
+@app.get("/api/v1/auth/me", response_model=APIResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current user information."""
+    user_info = UserInfo(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        is_active=current_user.is_active,
+        is_admin=current_user.is_admin,
+        permissions=current_user.permissions,
+        created_at=current_user.created_at.isoformat(),
+        last_login=current_user.last_login.isoformat()
+        if current_user.last_login
+        else None,
+    )
+
+    return APIResponse(success=True, data=user_info.dict())
+
+
+@app.post("/api/v1/auth/logout", response_model=APIResponse)
+async def logout(current_user: User = Depends(get_current_user)):
+    """Logout user (invalidate token on client side)."""
+    # In a production system, you would maintain a token blacklist
+    # For now, we just log the logout event
+    logger.info(
+        "User logged out", user_id=current_user.id, username=current_user.username
+    )
+
+    return APIResponse(success=True, data={"message": "Logged out successfully"})
+
+
+@app.post("/api/v1/auth/users", response_model=APIResponse)
+@Permissions.system_write()
+async def create_user(
+    user_create: UserCreate, current_user: User = Depends(get_current_user)
+):
+    """Create a new user (admin only)."""
+    try:
+        # Check if username already exists
+        if security_manager.get_user_by_username(user_create.username):
+            raise HTTPException(status_code=400, detail="Username already exists")
+
+        # Create user
+        new_user = security_manager.create_user(
+            username=user_create.username,
+            email=user_create.email,
+            password=user_create.password,
+            permissions=user_create.permissions,
+        )
+
+        user_info = UserInfo(
+            id=new_user.id,
+            username=new_user.username,
+            email=new_user.email,
+            is_active=new_user.is_active,
+            is_admin=new_user.is_admin,
+            permissions=new_user.permissions,
+            created_at=new_user.created_at.isoformat(),
+            last_login=None,
+        )
+
+        return APIResponse(success=True, data=user_info.dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("User creation failed", error=str(e))
+        raise HTTPException(status_code=500, detail="User creation failed") from e
+
+
+# Health check endpoints
 async def broadcast_event(event_type: str, payload: dict):
     """Broadcast an event to all WebSocket clients."""
     message = {"type": event_type, "payload": payload, "timestamp": time.time()}
@@ -493,7 +710,8 @@ async def get_system_status():
 
 # Agent management endpoints
 @app.get("/api/v1/agents", response_model=APIResponse)
-async def list_agents():
+@Permissions.agent_read()
+async def list_agents(current_user: User = Depends(get_current_user)):
     """List all agents."""
     try:
         from pathlib import Path
@@ -522,7 +740,8 @@ async def list_agents():
 
 
 @app.get("/api/v1/agents/{agent_name}", response_model=APIResponse)
-async def get_agent(agent_name: str):
+@Permissions.agent_read()
+async def get_agent(agent_name: str, current_user: User = Depends(get_current_user)):
     """Get specific agent information."""
     try:
         from pathlib import Path
@@ -552,10 +771,12 @@ async def get_agent(agent_name: str):
 
 
 @app.post("/api/v1/agents", response_model=APIResponse)
+@Permissions.agent_spawn()
 async def spawn_agent(
     agent_type: str,
     agent_name: str | None = None,
     background_tasks: BackgroundTasks = None,
+    current_user: User = Depends(get_current_user),
 ):
     """Spawn a new agent."""
     try:
@@ -599,7 +820,8 @@ async def spawn_agent(
 
 
 @app.post("/api/v1/agents/{agent_name}/stop", response_model=APIResponse)
-async def stop_agent(agent_name: str):
+@Permissions.agent_terminate()
+async def stop_agent(agent_name: str, current_user: User = Depends(get_current_user)):
     """Stop a specific agent."""
     try:
         from pathlib import Path
@@ -660,7 +882,12 @@ async def check_agent_health(agent_name: str):
 
 # Task management endpoints
 @app.get("/api/v1/tasks", response_model=APIResponse)
-async def list_tasks(status: str | None = None, assigned_to: str | None = None):
+@Permissions.task_read()
+async def list_tasks(
+    status: str | None = None,
+    assigned_to: str | None = None,
+    current_user: User = Depends(get_current_user),
+):
     """List tasks with optional filtering."""
     try:
         tasks = await task_queue.list_tasks(status=status, assigned_to=assigned_to)
@@ -691,7 +918,10 @@ async def list_tasks(status: str | None = None, assigned_to: str | None = None):
 
 
 @app.post("/api/v1/tasks", response_model=APIResponse)
-async def create_task(task_create: TaskCreate):
+@Permissions.task_create()
+async def create_task(
+    task_create: TaskCreate, current_user: User = Depends(get_current_user)
+):
     """Create a new task."""
     try:
         task = Task(
@@ -835,7 +1065,8 @@ async def broadcast_message(topic: str, content: dict[str, Any]):
 
 # System control endpoints
 @app.post("/api/v1/system/analyze", response_model=APIResponse)
-async def trigger_system_analysis():
+@Permissions.system_write()
+async def trigger_system_analysis(current_user: User = Depends(get_current_user)):
     """Trigger a system analysis by the meta-agent."""
     try:
         task = Task(
@@ -862,7 +1093,8 @@ async def trigger_system_analysis():
 
 
 @app.post("/api/v1/system/shutdown", response_model=APIResponse)
-async def shutdown_system():
+@require_admin()
+async def shutdown_system(current_user: User = Depends(get_current_user)):
     """Gracefully shutdown the entire system."""
     try:
         # Send shutdown message to all agents
