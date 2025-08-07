@@ -1,5 +1,7 @@
 """FastAPI server for LeanVibe Agent Hive 2.0 - Agent management and coordination."""
 
+import asyncio
+import json
 import sys
 import time
 import uuid
@@ -8,7 +10,13 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -30,6 +38,123 @@ except ImportError:
     from core.task_queue import Task, TaskPriority, task_queue
 
 logger = structlog.get_logger()
+
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+        self.connection_metadata: dict[WebSocket, dict] = {}
+
+    async def connect(self, websocket: WebSocket, client_id: str = None):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        self.connection_metadata[websocket] = {
+            "client_id": client_id or str(uuid.uuid4()),
+            "connected_at": time.time(),
+            "subscriptions": set(),
+        }
+        logger.info(
+            "WebSocket client connected",
+            client_id=self.connection_metadata[websocket]["client_id"],
+            total_connections=len(self.active_connections),
+        )
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            client_info = self.connection_metadata.get(websocket, {})
+            self.active_connections.remove(websocket)
+            self.connection_metadata.pop(websocket, None)
+            logger.info(
+                "WebSocket client disconnected",
+                client_id=client_info.get("client_id"),
+                total_connections=len(self.active_connections),
+            )
+
+    async def send_personal_message(self, message: dict, websocket: WebSocket):
+        try:
+            await websocket.send_text(json.dumps(message))
+        except Exception as e:
+            logger.error("Failed to send personal WebSocket message", error=str(e))
+            self.disconnect(websocket)
+
+    async def broadcast(self, message: dict, event_type: str = None):
+        """Broadcast message to all connected clients or filtered by subscriptions."""
+        if not self.active_connections:
+            return
+
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                # Check if client is subscribed to this event type
+                metadata = self.connection_metadata.get(connection, {})
+                subscriptions = metadata.get("subscriptions", set())
+
+                if event_type and subscriptions and event_type not in subscriptions:
+                    continue
+
+                await connection.send_text(json.dumps(message))
+            except Exception as e:
+                logger.error("Failed to broadcast WebSocket message", error=str(e))
+                disconnected.append(connection)
+
+        # Clean up disconnected clients
+        for connection in disconnected:
+            self.disconnect(connection)
+
+    def subscribe_client(self, websocket: WebSocket, event_types: list[str]):
+        """Subscribe client to specific event types."""
+        if websocket in self.connection_metadata:
+            self.connection_metadata[websocket]["subscriptions"].update(event_types)
+
+    def unsubscribe_client(self, websocket: WebSocket, event_types: list[str]):
+        """Unsubscribe client from specific event types."""
+        if websocket in self.connection_metadata:
+            self.connection_metadata[websocket]["subscriptions"].difference_update(
+                event_types
+            )
+
+
+manager = ConnectionManager()
+
+
+# Background task for broadcasting system events
+async def system_event_broadcaster():
+    """Background task that sends periodic system updates via WebSocket."""
+    while True:
+        try:
+            # Broadcast system status every 30 seconds
+            await asyncio.sleep(30)
+
+            if manager.active_connections:
+                # Get system status
+                total_tasks = await task_queue.get_total_tasks()
+                completed_tasks = await task_queue.get_completed_tasks()
+                queue_depth = await task_queue.get_queue_depth()
+
+                from pathlib import Path
+
+                orchestrator = await get_orchestrator(settings.database_url, Path("."))
+                active_agents = await orchestrator.get_active_agent_count()
+
+                status_message = {
+                    "type": "system-status",
+                    "payload": {
+                        "timestamp": time.time(),
+                        "active_agents": active_agents,
+                        "total_tasks": total_tasks,
+                        "completed_tasks": completed_tasks,
+                        "queue_depth": queue_depth,
+                        "health_score": completed_tasks / max(total_tasks, 1),
+                    },
+                }
+
+                await manager.broadcast(status_message, "system-status")
+
+        except Exception as e:
+            logger.error("Error in system event broadcaster", error=str(e))
+            await asyncio.sleep(5)  # Short delay before retrying
+
 
 # FastAPI app
 app = FastAPI(
@@ -123,9 +248,14 @@ class APIResponse(BaseModel):
 
 
 # Startup and shutdown events
+startup_time = time.time()
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup."""
+    global startup_time
+    startup_time = time.time()
     logger.info("Starting LeanVibe Agent Hive API server")
 
     try:
@@ -139,6 +269,9 @@ async def startup_event():
             "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive", Path(".")
         )
         await orch.start()
+
+        # Start background event broadcaster
+        asyncio.create_task(system_event_broadcaster())
 
         logger.info("API server started successfully")
 
@@ -163,6 +296,150 @@ async def shutdown_event():
 
     except Exception as e:
         logger.error("Error during API server shutdown", error=str(e))
+
+
+# WebSocket endpoint for real-time events
+@app.websocket("/api/v1/ws/events")
+async def websocket_endpoint(websocket: WebSocket, client_id: str = None):
+    """WebSocket endpoint for real-time dashboard updates."""
+    await manager.connect(websocket, client_id)
+
+    try:
+        # Send initial connection confirmation
+        await manager.send_personal_message(
+            {
+                "type": "connection-status",
+                "payload": {
+                    "status": "connected",
+                    "client_id": manager.connection_metadata[websocket]["client_id"],
+                    "timestamp": time.time(),
+                },
+            },
+            websocket,
+        )
+
+        # Send initial system status
+        total_tasks = await task_queue.get_total_tasks()
+        completed_tasks = await task_queue.get_completed_tasks()
+        queue_depth = await task_queue.get_queue_depth()
+
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        active_agents = await orchestrator.get_active_agent_count()
+
+        initial_status = {
+            "type": "system-status",
+            "payload": {
+                "timestamp": time.time(),
+                "active_agents": active_agents,
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_tasks,
+                "queue_depth": queue_depth,
+                "health_score": completed_tasks / max(total_tasks, 1),
+                "uptime": time.time() - startup_time,
+            },
+        }
+
+        await manager.send_personal_message(initial_status, websocket)
+
+        # Listen for client messages
+        while True:
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                await handle_websocket_message(websocket, message)
+            except json.JSONDecodeError:
+                await manager.send_personal_message(
+                    {"type": "error", "payload": {"message": "Invalid JSON format"}},
+                    websocket,
+                )
+            except Exception as e:
+                logger.error("Error handling WebSocket message", error=str(e))
+                await manager.send_personal_message(
+                    {
+                        "type": "error",
+                        "payload": {"message": f"Error processing message: {str(e)}"},
+                    },
+                    websocket,
+                )
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error("WebSocket error", error=str(e))
+        manager.disconnect(websocket)
+
+
+async def handle_websocket_message(websocket: WebSocket, message: dict):
+    """Handle incoming WebSocket messages from clients."""
+    msg_type = message.get("type")
+    payload = message.get("payload", {})
+
+    if msg_type == "subscribe":
+        # Subscribe to specific event types
+        event_types = payload.get("event_types", [])
+        manager.subscribe_client(websocket, event_types)
+        await manager.send_personal_message(
+            {
+                "type": "subscription-confirmed",
+                "payload": {"subscribed_to": event_types},
+            },
+            websocket,
+        )
+
+    elif msg_type == "unsubscribe":
+        # Unsubscribe from event types
+        event_types = payload.get("event_types", [])
+        manager.unsubscribe_client(websocket, event_types)
+        await manager.send_personal_message(
+            {
+                "type": "unsubscription-confirmed",
+                "payload": {"unsubscribed_from": event_types},
+            },
+            websocket,
+        )
+
+    elif msg_type == "request-status":
+        # Send current status on demand
+        total_tasks = await task_queue.get_total_tasks()
+        completed_tasks = await task_queue.get_completed_tasks()
+        queue_depth = await task_queue.get_queue_depth()
+
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        active_agents = await orchestrator.get_active_agent_count()
+
+        status = {
+            "type": "system-status",
+            "payload": {
+                "timestamp": time.time(),
+                "active_agents": active_agents,
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_tasks,
+                "queue_depth": queue_depth,
+                "health_score": completed_tasks / max(total_tasks, 1),
+                "uptime": time.time() - startup_time,
+            },
+        }
+        await manager.send_personal_message(status, websocket)
+
+    else:
+        await manager.send_personal_message(
+            {
+                "type": "error",
+                "payload": {"message": f"Unknown message type: {msg_type}"},
+            },
+            websocket,
+        )
+
+
+# Helper function to broadcast events to WebSocket clients
+async def broadcast_event(event_type: str, payload: dict):
+    """Broadcast an event to all WebSocket clients."""
+    message = {"type": event_type, "payload": payload, "timestamp": time.time()}
+    await manager.broadcast(message, event_type)
 
 
 # Health check endpoints
@@ -291,6 +568,21 @@ async def spawn_agent(
         orchestrator = await get_orchestrator(settings.database_url, Path("."))
         session_name = await orchestrator.spawn_agent(agent_type, agent_name)
 
+        # Broadcast agent creation event
+        await broadcast_event(
+            "agent-update",
+            {
+                "action": "spawned",
+                "agent": {
+                    "name": agent_name,
+                    "type": agent_type,
+                    "status": "spawning",
+                    "session_name": session_name,
+                    "timestamp": time.time(),
+                },
+            },
+        )
+
         return APIResponse(
             success=True,
             data={
@@ -316,6 +608,19 @@ async def stop_agent(agent_name: str):
         success = await orchestrator.stop_agent(agent_name)
 
         if success:
+            # Broadcast agent stop event
+            await broadcast_event(
+                "agent-update",
+                {
+                    "action": "stopped",
+                    "agent": {
+                        "name": agent_name,
+                        "status": "stopping",
+                        "timestamp": time.time(),
+                    },
+                },
+            )
+
             return APIResponse(
                 success=True, data={"agent_name": agent_name, "status": "stopping"}
             )
@@ -403,6 +708,23 @@ async def create_task(task_create: TaskCreate):
         )
 
         task_id = await task_queue.add_task(task)
+
+        # Broadcast task creation event
+        await broadcast_event(
+            "task-update",
+            {
+                "action": "created",
+                "task": {
+                    "id": task_id,
+                    "title": task.title,
+                    "type": task.type,
+                    "status": task.status.value,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                    "created_at": task.created_at,
+                },
+            },
+        )
 
         return APIResponse(
             success=True,

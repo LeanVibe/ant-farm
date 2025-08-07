@@ -155,20 +155,73 @@ export class SystemMetrics extends LitElement {
         super.connectedCallback();
         this.loadMetrics();
         this.generateChartData();
-        this.startPolling();
+        this.initializeWebSocketListeners();
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-        }
+        this.removeWebSocketListeners();
     }
 
-    startPolling() {
-        this.pollInterval = setInterval(() => {
-            this.loadMetrics();
-        }, 5000); // Update every 5 seconds
+    initializeWebSocketListeners() {
+        // Listen for real-time system status updates
+        this.handleSystemStatus = (event) => {
+            const systemData = event.detail;
+            
+            // Update metrics from WebSocket data
+            this.metrics = {
+                ...this.metrics,
+                activeAgents: systemData.active_agents || this.metrics.activeAgents,
+                completedTasks: systemData.completed_tasks || this.metrics.completedTasks,
+                queueDepth: systemData.queue_depth || this.metrics.queueDepth,
+                systemHealth: Math.round((systemData.health_score || 0) * 100),
+                uptime: systemData.uptime || this.metrics.uptime
+            };
+            
+            // Update chart data with new point
+            if (this.chartData.length >= 24) {
+                this.chartData.shift(); // Remove oldest data point
+            }
+            
+            this.chartData.push({
+                time: new Date().getHours(),
+                tasks: systemData.completed_tasks || 0,
+                performance: Math.round((systemData.health_score || 0) * 100)
+            });
+            
+            this.requestUpdate();
+        };
+
+        // Listen for metrics updates
+        this.handleMetricsUpdate = (event) => {
+            const metricsData = event.detail;
+            
+            // Process metrics data and update display
+            if (Array.isArray(metricsData)) {
+                // Calculate aggregated metrics from individual metrics
+                const latestMetrics = {};
+                metricsData.forEach(metric => {
+                    if (metric.name === 'cpu_usage') latestMetrics.cpuUsage = metric.value;
+                    if (metric.name === 'memory_usage') latestMetrics.memoryUsage = metric.value;
+                    if (metric.name === 'response_time') latestMetrics.averageResponseTime = metric.value;
+                });
+                
+                this.metrics = { ...this.metrics, ...latestMetrics };
+                this.requestUpdate();
+            }
+        };
+
+        window.addEventListener('hive-status-update', this.handleSystemStatus);
+        window.addEventListener('metrics-update', this.handleMetricsUpdate);
+    }
+
+    removeWebSocketListeners() {
+        if (this.handleSystemStatus) {
+            window.removeEventListener('hive-status-update', this.handleSystemStatus);
+        }
+        if (this.handleMetricsUpdate) {
+            window.removeEventListener('metrics-update', this.handleMetricsUpdate);
+        }
     }
 
     async loadMetrics() {

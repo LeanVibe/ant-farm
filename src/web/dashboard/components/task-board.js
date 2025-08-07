@@ -142,20 +142,62 @@ export class TaskBoard extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this.loadTasks();
-        this.startPolling();
+        this.initializeWebSocketListeners();
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-        }
+        this.removeWebSocketListeners();
     }
 
-    startPolling() {
-        this.pollInterval = setInterval(() => {
-            this.loadTasks();
-        }, 3000); // Update every 3 seconds
+    initializeWebSocketListeners() {
+        // Listen for real-time task updates via WebSocket
+        this.handleTaskUpdate = (event) => {
+            const taskData = event.detail;
+            
+            if (taskData.action === 'created') {
+                // Add new task to list
+                this.tasks = [...this.tasks, taskData.task];
+            } else if (taskData.action === 'updated') {
+                // Update existing task
+                this.tasks = this.tasks.map(task =>
+                    task.id === taskData.task.id
+                        ? { ...task, ...taskData.task }
+                        : task
+                );
+            } else if (taskData.action === 'completed') {
+                // Update task status to completed
+                this.tasks = this.tasks.map(task =>
+                    task.id === taskData.task.id
+                        ? { ...task, status: 'completed', completed_at: taskData.task.completed_at }
+                        : task
+                );
+            } else if (taskData.action === 'failed') {
+                // Update task status to failed
+                this.tasks = this.tasks.map(task =>
+                    task.id === taskData.task.id
+                        ? { ...task, status: 'failed', error: taskData.task.error }
+                        : task
+                );
+            } else if (taskData.action === 'assigned') {
+                // Update task assignment
+                this.tasks = this.tasks.map(task =>
+                    task.id === taskData.task.id
+                        ? { ...task, assigned_to: taskData.task.assigned_to, status: 'in_progress' }
+                        : task
+                );
+            }
+            
+            this.requestUpdate();
+        };
+
+        window.addEventListener('task-status-update', this.handleTaskUpdate);
+    }
+
+    removeWebSocketListeners() {
+        if (this.handleTaskUpdate) {
+            window.removeEventListener('task-status-update', this.handleTaskUpdate);
+        }
     }
 
     async loadTasks() {

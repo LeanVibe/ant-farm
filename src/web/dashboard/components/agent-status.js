@@ -110,20 +110,62 @@ export class AgentStatus extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this.loadAgents();
-        this.startPolling();
+        this.initializeWebSocketListeners();
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-        }
+        this.removeWebSocketListeners();
     }
 
-    startPolling() {
-        this.pollInterval = setInterval(() => {
-            this.loadAgents();
-        }, 5000); // Update every 5 seconds
+    initializeWebSocketListeners() {
+        // Listen for real-time agent updates via WebSocket
+        this.handleAgentUpdate = (event) => {
+            const agentData = event.detail;
+            if (agentData.action === 'spawned') {
+                // Add new agent to list
+                this.agents = [...this.agents, agentData.agent];
+            } else if (agentData.action === 'stopped') {
+                // Remove or update agent status
+                this.agents = this.agents.map(agent => 
+                    agent.name === agentData.agent.name 
+                        ? { ...agent, status: 'stopping' }
+                        : agent
+                );
+            } else if (agentData.action === 'status_update') {
+                // Update existing agent
+                this.agents = this.agents.map(agent =>
+                    agent.name === agentData.agent.name
+                        ? { ...agent, ...agentData.agent }
+                        : agent
+                );
+            }
+            this.requestUpdate();
+        };
+
+        this.handleSystemStatus = (event) => {
+            // System status updates may contain agent count changes
+            const systemData = event.detail;
+            if (systemData.active_agents !== undefined) {
+                // Trigger agents reload if count mismatch
+                const activeCount = this.agents.filter(a => a.status === 'active').length;
+                if (activeCount !== systemData.active_agents) {
+                    this.loadAgents();
+                }
+            }
+        };
+
+        window.addEventListener('agent-status-update', this.handleAgentUpdate);
+        window.addEventListener('hive-status-update', this.handleSystemStatus);
+    }
+
+    removeWebSocketListeners() {
+        if (this.handleAgentUpdate) {
+            window.removeEventListener('agent-status-update', this.handleAgentUpdate);
+        }
+        if (this.handleSystemStatus) {
+            window.removeEventListener('hive-status-update', this.handleSystemStatus);
+        }
     }
 
     async loadAgents() {
