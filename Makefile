@@ -126,8 +126,20 @@ generate: ## Generate system with Claude Code
 	claude "Create the complete LeanVibe Agent Hive 2.0 system. Follow IMPLEMENTATION.md"
 
 .PHONY: test
-test: ## Run tests locally
-	python -m pytest tests/ -v
+test: ## Run tests (quick version without coverage)
+	python -m pytest tests/test_infrastructure.py -v --no-cov
+
+.PHONY: test-unit
+test-unit: ## Run unit tests only
+	python -m pytest tests/unit/ -v
+
+.PHONY: test-integration
+test-integration: ## Run integration tests
+	python -m pytest tests/integration/ -v
+
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage (when implementations exist)
+	python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html --cov-fail-under=50
 
 .PHONY: logs
 logs: ## Tail all log files
