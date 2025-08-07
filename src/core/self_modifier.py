@@ -17,6 +17,7 @@ logger = structlog.get_logger()
 
 class ModificationType(Enum):
     """Types of code modifications."""
+
     BUG_FIX = "bug_fix"
     FEATURE_ADDITION = "feature_addition"
     PERFORMANCE_OPTIMIZATION = "performance_optimization"
@@ -28,6 +29,7 @@ class ModificationType(Enum):
 
 class ModificationStatus(Enum):
     """Status of a modification."""
+
     PROPOSED = "proposed"
     ANALYZING = "analyzing"
     TESTING = "testing"
@@ -40,6 +42,7 @@ class ModificationStatus(Enum):
 @dataclass
 class CodeChange:
     """Represents a single code change."""
+
     file_path: str
     original_content: str
     modified_content: str
@@ -50,6 +53,7 @@ class CodeChange:
 @dataclass
 class ModificationProposal:
     """A proposed code modification."""
+
     id: str
     title: str
     description: str
@@ -66,6 +70,7 @@ class ModificationProposal:
 @dataclass
 class TestResult:
     """Result of running tests."""
+
     command: str
     success: bool
     output: str
@@ -77,6 +82,7 @@ class TestResult:
 @dataclass
 class ValidationResult:
     """Result of validating a modification."""
+
     proposal_id: str
     tests_passed: bool
     performance_impact: dict[str, float]
@@ -90,6 +96,7 @@ class ValidationResult:
 @dataclass
 class ModificationRecord:
     """Record of an applied modification."""
+
     proposal_id: str
     status: ModificationStatus
     git_branch: str
@@ -184,9 +191,11 @@ class GitManager:
             # Delete feature branch
             await self._run_git_command(["branch", "-d", feature_branch])
 
-            logger.info("Feature branch merged",
-                       feature_branch=feature_branch,
-                       commit_hash=commit_hash[:8])
+            logger.info(
+                "Feature branch merged",
+                feature_branch=feature_branch,
+                commit_hash=commit_hash[:8],
+            )
             return commit_hash
 
         except Exception as e:
@@ -218,7 +227,7 @@ class GitManager:
             *cmd,
             cwd=self.repo_path,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
 
         stdout, stderr = await process.communicate()
@@ -227,7 +236,7 @@ class GitManager:
             args=cmd,
             returncode=process.returncode,
             stdout=stdout.decode(),
-            stderr=stderr.decode()
+            stderr=stderr.decode(),
         )
 
         if result.returncode != 0:
@@ -272,7 +281,7 @@ class SandboxTester:
                 cwd=self.workspace_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                timeout=300  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
             )
 
             stdout, stderr = await process.communicate()
@@ -284,13 +293,15 @@ class SandboxTester:
                 output=stdout.decode(),
                 error=stderr.decode(),
                 execution_time=execution_time,
-                exit_code=process.returncode
+                exit_code=process.returncode,
             )
 
-            logger.info("Test command executed",
-                       command=command,
-                       success=result.success,
-                       execution_time=execution_time)
+            logger.info(
+                "Test command executed",
+                command=command,
+                success=result.success,
+                execution_time=execution_time,
+            )
 
             return result
 
@@ -302,7 +313,7 @@ class SandboxTester:
                 output="",
                 error="Test timed out after 5 minutes",
                 execution_time=execution_time,
-                exit_code=-1
+                exit_code=-1,
             )
         except Exception as e:
             execution_time = time.time() - start_time
@@ -312,7 +323,7 @@ class SandboxTester:
                 output="",
                 error=str(e),
                 execution_time=execution_time,
-                exit_code=-1
+                exit_code=-1,
             )
 
     async def run_performance_benchmarks(self) -> dict[str, float]:
@@ -321,8 +332,14 @@ class SandboxTester:
 
         # Example benchmarks (would be customized per project)
         benchmark_commands = [
-            ("startup_time", "python -c \"import time; start=time.time(); import src; print(time.time()-start)\""),
-            ("memory_usage", "python -c \"import psutil; print(psutil.Process().memory_info().rss / 1024 / 1024)\""),
+            (
+                "startup_time",
+                'python -c "import time; start=time.time(); import src; print(time.time()-start)"',
+            ),
+            (
+                "memory_usage",
+                'python -c "import psutil; print(psutil.Process().memory_info().rss / 1024 / 1024)"',
+            ),
         ]
 
         for name, command in benchmark_commands:
@@ -336,9 +353,9 @@ class SandboxTester:
                     except ValueError:
                         benchmarks[name] = 0.0
                 else:
-                    benchmarks[name] = float('inf')  # Indicates failure
+                    benchmarks[name] = float("inf")  # Indicates failure
             except Exception:
-                benchmarks[name] = float('inf')
+                benchmarks[name] = float("inf")
 
         return benchmarks
 
@@ -380,27 +397,37 @@ class SecurityScanner:
             content = change.modified_content.lower()
 
             # Check for hardcoded secrets
-            if any(keyword in content for keyword in [
-                'password', 'secret', 'key', 'token', 'api_key'
-            ]):
-                if any(bad_pattern in content for bad_pattern in [
-                    '= "', '= \'', 'password="', 'secret="'
-                ]):
+            if any(
+                keyword in content
+                for keyword in ["password", "secret", "key", "token", "api_key"]
+            ):
+                if any(
+                    bad_pattern in content
+                    for bad_pattern in ['= "', "= '", 'password="', 'secret="']
+                ):
                     issues.append(f"Potential hardcoded secret in {change.file_path}")
 
             # Check for SQL injection vulnerabilities
-            if 'sql' in content and any(pattern in content for pattern in [
-                'execute(', 'query(', '.format(', '% '
-            ]):
-                issues.append(f"Potential SQL injection vulnerability in {change.file_path}")
+            if "sql" in content and any(
+                pattern in content
+                for pattern in ["execute(", "query(", ".format(", "% "]
+            ):
+                issues.append(
+                    f"Potential SQL injection vulnerability in {change.file_path}"
+                )
 
             # Check for command injection
-            if any(func in content for func in ['os.system', 'subprocess.', 'eval(', 'exec(']):
+            if any(
+                func in content
+                for func in ["os.system", "subprocess.", "eval(", "exec("]
+            ):
                 issues.append(f"Potential command injection in {change.file_path}")
 
             # Check for insecure random usage
-            if 'random.' in content and 'import random' in content:
-                issues.append(f"Insecure random usage in {change.file_path} (use secrets module)")
+            if "random." in content and "import random" in content:
+                issues.append(
+                    f"Insecure random usage in {change.file_path} (use secrets module)"
+                )
 
         return issues
 
@@ -425,12 +452,14 @@ class SelfModifier:
 
         logger.info("Self-modifier initialized", workspace_path=str(workspace_path))
 
-    async def propose_modification(self,
-                                 title: str,
-                                 description: str,
-                                 modification_type: ModificationType,
-                                 changes: list[CodeChange],
-                                 created_by: str) -> str:
+    async def propose_modification(
+        self,
+        title: str,
+        description: str,
+        modification_type: ModificationType,
+        changes: list[CodeChange],
+        created_by: str,
+    ) -> str:
         """Propose a code modification."""
 
         # Check rate limits
@@ -460,16 +489,18 @@ class SelfModifier:
             risk_level=risk_level,
             estimated_impact=self._estimate_impact(changes),
             created_at=time.time(),
-            created_by=created_by
+            created_by=created_by,
         )
 
         self.active_proposals[proposal_id] = proposal
 
-        logger.info("Modification proposed",
-                   proposal_id=proposal_id,
-                   title=title,
-                   risk_level=risk_level,
-                   changes_count=len(changes))
+        logger.info(
+            "Modification proposed",
+            proposal_id=proposal_id,
+            title=title,
+            risk_level=risk_level,
+            changes_count=len(changes),
+        )
 
         return proposal_id
 
@@ -484,7 +515,7 @@ class SelfModifier:
         logger.info("Starting modification validation", proposal_id=proposal_id)
 
         # Create backup
-        backup_branch = await self.git_manager.create_backup_branch(f"backup-{proposal_id}")
+        await self.git_manager.create_backup_branch(f"backup-{proposal_id}")
         backup_commit = await self.git_manager.get_current_commit()
 
         try:
@@ -506,7 +537,9 @@ class SelfModifier:
             performance_impact = await self.sandbox_tester.run_performance_benchmarks()
 
             # Security scan
-            security_issues = await self.security_scanner.scan_for_security_issues(proposal.changes)
+            security_issues = await self.security_scanner.scan_for_security_issues(
+                proposal.changes
+            )
 
             # Code quality check
             code_quality_score = await self.sandbox_tester.check_code_quality()
@@ -514,19 +547,23 @@ class SelfModifier:
             # Overall validation
             issues_found = []
             if not tests_passed:
-                issues_found.extend([f"Test failed: {r.command}" for r in test_results if not r.success])
+                issues_found.extend(
+                    [f"Test failed: {r.command}" for r in test_results if not r.success]
+                )
 
             if security_issues:
                 issues_found.extend(security_issues)
 
             if code_quality_score < 0.7:
-                issues_found.append(f"Code quality below threshold: {code_quality_score:.2f}")
+                issues_found.append(
+                    f"Code quality below threshold: {code_quality_score:.2f}"
+                )
 
             overall_success = (
-                tests_passed and
-                len(security_issues) == 0 and
-                code_quality_score >= 0.7 and
-                self._check_performance_impact(performance_impact)
+                tests_passed
+                and len(security_issues) == 0
+                and code_quality_score >= 0.7
+                and self._check_performance_impact(performance_impact)
             )
 
             validation_result = ValidationResult(
@@ -537,26 +574,30 @@ class SelfModifier:
                 code_quality_score=code_quality_score,
                 overall_success=overall_success,
                 issues_found=issues_found,
-                recommendations=self._generate_recommendations(proposal, issues_found)
+                recommendations=self._generate_recommendations(proposal, issues_found),
             )
 
             # Record validation
             record = ModificationRecord(
                 proposal_id=proposal_id,
-                status=ModificationStatus.VALIDATED if overall_success else ModificationStatus.FAILED,
+                status=ModificationStatus.VALIDATED
+                if overall_success
+                else ModificationStatus.FAILED,
                 git_branch=feature_branch,
                 git_commit_hash=commit_hash,
                 backup_commit_hash=backup_commit,
                 applied_at=time.time(),
-                validation_result=validation_result
+                validation_result=validation_result,
             )
 
             self.modification_records[proposal_id] = record
 
-            logger.info("Modification validation completed",
-                       proposal_id=proposal_id,
-                       overall_success=overall_success,
-                       issues_count=len(issues_found))
+            logger.info(
+                "Modification validation completed",
+                proposal_id=proposal_id,
+                overall_success=overall_success,
+                issues_count=len(issues_found),
+            )
 
             return validation_result
 
@@ -575,7 +616,7 @@ class SelfModifier:
                 code_quality_score=0.0,
                 overall_success=False,
                 issues_found=[f"Validation exception: {str(e)}"],
-                recommendations=["Fix validation errors before retrying"]
+                recommendations=["Fix validation errors before retrying"],
             )
 
             return validation_result
@@ -609,15 +650,18 @@ class SelfModifier:
             if proposal_id in self.active_proposals:
                 del self.active_proposals[proposal_id]
 
-            logger.info("Modification applied successfully",
-                       proposal_id=proposal_id,
-                       commit_hash=merge_commit[:8])
+            logger.info(
+                "Modification applied successfully",
+                proposal_id=proposal_id,
+                commit_hash=merge_commit[:8],
+            )
 
             return True
 
         except Exception as e:
-            logger.error("Failed to apply modification",
-                        proposal_id=proposal_id, error=str(e))
+            logger.error(
+                "Failed to apply modification", proposal_id=proposal_id, error=str(e)
+            )
 
             # Mark as failed
             record.status = ModificationStatus.FAILED
@@ -644,15 +688,16 @@ class SelfModifier:
             record.rollback_reason = reason
             record.rollback_at = time.time()
 
-            logger.info("Modification rolled back",
-                       proposal_id=proposal_id,
-                       reason=reason)
+            logger.info(
+                "Modification rolled back", proposal_id=proposal_id, reason=reason
+            )
 
             return True
 
         except Exception as e:
-            logger.error("Failed to rollback modification",
-                        proposal_id=proposal_id, error=str(e))
+            logger.error(
+                "Failed to rollback modification", proposal_id=proposal_id, error=str(e)
+            )
             return False
 
     async def _apply_changes(self, changes: list[CodeChange]) -> None:
@@ -676,30 +721,35 @@ class SelfModifier:
             "python -c 'import src; print(\"Import successful\")'",
         ]
 
-    def _get_validation_criteria(self, modification_type: ModificationType) -> list[str]:
+    def _get_validation_criteria(
+        self, modification_type: ModificationType
+    ) -> list[str]:
         """Get validation criteria based on modification type."""
         base_criteria = [
             "All existing tests pass",
             "No security vulnerabilities introduced",
-            "Code quality standards maintained"
+            "Code quality standards maintained",
         ]
 
         if modification_type == ModificationType.PERFORMANCE_OPTIMIZATION:
             base_criteria.append("Performance improves or maintains current levels")
 
         elif modification_type == ModificationType.FEATURE_ADDITION:
-            base_criteria.extend([
-                "New functionality works as expected",
-                "No breaking changes to existing functionality"
-            ])
+            base_criteria.extend(
+                [
+                    "New functionality works as expected",
+                    "No breaking changes to existing functionality",
+                ]
+            )
 
         elif modification_type == ModificationType.BUG_FIX:
             base_criteria.append("Bug is actually fixed")
 
         return base_criteria
 
-    def _assess_risk_level(self, changes: list[CodeChange],
-                         modification_type: ModificationType) -> str:
+    def _assess_risk_level(
+        self, changes: list[CodeChange], modification_type: ModificationType
+    ) -> str:
         """Assess the risk level of a modification."""
 
         # High risk modifications
@@ -707,16 +757,16 @@ class SelfModifier:
             return "high"
 
         # Check for high-risk file patterns
-        high_risk_patterns = [
-            "core/", "models.py", "config.py", "__init__.py"
-        ]
+        high_risk_patterns = ["core/", "models.py", "config.py", "__init__.py"]
 
         for change in changes:
             if any(pattern in change.file_path for pattern in high_risk_patterns):
                 return "high"
 
         # Check change size
-        total_lines_changed = sum(len(change.modified_content.split('\n')) for change in changes)
+        total_lines_changed = sum(
+            len(change.modified_content.split("\n")) for change in changes
+        )
 
         if total_lines_changed > 100:
             return "medium"
@@ -728,7 +778,9 @@ class SelfModifier:
     def _estimate_impact(self, changes: list[CodeChange]) -> str:
         """Estimate the impact of changes."""
         total_files = len(changes)
-        total_lines = sum(len(change.modified_content.split('\n')) for change in changes)
+        total_lines = sum(
+            len(change.modified_content.split("\n")) for change in changes
+        )
 
         if total_files > 5 or total_lines > 200:
             return "high"
@@ -740,10 +792,11 @@ class SelfModifier:
     def _check_performance_impact(self, performance_impact: dict[str, float]) -> bool:
         """Check if performance impact is acceptable."""
         # Simple check - no performance metric should be infinite (indicating failure)
-        return all(value != float('inf') for value in performance_impact.values())
+        return all(value != float("inf") for value in performance_impact.values())
 
-    def _generate_recommendations(self, proposal: ModificationProposal,
-                                issues: list[str]) -> list[str]:
+    def _generate_recommendations(
+        self, proposal: ModificationProposal, issues: list[str]
+    ) -> list[str]:
         """Generate recommendations based on validation results."""
         recommendations = []
 
@@ -751,7 +804,9 @@ class SelfModifier:
             recommendations.append("Address all identified issues before applying")
 
         if proposal.risk_level == "high":
-            recommendations.append("Consider additional review for high-risk modification")
+            recommendations.append(
+                "Consider additional review for high-risk modification"
+            )
 
         if len(proposal.changes) > 3:
             recommendations.append("Consider breaking into smaller modifications")
@@ -764,7 +819,8 @@ class SelfModifier:
 
         # Clean old entries
         self.modification_history = [
-            t for t in self.modification_history
+            t
+            for t in self.modification_history
             if current_time - t < 3600  # Keep last hour
         ]
 
@@ -774,8 +830,10 @@ class SelfModifier:
 
         # Check concurrent modifications
         active_count = sum(
-            1 for record in self.modification_records.values()
-            if record.status in [ModificationStatus.ANALYZING, ModificationStatus.TESTING]
+            1
+            for record in self.modification_records.values()
+            if record.status
+            in [ModificationStatus.ANALYZING, ModificationStatus.TESTING]
         )
 
         return active_count < self.max_concurrent_modifications
@@ -790,19 +848,22 @@ class SelfModifier:
                 "success_rate": 0.0,
                 "by_status": {},
                 "by_type": {},
-                "average_validation_time": 0.0
+                "average_validation_time": 0.0,
             }
 
         status_counts = {}
         type_counts = {}
-        validation_times = []
 
         for record in self.modification_records.values():
-            status_counts[record.status.value] = status_counts.get(record.status.value, 0) + 1
+            status_counts[record.status.value] = (
+                status_counts.get(record.status.value, 0) + 1
+            )
 
             if record.proposal_id in self.active_proposals:
                 proposal = self.active_proposals[record.proposal_id]
-                type_counts[proposal.modification_type.value] = type_counts.get(proposal.modification_type.value, 0) + 1
+                type_counts[proposal.modification_type.value] = (
+                    type_counts.get(proposal.modification_type.value, 0) + 1
+                )
 
         applied_count = status_counts.get(ModificationStatus.APPLIED.value, 0)
         success_rate = applied_count / total_proposals
@@ -812,8 +873,9 @@ class SelfModifier:
             "success_rate": success_rate,
             "by_status": status_counts,
             "by_type": type_counts,
-            "rate_limit_remaining": self.max_modifications_per_hour - len(self.modification_history),
-            "active_proposals": len(self.active_proposals)
+            "rate_limit_remaining": self.max_modifications_per_hour
+            - len(self.modification_history),
+            "active_proposals": len(self.active_proposals),
         }
 
 

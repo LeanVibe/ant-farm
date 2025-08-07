@@ -16,10 +16,9 @@ from pydantic import BaseModel, Field
 try:
     from ..core.config import settings
     from ..core.message_broker import MessageType, message_broker
-    from ..core.models import Agent as AgentModel
     from ..core.models import SystemMetric, get_database_manager
     from ..core.orchestrator import get_orchestrator
-    from ..core.task_queue import Task, TaskPriority, TaskStatus, task_queue
+    from ..core.task_queue import Task, TaskPriority, task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent

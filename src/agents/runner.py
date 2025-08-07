@@ -11,7 +11,6 @@ import structlog
 
 # Handle both module and direct execution imports
 try:
-    from ..core.config import settings
     from ..core.task_queue import task_queue
     from .base_agent import BaseAgent
     from .meta_agent import MetaAgent

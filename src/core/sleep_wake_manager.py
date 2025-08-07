@@ -560,7 +560,7 @@ class SleepWakeManager:
 
             try:
                 # Clean up old records (simplified)
-                cutoff_time = time.time() - (30 * 24 * 3600)  # 30 days
+                # cutoff_time = time.time() - (30 * 24 * 3600)  # 30 days
 
                 # Would clean up old contexts, metrics, etc.
                 logger.info("Database maintenance completed")

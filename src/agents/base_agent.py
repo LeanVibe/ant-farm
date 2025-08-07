@@ -25,7 +25,7 @@ try:
     )
     from ..core.models import Agent as AgentModel
     from ..core.models import SystemMetric, get_database_manager
-    from ..core.task_queue import Task, TaskStatus, task_queue
+    from ..core.task_queue import Task, task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent

@@ -16,6 +16,7 @@ logger = structlog.get_logger()
 
 class EmbeddingProvider(Enum):
     """Supported embedding providers."""
+
     OPENAI = "openai"
     SENTENCE_TRANSFORMERS = "sentence_transformers"
     OLLAMA = "ollama"
@@ -23,15 +24,17 @@ class EmbeddingProvider(Enum):
 
 class MemoryLayer(Enum):
     """Hierarchical memory layers."""
-    WORKING = "working"      # Current session, active tasks
-    SHORT_TERM = "short_term"    # Recent activities, last 24 hours
+
+    WORKING = "working"  # Current session, active tasks
+    SHORT_TERM = "short_term"  # Recent activities, last 24 hours
     MEDIUM_TERM = "medium_term"  # Important events, last week
-    LONG_TERM = "long_term"      # Core knowledge, permanent storage
-    SEMANTIC = "semantic"        # Distilled patterns and rules
+    LONG_TERM = "long_term"  # Core knowledge, permanent storage
+    SEMANTIC = "semantic"  # Distilled patterns and rules
 
 
 class ContextType(Enum):
     """Types of context for better organization."""
+
     TASK = "task"
     CONVERSATION = "conversation"
     CODE = "code"
@@ -46,6 +49,7 @@ class ContextType(Enum):
 @dataclass
 class ContextSearchResult:
     """Result from context search."""
+
     context: Context
     similarity_score: float
     relevance_score: float
@@ -56,6 +60,7 @@ class ContextSearchResult:
 @dataclass
 class MemoryStats:
     """Comprehensive memory statistics."""
+
     total_contexts: int
     contexts_by_importance: dict[str, int]
     contexts_by_category: dict[str, int]
@@ -71,6 +76,7 @@ class MemoryStats:
 @dataclass
 class ConsolidationRule:
     """Rules for memory consolidation."""
+
     source_layer: MemoryLayer
     target_layer: MemoryLayer
     age_threshold_hours: float
@@ -82,6 +88,7 @@ class ConsolidationRule:
 @dataclass
 class KnowledgePattern:
     """Discovered knowledge pattern."""
+
     id: str
     pattern_type: str
     confidence_score: float
@@ -94,7 +101,9 @@ class KnowledgePattern:
 class EmbeddingService:
     """Service for generating text embeddings."""
 
-    def __init__(self, provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMERS):
+    def __init__(
+        self, provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMERS
+    ):
         self.provider = provider
         self.model = None
         self.client = None
@@ -105,10 +114,13 @@ class EmbeddingService:
         if self.provider == EmbeddingProvider.OPENAI:
             try:
                 import openai
+
                 self.client = openai.OpenAI()
                 logger.info("OpenAI embedding service initialized")
             except ImportError:
-                logger.warning("OpenAI not available, falling back to sentence-transformers")
+                logger.warning(
+                    "OpenAI not available, falling back to sentence-transformers"
+                )
                 self.provider = EmbeddingProvider.SENTENCE_TRANSFORMERS
                 self._initialize_sentence_transformers()
 
@@ -122,7 +134,8 @@ class EmbeddingService:
         """Initialize sentence transformers (local)."""
         try:
             from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+
+            self.model = SentenceTransformer("all-MiniLM-L6-v2")
             self.provider = EmbeddingProvider.SENTENCE_TRANSFORMERS
             logger.info("Sentence transformers embedding service initialized")
         except ImportError:
@@ -133,6 +146,7 @@ class EmbeddingService:
         """Initialize Ollama (local)."""
         try:
             import requests
+
             # Test Ollama connection
             response = requests.get("http://localhost:11434/api/version", timeout=5)
             if response.status_code == 200:
@@ -141,7 +155,9 @@ class EmbeddingService:
             else:
                 raise ConnectionError("Ollama not available")
         except Exception:
-            logger.warning("Ollama not available, falling back to sentence-transformers")
+            logger.warning(
+                "Ollama not available, falling back to sentence-transformers"
+            )
             self._initialize_sentence_transformers()
 
     async def generate_embedding(self, text: str) -> list[float]:
@@ -160,8 +176,7 @@ class EmbeddingService:
         try:
             response = await asyncio.to_thread(
                 lambda: self.client.embeddings.create(
-                    model="text-embedding-ada-002",
-                    input=text
+                    model="text-embedding-ada-002", input=text
                 )
             )
             return response.data[0].embedding
@@ -172,22 +187,23 @@ class EmbeddingService:
     async def _generate_sentence_transformers_embedding(self, text: str) -> list[float]:
         """Generate embedding using sentence transformers."""
         try:
-            embedding = await asyncio.to_thread(
-                lambda: self.model.encode([text])
-            )
+            embedding = await asyncio.to_thread(lambda: self.model.encode([text]))
             return embedding[0].tolist()
         except Exception as e:
-            logger.error("Sentence transformers embedding generation failed", error=str(e))
+            logger.error(
+                "Sentence transformers embedding generation failed", error=str(e)
+            )
             raise
 
     async def _generate_ollama_embedding(self, text: str) -> list[float]:
         """Generate embedding using Ollama."""
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     "http://localhost:11434/api/embeddings",
-                    json={"model": "nomic-embed-text", "prompt": text}
+                    json={"model": "nomic-embed-text", "prompt": text},
                 ) as response:
                     result = await response.json()
                     return result["embedding"]
@@ -201,7 +217,7 @@ class ContextCompressor:
 
     def __init__(self):
         self.compression_ratio = 0.3  # Target compression ratio
-        self.max_chunk_size = 2000    # Max characters per chunk
+        self.max_chunk_size = 2000  # Max characters per chunk
 
     async def compress_contexts(self, contexts: list[Context]) -> Context:
         """Compress multiple contexts into a single summary context."""
@@ -236,9 +252,9 @@ class ContextCompressor:
             metadata={
                 **combined_metadata,
                 "compressed_from": [str(ctx.id) for ctx in contexts],
-                "compression_ratio": len(summary_content) / len(combined_content)
+                "compression_ratio": len(summary_content) / len(combined_content),
             },
-            source="context_compressor"
+            source="context_compressor",
         )
 
         return compressed_context
@@ -246,7 +262,7 @@ class ContextCompressor:
     async def _generate_summary(self, content: str) -> str:
         """Generate summary of content."""
         # Simple extraction for now - in production would use LLM
-        lines = content.split('\n')
+        lines = content.split("\n")
         important_lines = []
 
         # Extract key information
@@ -256,18 +272,28 @@ class ContextCompressor:
                 continue
 
             # Simple heuristics for important content
-            if any(keyword in line.lower() for keyword in [
-                'error', 'fail', 'success', 'complete', 'important',
-                'critical', 'key', 'result', 'conclusion'
-            ]):
+            if any(
+                keyword in line.lower()
+                for keyword in [
+                    "error",
+                    "fail",
+                    "success",
+                    "complete",
+                    "important",
+                    "critical",
+                    "key",
+                    "result",
+                    "conclusion",
+                ]
+            ):
                 important_lines.append(line)
 
         # If we have extracted lines, use them
         if important_lines:
-            summary = '\n'.join(important_lines[:20])  # Max 20 lines
+            summary = "\n".join(important_lines[:20])  # Max 20 lines
         else:
             # Fall back to first few lines
-            summary = '\n'.join(lines[:10])
+            summary = "\n".join(lines[:10])
 
         # Ensure reasonable length
         if len(summary) > 1000:
@@ -282,18 +308,20 @@ class SemanticSearch:
     def __init__(self, embedding_service: EmbeddingService):
         self.embedding_service = embedding_service
 
-    async def search_contexts(self,
-                            query: str,
-                            agent_id: str,
-                            db_session: Session,
-                            limit: int = 10,
-                            min_similarity: float = 0.3,
-                            category_filter: str | None = None,
-                            time_filter_hours: int | None = None) -> list[ContextSearchResult]:
+    async def search_contexts(
+        self,
+        query: str,
+        agent_id: str,
+        db_session: Session,
+        limit: int = 10,
+        min_similarity: float = 0.3,
+        category_filter: str | None = None,
+        time_filter_hours: int | None = None,
+    ) -> list[ContextSearchResult]:
         """Search for contexts using semantic similarity."""
 
         # Generate query embedding
-        query_embedding = await self.embedding_service.generate_embedding(query)
+        await self.embedding_service.generate_embedding(query)
 
         # Get candidate contexts
         query_obj = db_session.query(Context).filter(Context.agent_id == agent_id)
@@ -316,11 +344,14 @@ class SemanticSearch:
             if similarity >= min_similarity:
                 relevance = self._calculate_relevance(context, similarity)
 
-                results.append(ContextSearchResult(
-                    context=context,
-                    similarity_score=similarity,
-                    relevance_score=relevance
-                ))
+                results.append(
+                    ContextSearchResult(
+                        context=context,
+                        similarity_score=similarity,
+                        relevance_score=relevance,
+                        layer=MemoryLayer.WORKING,  # Default layer for search results
+                    )
+                )
 
         # Sort by relevance score
         results.sort(key=lambda r: r.relevance_score, reverse=True)
@@ -343,12 +374,14 @@ class SemanticSearch:
     def _calculate_relevance(self, context: Context, similarity: float) -> float:
         """Calculate relevance score combining similarity and importance."""
         # Combine similarity with importance score and recency
-        age_penalty = min(1.0, (time.time() - context.created_at.timestamp()) / (7 * 24 * 3600))  # Week decay
+        age_penalty = min(
+            1.0, (time.time() - context.created_at.timestamp()) / (7 * 24 * 3600)
+        )  # Week decay
 
         relevance = (
-            similarity * 0.6 +                    # 60% similarity
-            context.importance_score * 0.3 +      # 30% importance
-            (1.0 - age_penalty) * 0.1            # 10% recency
+            similarity * 0.6  # 60% similarity
+            + context.importance_score * 0.3  # 30% importance
+            + (1.0 - age_penalty) * 0.1  # 10% recency
         )
 
         return min(1.0, relevance)
@@ -361,7 +394,9 @@ class MemoryConsolidator:
         self.context_engine = context_engine
         self.compressor = ContextCompressor()
 
-    async def consolidate_memory(self, agent_id: str, db_session: Session) -> dict[str, Any]:
+    async def consolidate_memory(
+        self, agent_id: str, db_session: Session
+    ) -> dict[str, Any]:
         """Consolidate memory for an agent."""
         logger.info("Starting memory consolidation", agent_id=agent_id)
 
@@ -370,14 +405,16 @@ class MemoryConsolidator:
             "contexts_compressed": 0,
             "contexts_archived": 0,
             "contexts_deleted": 0,
-            "processing_time_seconds": 0
+            "processing_time_seconds": 0,
         }
 
         start_time = time.time()
 
         try:
             # Get all contexts for agent
-            contexts = db_session.query(Context).filter(Context.agent_id == agent_id).all()
+            contexts = (
+                db_session.query(Context).filter(Context.agent_id == agent_id).all()
+            )
             consolidation_stats["contexts_processed"] = len(contexts)
 
             # Group contexts by session and category
@@ -404,7 +441,9 @@ class MemoryConsolidator:
                         consolidation_stats["contexts_compressed"] += 1
 
             # Clean up expired contexts
-            await self._cleanup_expired_contexts(agent_id, db_session, consolidation_stats)
+            await self._cleanup_expired_contexts(
+                agent_id, db_session, consolidation_stats
+            )
 
             # Update importance scores based on usage
             await self._update_importance_scores(agent_id, db_session)
@@ -413,9 +452,11 @@ class MemoryConsolidator:
 
             consolidation_stats["processing_time_seconds"] = time.time() - start_time
 
-            logger.info("Memory consolidation completed",
-                       agent_id=agent_id,
-                       stats=consolidation_stats)
+            logger.info(
+                "Memory consolidation completed",
+                agent_id=agent_id,
+                stats=consolidation_stats,
+            )
 
             return consolidation_stats
 
@@ -440,15 +481,21 @@ class MemoryConsolidator:
 
         return groups
 
-    async def _cleanup_expired_contexts(self, agent_id: str, db_session: Session, stats: dict[str, Any]):
+    async def _cleanup_expired_contexts(
+        self, agent_id: str, db_session: Session, stats: dict[str, Any]
+    ):
         """Clean up expired contexts."""
         current_time = time.time()
 
-        expired_contexts = db_session.query(Context).filter(
-            Context.agent_id == agent_id,
-            Context.expires_at.isnot(None),
-            Context.expires_at < current_time
-        ).all()
+        expired_contexts = (
+            db_session.query(Context)
+            .filter(
+                Context.agent_id == agent_id,
+                Context.expires_at.isnot(None),
+                Context.expires_at < current_time,
+            )
+            .all()
+        )
 
         for context in expired_contexts:
             db_session.delete(context)
@@ -473,7 +520,11 @@ class MemoryConsolidator:
 class ContextEngine:
     """Main context engine for semantic memory management."""
 
-    def __init__(self, database_url: str, embedding_provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMERS):
+    def __init__(
+        self,
+        database_url: str,
+        embedding_provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMERS,
+    ):
         self.db_manager = get_database_manager(database_url)
         self.embedding_service = EmbeddingService(embedding_provider)
         self.semantic_search = SemanticSearch(self.embedding_service)
@@ -485,15 +536,17 @@ class ContextEngine:
         self.db_manager.create_tables()
         logger.info("Context engine initialized")
 
-    async def store_context(self,
-                           agent_id: str,
-                           content: str,
-                           session_id: str | None = None,
-                           importance_score: float = 0.5,
-                           category: str = "general",
-                           topic: str = None,
-                           metadata: dict[str, Any] = None,
-                           content_type: str = "text") -> str:
+    async def store_context(
+        self,
+        agent_id: str,
+        content: str,
+        session_id: str | None = None,
+        importance_score: float = 0.5,
+        category: str = "general",
+        topic: str = None,
+        metadata: dict[str, Any] = None,
+        content_type: str = "text",
+    ) -> str:
         """Store a new context."""
 
         db_session = self.db_manager.get_session()
@@ -512,7 +565,7 @@ class ContextEngine:
                 topic=topic or self._extract_topic(content),
                 metadata=metadata or {},
                 embedding_model=embedding_model,
-                source="agent_input"
+                source="agent_input",
             )
 
             db_session.add(context)
@@ -520,10 +573,12 @@ class ContextEngine:
 
             context_id = str(context.id)
 
-            logger.info("Context stored",
-                       context_id=context_id,
-                       agent_id=agent_id,
-                       category=category)
+            logger.info(
+                "Context stored",
+                context_id=context_id,
+                agent_id=agent_id,
+                category=category,
+            )
 
             return context_id
 
@@ -534,12 +589,14 @@ class ContextEngine:
         finally:
             db_session.close()
 
-    async def retrieve_context(self,
-                              query: str,
-                              agent_id: str,
-                              limit: int = 10,
-                              category_filter: str = None,
-                              min_importance: float = 0.0) -> list[ContextSearchResult]:
+    async def retrieve_context(
+        self,
+        query: str,
+        agent_id: str,
+        limit: int = 10,
+        category_filter: str = None,
+        min_importance: float = 0.0,
+    ) -> list[ContextSearchResult]:
         """Retrieve relevant contexts for a query."""
 
         db_session = self.db_manager.get_session()
@@ -549,13 +606,12 @@ class ContextEngine:
                 agent_id=agent_id,
                 db_session=db_session,
                 limit=limit,
-                category_filter=category_filter
+                category_filter=category_filter,
             )
 
             # Filter by minimum importance
             filtered_results = [
-                r for r in results
-                if r.context.importance_score >= min_importance
+                r for r in results if r.context.importance_score >= min_importance
             ]
 
             # Update access tracking
@@ -565,10 +621,12 @@ class ContextEngine:
 
             db_session.commit()
 
-            logger.info("Context retrieved",
-                       agent_id=agent_id,
-                       query=query[:50],
-                       results_count=len(filtered_results))
+            logger.info(
+                "Context retrieved",
+                agent_id=agent_id,
+                query=query[:50],
+                results_count=len(filtered_results),
+            )
 
             return filtered_results
 
@@ -579,7 +637,9 @@ class ContextEngine:
         finally:
             db_session.close()
 
-    async def update_context_importance(self, context_id: str, new_importance: float) -> bool:
+    async def update_context_importance(
+        self, context_id: str, new_importance: float
+    ) -> bool:
         """Update the importance score of a context."""
 
         db_session = self.db_manager.get_session()
@@ -589,17 +649,21 @@ class ContextEngine:
                 context.importance_score = max(0.0, min(1.0, new_importance))
                 db_session.commit()
 
-                logger.info("Context importance updated",
-                           context_id=context_id,
-                           new_importance=new_importance)
+                logger.info(
+                    "Context importance updated",
+                    context_id=context_id,
+                    new_importance=new_importance,
+                )
                 return True
             return False
 
         except Exception as e:
             db_session.rollback()
-            logger.error("Failed to update context importance",
-                        context_id=context_id,
-                        error=str(e))
+            logger.error(
+                "Failed to update context importance",
+                context_id=context_id,
+                error=str(e),
+            )
             return False
         finally:
             db_session.close()
@@ -609,7 +673,9 @@ class ContextEngine:
 
         db_session = self.db_manager.get_session()
         try:
-            original_context = db_session.query(Context).filter(Context.id == context_id).first()
+            original_context = (
+                db_session.query(Context).filter(Context.id == context_id).first()
+            )
             if not original_context:
                 return False
 
@@ -619,31 +685,30 @@ class ContextEngine:
                 session_id=original_context.session_id,
                 content=original_context.content,
                 content_type=original_context.content_type,
-                importance_score=original_context.importance_score * 0.8,  # Slightly lower
+                importance_score=original_context.importance_score
+                * 0.8,  # Slightly lower
                 category=original_context.category,
                 topic=original_context.topic,
                 metadata={
                     **(original_context.metadata or {}),
                     "shared_from": str(original_context.id),
-                    "original_agent": str(original_context.agent_id)
+                    "original_agent": str(original_context.agent_id),
                 },
-                source="shared_context"
+                source="shared_context",
             )
 
             db_session.add(shared_context)
             db_session.commit()
 
-            logger.info("Context shared",
-                       context_id=context_id,
-                       target_agent_id=target_agent_id)
+            logger.info(
+                "Context shared", context_id=context_id, target_agent_id=target_agent_id
+            )
 
             return True
 
         except Exception as e:
             db_session.rollback()
-            logger.error("Failed to share context",
-                        context_id=context_id,
-                        error=str(e))
+            logger.error("Failed to share context", context_id=context_id, error=str(e))
             return False
         finally:
             db_session.close()
@@ -653,7 +718,9 @@ class ContextEngine:
 
         db_session = self.db_manager.get_session()
         try:
-            contexts = db_session.query(Context).filter(Context.agent_id == agent_id).all()
+            contexts = (
+                db_session.query(Context).filter(Context.agent_id == agent_id).all()
+            )
 
             if not contexts:
                 return MemoryStats(
@@ -662,7 +729,7 @@ class ContextEngine:
                     contexts_by_category={},
                     storage_size_mb=0.0,
                     oldest_context_age_days=0.0,
-                    most_accessed_context_id=""
+                    most_accessed_context_id="",
                 )
 
             # Calculate statistics
@@ -685,7 +752,7 @@ class ContextEngine:
                 category_counts[category] = category_counts.get(category, 0) + 1
 
                 # Size calculation
-                total_size += len(context.content.encode('utf-8'))
+                total_size += len(context.content.encode("utf-8"))
 
                 # Most accessed
                 if context.access_count > most_accessed.access_count:
@@ -693,7 +760,9 @@ class ContextEngine:
 
             # Calculate oldest context age
             oldest_context = min(contexts, key=lambda c: c.created_at)
-            oldest_age_days = (time.time() - oldest_context.created_at.timestamp()) / (24 * 3600)
+            oldest_age_days = (time.time() - oldest_context.created_at.timestamp()) / (
+                24 * 3600
+            )
 
             return MemoryStats(
                 total_contexts=len(contexts),
@@ -701,7 +770,7 @@ class ContextEngine:
                 contexts_by_category=category_counts,
                 storage_size_mb=total_size / (1024 * 1024),
                 oldest_context_age_days=oldest_age_days,
-                most_accessed_context_id=str(most_accessed.id)
+                most_accessed_context_id=str(most_accessed.id),
             )
 
         except Exception as e:
@@ -715,7 +784,9 @@ class ContextEngine:
 
         db_session = self.db_manager.get_session()
         try:
-            return await self.memory_consolidator.consolidate_memory(agent_id, db_session)
+            return await self.memory_consolidator.consolidate_memory(
+                agent_id, db_session
+            )
         finally:
             db_session.close()
 
@@ -738,6 +809,7 @@ class ContextEngine:
 
 # Global context engine instance
 context_engine = None
+
 
 async def get_context_engine(database_url: str) -> ContextEngine:
     """Get the global context engine instance."""

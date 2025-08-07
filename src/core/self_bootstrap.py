@@ -19,6 +19,7 @@ logger = structlog.get_logger()
 
 class DevelopmentPhase(Enum):
     """Development phases for autonomous development."""
+
     ANALYSIS = "analysis"
     PLANNING = "planning"
     IMPLEMENTATION = "implementation"
@@ -30,6 +31,7 @@ class DevelopmentPhase(Enum):
 @dataclass
 class DevelopmentGoal:
     """A development goal for autonomous development."""
+
     id: str
     title: str
     description: str
@@ -45,6 +47,7 @@ class DevelopmentGoal:
 @dataclass
 class SystemCapability:
     """A capability that the system should have."""
+
     name: str
     description: str
     current_level: float  # 0.0 to 1.0
@@ -101,15 +104,14 @@ class SelfBootstrapper:
                     "Implement safe code modification protocols",
                     "Add automated testing before changes",
                     "Create rollback mechanisms",
-                    "Add change validation"
+                    "Add change validation",
                 ],
                 measurement_criteria=[
                     "Successfully implement code changes",
                     "No system crashes from self-modification",
-                    "Rollback works when needed"
-                ]
+                    "Rollback works when needed",
+                ],
             ),
-
             "autonomous_learning": SystemCapability(
                 name="autonomous_learning",
                 description="Ability to learn from experience and improve",
@@ -119,15 +121,14 @@ class SelfBootstrapper:
                     "Implement experience recording",
                     "Add pattern recognition",
                     "Create learning algorithms",
-                    "Add knowledge transfer between agents"
+                    "Add knowledge transfer between agents",
                 ],
                 measurement_criteria=[
                     "Performance improves over time",
                     "Similar problems solved faster",
-                    "Knowledge shared between agents"
-                ]
+                    "Knowledge shared between agents",
+                ],
             ),
-
             "system_monitoring": SystemCapability(
                 name="system_monitoring",
                 description="Comprehensive monitoring and self-diagnosis",
@@ -137,15 +138,14 @@ class SelfBootstrapper:
                     "Implement comprehensive metrics collection",
                     "Add anomaly detection",
                     "Create health monitoring dashboards",
-                    "Add predictive maintenance"
+                    "Add predictive maintenance",
                 ],
                 measurement_criteria=[
                     "All system components monitored",
                     "Issues detected before failures",
-                    "Performance trends tracked"
-                ]
+                    "Performance trends tracked",
+                ],
             ),
-
             "task_optimization": SystemCapability(
                 name="task_optimization",
                 description="Optimize task execution and agent coordination",
@@ -155,15 +155,14 @@ class SelfBootstrapper:
                     "Implement intelligent task scheduling",
                     "Add agent load balancing",
                     "Create task dependency optimization",
-                    "Add performance-based agent selection"
+                    "Add performance-based agent selection",
                 ],
                 measurement_criteria=[
                     "Tasks complete faster",
                     "Better agent utilization",
-                    "Fewer task failures"
-                ]
+                    "Fewer task failures",
+                ],
             ),
-
             "code_quality": SystemCapability(
                 name="code_quality",
                 description="Maintain and improve code quality automatically",
@@ -173,15 +172,14 @@ class SelfBootstrapper:
                     "Implement automated code review",
                     "Add refactoring suggestions",
                     "Create coding standard enforcement",
-                    "Add technical debt tracking"
+                    "Add technical debt tracking",
                 ],
                 measurement_criteria=[
                     "Code quality scores improve",
                     "Technical debt reduces",
-                    "Fewer bugs introduced"
-                ]
+                    "Fewer bugs introduced",
+                ],
             ),
-
             "security_hardening": SystemCapability(
                 name="security_hardening",
                 description="Continuously improve system security",
@@ -191,14 +189,14 @@ class SelfBootstrapper:
                     "Implement security scanning",
                     "Add vulnerability detection",
                     "Create security best practices enforcement",
-                    "Add penetration testing"
+                    "Add penetration testing",
                 ],
                 measurement_criteria=[
                     "No known vulnerabilities",
                     "Security tests pass",
-                    "Compliance with security standards"
-                ]
-            )
+                    "Compliance with security standards",
+                ],
+            ),
         }
 
         self.system_capabilities.update(capabilities)
@@ -222,13 +220,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "Meta-agent can propose specific code changes",
                     "Changes are validated before implementation",
-                    "Rollback mechanism works reliably"
+                    "Rollback mechanism works reliably",
                 ],
                 estimated_effort=8.0,
                 dependencies=[],
-                created_at=time.time()
+                created_at=time.time(),
             ),
-
             DevelopmentGoal(
                 id="improve_agent_coordination",
                 title="Improve Agent Coordination",
@@ -239,13 +236,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "Agents coordinate effectively on complex tasks",
                     "No duplicate work",
-                    "Task dependencies handled correctly"
+                    "Task dependencies handled correctly",
                 ],
                 estimated_effort=6.0,
                 dependencies=["enhance_meta_agent"],
-                created_at=time.time()
+                created_at=time.time(),
             ),
-
             DevelopmentGoal(
                 id="implement_continuous_testing",
                 title="Implement Continuous Testing",
@@ -256,12 +252,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "All changes tested automatically",
                     "Test coverage > 90%",
-                    "Performance regression tests"
+                    "Performance regression tests",
                 ],
                 estimated_effort=4.0,
                 dependencies=[],
-                created_at=time.time()
-            )
+                created_at=time.time(),
+            ),
         ]
 
         # Phase 2: Advanced Capabilities
@@ -276,13 +272,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "System learns from past tasks",
                     "Performance improves over time",
-                    "Knowledge transfer between agents"
+                    "Knowledge transfer between agents",
                 ],
                 estimated_effort=12.0,
                 dependencies=["enhance_meta_agent", "improve_agent_coordination"],
-                created_at=time.time()
+                created_at=time.time(),
             ),
-
             DevelopmentGoal(
                 id="advanced_monitoring",
                 title="Advanced System Monitoring",
@@ -293,12 +288,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "Anomalies detected automatically",
                     "Predictive maintenance works",
-                    "Performance bottlenecks identified"
+                    "Performance bottlenecks identified",
                 ],
                 estimated_effort=8.0,
                 dependencies=["implement_continuous_testing"],
-                created_at=time.time()
-            )
+                created_at=time.time(),
+            ),
         ]
 
         # Phase 3: Optimization and Scaling
@@ -313,13 +308,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "50% improvement in task execution time",
                     "Better resource utilization",
-                    "Reduced memory usage"
+                    "Reduced memory usage",
                 ],
                 estimated_effort=10.0,
                 dependencies=["implement_learning_system", "advanced_monitoring"],
-                created_at=time.time()
+                created_at=time.time(),
             ),
-
             DevelopmentGoal(
                 id="scale_agent_system",
                 title="Scale Agent System",
@@ -330,12 +324,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "Support 100+ concurrent agents",
                     "Horizontal scaling works",
-                    "Load balancing effective"
+                    "Load balancing effective",
                 ],
                 estimated_effort=15.0,
                 dependencies=["optimize_performance"],
-                created_at=time.time()
-            )
+                created_at=time.time(),
+            ),
         ]
 
         # Add all goals
@@ -359,13 +353,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "Code quality scores maintained",
                     "Technical debt doesn't increase",
-                    "Best practices followed"
+                    "Best practices followed",
                 ],
                 estimated_effort=2.0,  # hours per week
                 dependencies=[],
-                created_at=time.time()
+                created_at=time.time(),
             ),
-
             DevelopmentGoal(
                 id="continuous_security_hardening",
                 title="Continuous Security Hardening",
@@ -376,13 +369,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "No security vulnerabilities",
                     "Security best practices followed",
-                    "Regular security audits pass"
+                    "Regular security audits pass",
                 ],
                 estimated_effort=3.0,  # hours per week
                 dependencies=[],
-                created_at=time.time()
+                created_at=time.time(),
             ),
-
             DevelopmentGoal(
                 id="continuous_performance_monitoring",
                 title="Continuous Performance Monitoring",
@@ -393,12 +385,12 @@ class SelfBootstrapper:
                 success_criteria=[
                     "Performance metrics tracked",
                     "Regressions detected quickly",
-                    "Optimization opportunities identified"
+                    "Optimization opportunities identified",
                 ],
                 estimated_effort=1.0,  # hours per week
                 dependencies=[],
-                created_at=time.time()
-            )
+                created_at=time.time(),
+            ),
         ]
 
         for goal in continuous_goals:
@@ -450,7 +442,7 @@ class SelfBootstrapper:
             assigned_to="meta-agent",
             status=TaskStatus.PENDING,
             created_at=time.time(),
-            metadata={"autonomous_development": True}
+            metadata={"autonomous_development": True},
         )
 
         await task_queue.add_task(analysis_task)
@@ -468,8 +460,7 @@ class SelfBootstrapper:
 
             # Check if dependencies are met
             dependencies_met = all(
-                dep_id in self.completed_milestones
-                for dep_id in goal.dependencies
+                dep_id in self.completed_milestones for dep_id in goal.dependencies
             )
 
             if dependencies_met:
@@ -479,16 +470,15 @@ class SelfBootstrapper:
             return None
 
         # Sort by priority and complexity (prefer high priority, low complexity)
-        available_goals.sort(
-            key=lambda g: (g.priority, -g.complexity),
-            reverse=True
-        )
+        available_goals.sort(key=lambda g: (g.priority, -g.complexity), reverse=True)
 
         selected_goal = available_goals[0]
-        logger.info("Selected next development goal",
-                   goal_id=selected_goal.id,
-                   title=selected_goal.title,
-                   priority=selected_goal.priority)
+        logger.info(
+            "Selected next development goal",
+            goal_id=selected_goal.id,
+            title=selected_goal.title,
+            priority=selected_goal.priority,
+        )
 
         return selected_goal
 
@@ -538,8 +528,8 @@ class SelfBootstrapper:
             metadata={
                 "development_goal_id": goal.id,
                 "autonomous_development": True,
-                "success_criteria": goal.success_criteria
-            }
+                "success_criteria": goal.success_criteria,
+            },
         )
 
         await task_queue.add_task(impl_task)
@@ -555,18 +545,17 @@ class SelfBootstrapper:
             status=TaskStatus.PENDING,
             created_at=time.time(),
             dependencies=[impl_task.id],
-            metadata={
-                "development_goal_id": goal.id,
-                "autonomous_development": True
-            }
+            metadata={"development_goal_id": goal.id, "autonomous_development": True},
         )
 
         await task_queue.add_task(test_task)
 
-        logger.info("Implementation tasks created",
-                   goal_id=goal.id,
-                   impl_task_id=impl_task.id,
-                   test_task_id=test_task.id)
+        logger.info(
+            "Implementation tasks created",
+            goal_id=goal.id,
+            impl_task_id=impl_task.id,
+            test_task_id=test_task.id,
+        )
 
     async def _create_planning_tasks(self, goal: DevelopmentGoal) -> None:
         """Create planning tasks for a development goal."""
@@ -589,10 +578,7 @@ class SelfBootstrapper:
             assigned_to="architect-agent",
             status=TaskStatus.PENDING,
             created_at=time.time(),
-            metadata={
-                "development_goal_id": goal.id,
-                "autonomous_development": True
-            }
+            metadata={"development_goal_id": goal.id, "autonomous_development": True},
         )
 
         await task_queue.add_task(planning_task)
@@ -620,12 +606,14 @@ class SelfBootstrapper:
             metadata={
                 "development_goal_id": goal.id,
                 "autonomous_development": True,
-                "continuous": True
-            }
+                "continuous": True,
+            },
         )
 
         await task_queue.add_task(monitoring_task)
-        logger.info("Monitoring task created", goal_id=goal.id, task_id=monitoring_task.id)
+        logger.info(
+            "Monitoring task created", goal_id=goal.id, task_id=monitoring_task.id
+        )
 
     async def _update_capability_assessments(self) -> None:
         """Update assessments of system capabilities."""
@@ -650,7 +638,7 @@ class SelfBootstrapper:
             assigned_to="meta-agent",
             status=TaskStatus.PENDING,
             created_at=time.time(),
-            metadata={"autonomous_development": True}
+            metadata={"autonomous_development": True},
         )
 
         await task_queue.add_task(assessment_task)
@@ -676,7 +664,7 @@ class SelfBootstrapper:
             assigned_to="meta-agent",
             status=TaskStatus.PENDING,
             created_at=time.time(),
-            metadata={"autonomous_development": True}
+            metadata={"autonomous_development": True},
         )
 
         await task_queue.add_task(planning_task)
@@ -685,18 +673,12 @@ class SelfBootstrapper:
         """Store capability information in context for agents to access."""
 
         # This would store in the context engine, but we'll simulate it
-        context_content = f"""
-        System Capability: {capability.name}
-        Description: {capability.description}
-        Current Level: {capability.current_level}
-        Target Level: {capability.target_level}
-        
-        Implementation Tasks:
-        {chr(10).join(f"- {task}" for task in capability.implementation_tasks)}
-        
-        Measurement Criteria:
-        {chr(10).join(f"- {criteria}" for criteria in capability.measurement_criteria)}
-        """
+        # Context content would include capability details for agent reference
+        logger.info(
+            "Capability context stored",
+            capability=capability.name,
+            level=capability.current_level,
+        )
 
         # Would use context engine to store this
         logger.info("Capability context stored", capability=capability.name)
@@ -713,7 +695,9 @@ class SelfBootstrapper:
             progress = capability.current_level / capability.target_level
             capability_progress[name] = min(1.0, progress)
 
-        avg_capability_progress = sum(capability_progress.values()) / len(capability_progress)
+        avg_capability_progress = sum(capability_progress.values()) / len(
+            capability_progress
+        )
 
         return {
             "autonomous_mode": self.autonomous_mode,
@@ -725,9 +709,10 @@ class SelfBootstrapper:
             "capability_progress": capability_progress,
             "avg_capability_progress": avg_capability_progress,
             "next_milestones": [
-                goal.title for goal in self.development_goals.values()
+                goal.title
+                for goal in self.development_goals.values()
                 if goal.id not in self.completed_milestones
-            ][:5]
+            ][:5],
         }
 
 
