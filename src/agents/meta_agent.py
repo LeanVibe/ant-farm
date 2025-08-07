@@ -16,9 +16,8 @@ try:
     from ..core.config import settings
     from ..core.message_broker import MessageType, message_broker
     from ..core.models import Agent as AgentModel
-    from ..core.models import get_database_manager
-    from ..core.task_queue import Task, TaskPriority, TaskStatus, task_queue
-    from .base_agent import BaseAgent, TaskResult, ToolResult
+    from ..core.task_queue import Task, task_queue
+    from .base_agent import BaseAgent, TaskResult
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
