@@ -142,7 +142,10 @@ class Settings(BaseSettings):
     health_check_interval: int = Field(default=60, env="HEALTH_CHECK_INTERVAL")
 
     # File System Configuration
-    project_root: str = Field(default=os.getcwd(), env="PROJECT_ROOT")
+    project_root: str = Field(
+        default=os.getcwd() if os.access(os.getcwd(), os.W_OK) else "/tmp",
+        env="PROJECT_ROOT",
+    )
     workspace_dir: str = Field(default="workspace", env="WORKSPACE_DIR")
     logs_dir: str = Field(default="logs", env="LOGS_DIR")
     temp_dir: str = Field(default="tmp", env="TEMP_DIR")
@@ -248,7 +251,7 @@ class Settings(BaseSettings):
         try:
             os.makedirs(self.logs_dir, exist_ok=True)
             os.makedirs(self.get_workspace_path(), exist_ok=True)
-        except PermissionError:
+        except (PermissionError, OSError):
             issues.append(f"Cannot create directories in {self.project_root}")
 
         # Check database URL format
