@@ -1744,9 +1744,19 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
         from ..core.context_engine import get_context_engine
 
         context_engine = await get_context_engine(settings.database_url)
-        results = await context_engine.search_context(
-            agent_id=agent_id, query=query, limit=limit
-        )
+
+        # Search contexts and filter by agent_id
+        all_results = await context_engine.search_context(
+            query=query, limit=limit * 3
+        )  # Get more to filter
+
+        # Filter results by agent_id
+        agent_results = [
+            result for result in all_results if str(result.context.agent_id) == agent_id
+        ]
+
+        # Take only the requested limit
+        results = agent_results[:limit]
 
         return APIResponse(
             success=True,
@@ -1755,13 +1765,13 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
                 "query": query,
                 "results": [
                     {
-                        "id": str(result.id),
-                        "content": result.content,
+                        "id": str(result.context.id),
+                        "content": result.content or result.context.content,
                         "similarity_score": result.similarity_score,
-                        "importance_score": result.importance_score,
-                        "category": result.category,
-                        "created_at": result.created_at.isoformat()
-                        if result.created_at
+                        "importance_score": result.context.importance_score,
+                        "category": result.context.category,
+                        "created_at": result.context.created_at.isoformat()
+                        if result.context.created_at
                         else None,
                     }
                     for result in results
@@ -1792,8 +1802,8 @@ async def add_context(
 
         context_engine = await get_context_engine(settings.database_url)
         context_id = await context_engine.store_context(
-            agent_id=agent_id,
             content=content,
+            agent_id=agent_id,
             content_type=content_type,
             category=category,
             importance_score=importance_score,
