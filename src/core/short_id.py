@@ -19,6 +19,8 @@ class ShortIDGenerator:
 
         Format: 3-letter abbreviation from name + 2 chars from UUID hash
         Example: "meta" -> "met" + "7a" -> "met7a"
+
+        Enhanced collision resistance: combines name and UUID for better entropy.
         """
         # Get 3-letter abbreviation from name
         name_clean = "".join(c for c in name.lower() if c.isalpha())
@@ -27,11 +29,14 @@ class ShortIDGenerator:
         else:
             name_part = name_clean.ljust(3, "x")
 
-        # Get 2 chars from UUID hash
-        uuid_hash = hashlib.sha256(uuid_str.encode()).hexdigest()
-        uuid_part = "".join(c for c in uuid_hash if c in ShortIDGenerator.ALPHANUMERIC)[
-            :2
-        ]
+        # Combine name and UUID for better collision resistance
+        combined = f"{name}{uuid_str}"
+        combined_hash = hashlib.sha256(combined.encode()).hexdigest()
+
+        # Get 2 chars from combined hash
+        uuid_part = "".join(
+            c for c in combined_hash if c in ShortIDGenerator.ALPHANUMERIC
+        )[:2]
 
         return f"{name_part}{uuid_part}"
 
@@ -87,6 +92,52 @@ class ShortIDGenerator:
         ]
 
         return f"{name_part}{hash_part}"
+
+    @staticmethod
+    def generate_unique_agent_short_id(
+        name: str, uuid_str: str, existing_ids: set[str] = None
+    ) -> str:
+        """Generate a unique agent short ID, avoiding collisions with existing IDs.
+
+        Args:
+            name: Agent name
+            uuid_str: Agent UUID string
+            existing_ids: Set of existing short IDs to avoid collisions
+
+        Returns:
+            Unique short ID string
+        """
+        if existing_ids is None:
+            existing_ids = set()
+
+        # Try the standard generation first
+        short_id = ShortIDGenerator.generate_agent_short_id(name, uuid_str)
+
+        if short_id not in existing_ids:
+            return short_id
+
+        # If collision detected, generate alternatives
+        name_clean = "".join(c for c in name.lower() if c.isalpha())
+        name_part = name_clean[:3] if len(name_clean) >= 3 else name_clean.ljust(3, "x")
+
+        # Try different hash combinations
+        for attempt in range(10):  # Try up to 10 variations
+            # Use different salt for each attempt
+            salted_input = f"{name}{uuid_str}{attempt}"
+            hash_obj = hashlib.sha256(salted_input.encode())
+            hash_hex = hash_obj.hexdigest()
+
+            uuid_part = "".join(
+                c for c in hash_hex if c in ShortIDGenerator.ALPHANUMERIC
+            )[:2]
+            candidate = f"{name_part}{uuid_part}"
+
+            if candidate not in existing_ids:
+                return candidate
+
+        # Fallback: use last 2 chars of UUID
+        fallback_suffix = uuid_str.replace("-", "")[-2:].lower()
+        return f"{name_part}{fallback_suffix}"
 
     @staticmethod
     def is_valid_short_id(short_id: str, id_type: str) -> bool:

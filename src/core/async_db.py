@@ -122,7 +122,17 @@ class AsyncDatabaseManager:
                     )
                     return str(existing_agent.id)
                 else:
-                    # Create new agent
+                    # Create new agent - generate unique short ID
+                    from .short_id import ShortIDGenerator
+
+                    # Get existing short IDs to avoid collisions
+                    existing_stmt = select(AgentModel.short_id).where(
+                        AgentModel.short_id.isnot(None)
+                    )
+                    existing_result = await session.execute(existing_stmt)
+                    existing_short_ids = {row[0] for row in existing_result.fetchall()}
+
+                    # Create agent first to get UUID
                     agent = AgentModel(
                         name=name,
                         type=agent_type,
@@ -133,10 +143,21 @@ class AsyncDatabaseManager:
                         last_heartbeat=datetime.now(timezone.utc),
                     )
                     session.add(agent)
+                    await session.flush()  # Get the ID without committing
+
+                    # Generate unique short ID
+                    unique_short_id = ShortIDGenerator.generate_unique_agent_short_id(
+                        name, str(agent.id), existing_short_ids
+                    )
+                    agent.short_id = unique_short_id
+
                     await session.commit()
                     await session.refresh(agent)
                     logger.info(
-                        "Created new agent", agent_name=name, agent_id=str(agent.id)
+                        "Created new agent",
+                        agent_name=name,
+                        agent_id=str(agent.id),
+                        short_id=unique_short_id,
                     )
                     return str(agent.id)
 
@@ -299,38 +320,82 @@ class AsyncDatabaseManager:
                 logger.error("Failed to get active agents", error=str(e))
                 return []
 
-    async def cleanup_stale_agents(self, threshold_minutes: int = 10) -> int:
-        """Clean up agents that haven't sent heartbeat in threshold_minutes."""
+    async def cleanup_stale_agents(self, threshold_minutes: int = 10) -> dict[str, int]:
+        """Clean up agents that haven't sent heartbeat in threshold_minutes.
+
+        Returns:
+            Dict with cleanup statistics
+        """
         async with self.async_session_maker() as session:
             try:
-                from sqlalchemy import select, update
+                from sqlalchemy import select, update, and_
 
                 threshold_time = datetime.now(timezone.utc) - timedelta(
                     minutes=threshold_minutes
                 )
 
-                # Update stale agents to inactive status
-                stmt = (
+                stats = {
+                    "stale_active_agents": 0,
+                    "null_heartbeat_agents": 0,
+                    "old_starting_agents": 0,
+                }
+
+                # 1. Clean up active agents with stale heartbeats
+                stale_active_stmt = (
                     update(AgentModel)
                     .where(
-                        AgentModel.status == "active",
-                        AgentModel.last_heartbeat < threshold_time,
+                        and_(
+                            AgentModel.status == "active",
+                            AgentModel.last_heartbeat < threshold_time,
+                            AgentModel.last_heartbeat.isnot(None),
+                        )
                     )
                     .values(status="inactive")
                 )
-                result = await session.execute(stmt)
+                result = await session.execute(stale_active_stmt)
+                stats["stale_active_agents"] = result.rowcount
+
+                # 2. Clean up agents with null heartbeats (old test agents)
+                null_heartbeat_stmt = (
+                    update(AgentModel)
+                    .where(
+                        and_(
+                            AgentModel.status.in_(["active", "starting"]),
+                            AgentModel.last_heartbeat.is_(None),
+                        )
+                    )
+                    .values(status="inactive")
+                )
+                result = await session.execute(null_heartbeat_stmt)
+                stats["null_heartbeat_agents"] = result.rowcount
+
+                # 3. Clean up old "starting" agents (stuck in starting state > 5 minutes)
+                starting_threshold = datetime.now(timezone.utc) - timedelta(minutes=5)
+                old_starting_stmt = (
+                    update(AgentModel)
+                    .where(
+                        and_(
+                            AgentModel.status == "starting",
+                            AgentModel.created_at < starting_threshold,
+                        )
+                    )
+                    .values(status="failed")
+                )
+                result = await session.execute(old_starting_stmt)
+                stats["old_starting_agents"] = result.rowcount
+
                 await session.commit()
 
-                cleaned_count = result.rowcount
-                if cleaned_count > 0:
-                    logger.info("Cleaned up stale agents", count=cleaned_count)
+                total_cleaned = sum(stats.values())
+                if total_cleaned > 0:
+                    logger.info("Cleaned up stale agents", **stats, total=total_cleaned)
 
-                return cleaned_count
+                return stats
 
             except Exception as e:
                 await session.rollback()
                 logger.error("Failed to cleanup stale agents", error=str(e))
-                return 0
+                return {"error": str(e)}
 
     async def get_database_stats(self) -> dict[str, Any]:
         """Get database statistics."""

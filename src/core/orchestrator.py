@@ -409,6 +409,8 @@ class HealthMonitor:
         self.registry = registry
         self.heartbeat_interval = heartbeat_interval
         self.running = False
+        self.last_cleanup = time.time()
+        self.cleanup_interval = 300  # 5 minutes between database cleanups
 
     async def start_monitoring(self) -> None:
         """Start health monitoring loop."""
@@ -417,6 +419,7 @@ class HealthMonitor:
         while self.running:
             try:
                 await self._check_agent_health()
+                await self._periodic_database_cleanup()
                 await asyncio.sleep(self.heartbeat_interval)
             except Exception as e:
                 logger.error("Health monitor error", error=str(e))
@@ -425,6 +428,33 @@ class HealthMonitor:
     async def stop_monitoring(self) -> None:
         """Stop health monitoring."""
         self.running = False
+
+    async def _periodic_database_cleanup(self) -> None:
+        """Perform periodic database cleanup of stale agents."""
+        current_time = time.time()
+
+        if current_time - self.last_cleanup > self.cleanup_interval:
+            try:
+                from .async_db import get_async_database_manager
+
+                db_manager = await get_async_database_manager()
+                cleanup_stats = await db_manager.cleanup_stale_agents(
+                    threshold_minutes=10
+                )
+
+                if isinstance(cleanup_stats, dict) and "error" not in cleanup_stats:
+                    total_cleaned = sum(cleanup_stats.values())
+                    if total_cleaned > 0:
+                        logger.info(
+                            "Database cleanup completed",
+                            **cleanup_stats,
+                            total_cleaned=total_cleaned,
+                        )
+
+                self.last_cleanup = current_time
+
+            except Exception as e:
+                logger.error("Failed periodic database cleanup", error=str(e))
 
     async def _check_agent_health(self) -> None:
         """Check health of all agents."""
