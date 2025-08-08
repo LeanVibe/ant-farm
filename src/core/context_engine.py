@@ -8,6 +8,8 @@ from typing import Any
 
 import structlog
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.future import select
 
 from .caching import CONTEXT_CACHE_CONFIG, CacheKey, get_cache_manager
 from .models import Context, get_database_manager
@@ -48,6 +50,7 @@ class ContextType(Enum):
 
 
 @dataclass
+@dataclass
 class ContextSearchResult:
     """Result from context search."""
 
@@ -56,6 +59,8 @@ class ContextSearchResult:
     relevance_score: float
     layer: MemoryLayer
     recency_bonus: float = 0.0
+    content: str = ""
+    score: float = 0.0
 
 
 @dataclass
@@ -534,11 +539,18 @@ class ContextEngine:
         database_url: str,
         embedding_provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMERS,
     ):
+        self.database_url = database_url
         self.db_manager = get_database_manager(database_url)
         self.embedding_service = EmbeddingService(embedding_provider)
         self.semantic_search = SemanticSearch(self.embedding_service)
         self.memory_consolidator = MemoryConsolidator(self)
         self.cache_manager = None
+
+        # Set up async database session
+        self.async_engine = create_async_engine(database_url)
+        self.AsyncSessionLocal = async_sessionmaker(
+            self.async_engine, class_=AsyncSession, expire_on_commit=False
+        )
 
     async def initialize(self):
         """Initialize the context engine."""
@@ -552,8 +564,8 @@ class ContextEngine:
 
     async def store_context(
         self,
-        agent_id: str,
         content: str,
+        agent_id: str,
         session_id: str | None = None,
         importance_score: float = 0.5,
         category: str = "general",
@@ -561,59 +573,43 @@ class ContextEngine:
         metadata: dict[str, Any] = None,
         content_type: str = "text",
     ) -> str:
-        """Store a new context."""
+        """Store a new context using async database operations."""
 
-        db_session = self.db_manager.get_session()
-        try:
-            # Generate embedding
-            embedding_model = f"{self.embedding_service.provider.value}_model"
+        async with self.AsyncSessionLocal() as session:
+            try:
+                # Generate embedding
+                embedding_model = f"{self.embedding_service.provider.value}_model"
 
-            # Create context
-            context = Context(
-                agent_id=agent_id,
-                session_id=session_id,
-                content=content,
-                content_type=content_type,
-                importance_score=importance_score,
-                category=category,
-                topic=topic or self._extract_topic(content),
-                metadata=metadata or {},
-                embedding_model=embedding_model,
-                source="agent_input",
-            )
+                # Create context
+                context = Context(
+                    agent_id=agent_id,
+                    session_id=session_id,
+                    content=content,
+                    content_type=content_type,
+                    importance_score=importance_score,
+                    category=category,
+                    topic=topic or self._extract_topic(content),
+                    metadata=metadata or {},
+                    embedding_model=embedding_model,
+                    source="agent_input",
+                )
 
-            db_session.add(context)
-            db_session.commit()
+                session.add(context)
+                await session.commit()
 
-            context_id = str(context.id)
+                context_id = str(context.id)
 
-            # Invalidate related caches
-            if self.cache_manager:
-                cache_deps = [
-                    f"agent:{agent_id}",
-                    f"category:{category}",
-                    "context_stats",
-                ]
-                if session_id:
-                    cache_deps.append(f"session:{session_id}")
+                # Invalidate related caches
+                if self.cache_manager:
+                    await self.cache_manager.invalidate_dependency(f"agent:{agent_id}")
 
-                await self.cache_manager.invalidate_dependency(f"agent:{agent_id}")
+                logger.debug("Context stored successfully", context_id=context_id)
+                return context_id
 
-            logger.info(
-                "Context stored",
-                context_id=context_id,
-                agent_id=agent_id,
-                category=category,
-            )
-
-            return context_id
-
-        except Exception as e:
-            db_session.rollback()
-            logger.error("Failed to store context", agent_id=agent_id, error=str(e))
-            raise
-        finally:
-            db_session.close()
+            except Exception as e:
+                await session.rollback()
+                logger.error("Failed to store context", agent_id=agent_id, error=str(e))
+                raise
 
     async def retrieve_context(
         self,
@@ -910,6 +906,54 @@ class ContextEngine:
             return result
         finally:
             db_session.close()
+
+    async def search_context(
+        self, query: str, limit: int = 10
+    ) -> list[ContextSearchResult]:
+        """Search for contexts using semantic similarity (simplified interface)."""
+        async with self.AsyncSessionLocal() as session:
+            # Use ilike for case-insensitive partial matching
+            query_pattern = f"%{query.lower()}%"
+            stmt = (
+                select(Context).where(Context.content.ilike(query_pattern)).limit(limit)
+            )
+            result = await session.execute(stmt)
+            contexts = result.scalars().all()
+
+            # Convert to search results with similarity scores
+            search_results = []
+            for context in contexts:
+                # Calculate simple similarity based on word overlap
+                query_words = set(query.lower().split())
+                content_words = set(context.content.lower().split())
+                intersection = query_words.intersection(content_words)
+                union = query_words.union(content_words)
+                similarity = len(intersection) / len(union) if union else 0
+
+                search_results.append(
+                    ContextSearchResult(
+                        context=context,
+                        similarity_score=similarity,
+                        relevance_score=similarity * context.importance_score,
+                        layer=MemoryLayer.WORKING,
+                        content=context.content,
+                        score=similarity,
+                    )
+                )
+
+            return sorted(search_results, key=lambda x: x.score, reverse=True)
+
+    async def get_context(self, context_id: str) -> Context | None:
+        """Get a context by ID."""
+        async with self.AsyncSessionLocal() as session:
+            stmt = select(Context).where(Context.id == context_id)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+
+    async def close(self):
+        """Close the async database engine."""
+        if hasattr(self, "async_engine"):
+            await self.async_engine.dispose()
 
     def _extract_topic(self, content: str) -> str:
         """Extract topic from content (simple implementation)."""
