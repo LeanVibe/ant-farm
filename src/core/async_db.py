@@ -48,7 +48,7 @@ class AsyncDatabaseManager:
         try:
             async with self.async_session_maker() as session:
                 result = await session.execute(text("SELECT 1"))
-                return result.scalar() == 1
+                return await result.scalar() == 1
         except Exception as e:
             logger.error("Database health check failed", error=str(e))
             return False
@@ -69,7 +69,7 @@ class AsyncDatabaseManager:
 
                 stmt = select(AgentModel).where(AgentModel.name == name)
                 result = await session.execute(stmt)
-                existing_agent = result.scalar_one_or_none()
+                existing_agent = await result.scalar_one_or_none()
 
                 if existing_agent:
                     # Update existing agent
@@ -131,7 +131,7 @@ class AsyncDatabaseManager:
 
                 stmt = select(AgentModel).where(AgentModel.name == name)
                 result = await session.execute(stmt)
-                return result.scalar_one_or_none()
+                return await result.scalar_one_or_none()
 
             except Exception as e:
                 logger.error("Failed to get agent", agent=name, error=str(e))
@@ -216,7 +216,8 @@ class AsyncDatabaseManager:
 
                 stmt = select(AgentModel).where(AgentModel.status == "active")
                 result = await session.execute(stmt)
-                return list(result.scalars().all())
+                scalars_result = await result.scalars()
+                return await scalars_result.all()
 
             except Exception as e:
                 logger.error("Failed to get active agents", error=str(e))
