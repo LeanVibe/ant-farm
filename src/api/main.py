@@ -66,6 +66,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -277,13 +278,45 @@ app = FastAPI(
     ],
 )
 
+# Import enhanced error handling
+from .error_handlers import (
+    general_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
+from .middleware import (
+    RequestTimeoutMiddleware,
+    RequestValidationMiddleware,
+    SecurityHeadersMiddleware,
+)
+
+# Add comprehensive error handlers
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Add request validation middleware
+app.add_middleware(
+    RequestValidationMiddleware,
+    max_request_size_mb=10,
+    max_json_depth=10,
+    rate_limit_requests=100,
+    rate_limit_window=60,
+)
+
+# Add request timeout middleware
+app.add_middleware(RequestTimeoutMiddleware, timeout_seconds=30)
+
 # Add security middleware
 app.add_middleware(SecurityMiddleware)
 
 # Add performance monitoring middleware
 app.add_middleware(PerformanceMiddleware)
 
-# CORS middleware
+# CORS middleware (keep last in chain)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
