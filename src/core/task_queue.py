@@ -651,6 +651,10 @@ class TaskQueue:
             )
             return False
 
+    async def get_task_by_id(self, task_id: str) -> Task | None:
+        """Get a specific task by ID (alias for get_task_status for convenience)."""
+        return await self.get_task_status(task_id)
+
     async def get_task_status(self, task_id: str) -> Task | None:
         """Get current status and details of a specific task."""
         try:

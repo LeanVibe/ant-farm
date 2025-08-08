@@ -76,6 +76,94 @@ class AgentRegistry:
         # Initialize database
         self.db_manager.create_tables()
 
+    async def initialize(self) -> None:
+        """Initialize the registry and load existing agents from database."""
+        await self.load_agents_from_database()
+
+    async def load_agents_from_database(self) -> None:
+        """Load all agents from database into memory registry."""
+        async with self._lock:
+            try:
+                import asyncio
+                from functools import partial
+
+                def sync_load():
+                    session = self.db_manager.get_session()
+                    try:
+                        db_agents = session.query(Agent).all()
+                        return [
+                            (
+                                agent.name,
+                                agent.type,
+                                agent.role,
+                                agent.status,
+                                agent.capabilities or {},
+                                agent.tmux_session,
+                                agent.last_heartbeat,
+                                agent.created_at,
+                                agent.tasks_completed or 0,
+                                agent.tasks_failed or 0,
+                                agent.short_id,
+                            )
+                            for agent in db_agents
+                        ]
+                    finally:
+                        session.close()
+
+                # Run database query in thread to avoid blocking
+                loop = asyncio.get_event_loop()
+                db_results = await loop.run_in_executor(None, sync_load)
+
+                # Convert database results to AgentInfo objects
+                loaded_count = 0
+                for (
+                    name,
+                    agent_type,
+                    role,
+                    status,
+                    capabilities,
+                    tmux_session,
+                    last_heartbeat,
+                    created_at,
+                    tasks_completed,
+                    tasks_failed,
+                    short_id,
+                ) in db_results:
+                    # Convert string status to AgentStatus enum
+                    try:
+                        agent_status = AgentStatus(status)
+                    except ValueError:
+                        agent_status = AgentStatus.STOPPED  # Default for invalid status
+
+                    agent_info = AgentInfo(
+                        id=str(uuid.uuid4()),  # Generate new ID for in-memory
+                        name=name,
+                        type=agent_type,
+                        role=role,
+                        status=agent_status,
+                        capabilities=list(capabilities.keys())
+                        if isinstance(capabilities, dict)
+                        else [],
+                        tmux_session=tmux_session,
+                        last_heartbeat=last_heartbeat.timestamp()
+                        if last_heartbeat
+                        else time.time(),
+                        created_at=created_at.timestamp()
+                        if created_at
+                        else time.time(),
+                        tasks_completed=tasks_completed,
+                        tasks_failed=tasks_failed,
+                        short_id=short_id,
+                    )
+
+                    self.agents[name] = agent_info
+                    loaded_count += 1
+
+                logger.info(f"Loaded {loaded_count} agents from database into registry")
+
+            except Exception as e:
+                logger.error("Failed to load agents from database", error=str(e))
+
     async def register_agent(self, agent_info: AgentInfo) -> bool:
         """Register a new agent."""
         async with self._lock:
@@ -484,6 +572,9 @@ class AgentOrchestrator:
         self.running = True
         logger.info("Agent orchestrator starting")
 
+        # Initialize agent registry (load agents from database)
+        await self.registry.initialize()
+
         # Initialize task queue
         await task_queue.initialize()
 
@@ -575,6 +666,11 @@ class AgentOrchestrator:
             await self.registry.remove_agent(agent_name)
 
         return success
+
+    async def get_active_agent_count(self) -> int:
+        """Get count of active agents."""
+        agents = await self.registry.list_agents()
+        return sum(1 for agent in agents if agent.status == AgentStatus.ACTIVE)
 
     async def get_system_health(self) -> SystemHealth:
         """Get comprehensive system health metrics."""

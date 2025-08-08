@@ -43,6 +43,12 @@ except ImportError:
         return f"{id_type[:3]}{str(uuid_str)[:4]}"
 
 
+# Utility function for timezone-aware datetime
+def utc_now():
+    """Get current UTC time with timezone info."""
+    return datetime.now(timezone.utc)
+
+
 Base = declarative_base()
 
 
@@ -60,7 +66,7 @@ class Agent(Base):
     system_prompt = Column(Text)
     status = Column(String(50), default="inactive", index=True)
     tmux_session = Column(String(255))
-    last_heartbeat = Column(DateTime)
+    last_heartbeat = Column(DateTime(timezone=True))
 
     # Performance metrics
     tasks_completed = Column(Integer, default=0)
@@ -73,9 +79,9 @@ class Agent(Base):
     preferences = Column(JSONB, default={})
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_active = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    last_active = Column(DateTime(timezone=True), default=utc_now)
 
     # Relationships
     tasks = relationship("Task", back_populates="agent", cascade="all, delete-orphan")
@@ -153,10 +159,10 @@ class Task(Base):
     complexity_score = Column(Float, default=1.0)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    started_at = Column(DateTime, index=True)
-    completed_at = Column(DateTime, index=True)
-    deadline = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    started_at = Column(DateTime(timezone=True), index=True)
+    completed_at = Column(DateTime(timezone=True), index=True)
+    deadline = Column(DateTime(timezone=True))
 
     # Relationships
     agent = relationship("Agent", back_populates="tasks")
@@ -211,9 +217,9 @@ class Session(Base):
     goals = Column(JSONB, default=[])  # List of session goals
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    last_active = Column(DateTime, default=datetime.utcnow, index=True)
-    ended_at = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    last_active = Column(DateTime(timezone=True), default=utc_now, index=True)
+    ended_at = Column(DateTime(timezone=True))
 
     # Relationships
     owner = relationship("Agent")
@@ -263,14 +269,14 @@ class Context(Base):
 
     # Access tracking
     access_count = Column(Integer, default=0)
-    last_accessed = Column(DateTime, default=datetime.utcnow)
+    last_accessed = Column(DateTime(timezone=True), default=utc_now)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     # Expiration
-    expires_at = Column(DateTime)  # For temporary contexts
+    expires_at = Column(DateTime(timezone=True))  # For temporary contexts
 
     # Relationships
     agent = relationship("Agent", back_populates="contexts")
@@ -322,9 +328,9 @@ class Conversation(Base):
     priority = Column(Integer, default=5)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    delivered_at = Column(DateTime)
-    processed_at = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    delivered_at = Column(DateTime(timezone=True))
+    processed_at = Column(DateTime(timezone=True))
 
     # Relationships
     session = relationship("Session", back_populates="conversations")
@@ -383,9 +389,9 @@ class SystemCheckpoint(Base):
     )  # created, applied, rolled_back
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    applied_at = Column(DateTime)
-    rolled_back_at = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    applied_at = Column(DateTime(timezone=True))
+    rolled_back_at = Column(DateTime(timezone=True))
 
     # Relationships
     agent = relationship("Agent", back_populates="checkpoints")
@@ -420,7 +426,7 @@ class SystemMetric(Base):
     labels = Column(JSONB, default={})  # Key-value pairs for filtering
 
     # Timestamps
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime(timezone=True), default=utc_now, index=True)
 
     # Relationships
     agent = relationship("Agent")
@@ -478,9 +484,9 @@ class CodeArtifact(Base):
     )  # draft, reviewed, approved, deployed
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deployed_at = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    deployed_at = Column(DateTime(timezone=True))
 
     # Relationships
     generated_by_agent = relationship("Agent")

@@ -1331,7 +1331,7 @@ async def create_self_improvement_task(
 async def get_task(task_id: str):
     """Get specific task information."""
     try:
-        task = await task_queue.get_task(task_id)
+        task = await task_queue.get_task_by_id(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
 
