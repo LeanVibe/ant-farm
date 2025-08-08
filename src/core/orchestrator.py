@@ -5,15 +5,14 @@ import subprocess
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Dict
 
 import structlog
-from sqlalchemy.exc import SQLAlchemyError
 
-from .message_broker import message_broker
 from .models import Agent, get_database_manager
+from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
 
 logger = structlog.get_logger()
@@ -48,6 +47,7 @@ class AgentInfo:
     tasks_failed: int
     current_task_id: str | None = None
     load_factor: float = 0.0
+    short_id: str | None = None
 
 
 @dataclass
@@ -526,6 +526,9 @@ class AgentOrchestrator:
             return None
 
         # Register the agent
+        agent_short_id = ShortIDGenerator.generate_agent_short_id(
+            agent_name, agent_name
+        )
         agent_info = AgentInfo(
             id=str(uuid.uuid4()),
             name=agent_name,
@@ -538,6 +541,7 @@ class AgentOrchestrator:
             created_at=time.time(),
             tasks_completed=0,
             tasks_failed=0,
+            short_id=agent_short_id,
         )
 
         if await self.registry.register_agent(agent_info):

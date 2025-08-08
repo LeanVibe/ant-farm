@@ -312,6 +312,7 @@ class AgentInfo(BaseModel):
     tasks_completed: int = 0
     tasks_failed: int = 0
     uptime: float = 0.0
+    short_id: str | None = None
 
 
 class TaskCreate(BaseModel):
@@ -973,6 +974,7 @@ async def list_agents(
                 capabilities=capabilities_dict,
                 last_heartbeat=agent.last_heartbeat,
                 uptime=time.time() - agent.created_at if agent.created_at else 0.0,
+                short_id=agent.short_id,
             )
             agent_info.append(info.dict())
 
