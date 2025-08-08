@@ -13,6 +13,7 @@ import structlog
 try:
     from ..core.config import settings
     from ..core.task_queue import Task
+    from ..core.testing.ai_test_generator import AITestGenerator, TestType
     from .base_agent import BaseAgent, HealthStatus, TaskResult
 except ImportError:
     # Direct execution - add src to path
@@ -20,6 +21,7 @@ except ImportError:
     sys.path.insert(0, str(src_path))
     from core.config import settings
     from core.task_queue import Task
+    from core.testing.ai_test_generator import AITestGenerator, TestType
     from agents.base_agent import BaseAgent, HealthStatus, TaskResult
 
 logger = structlog.get_logger()
@@ -40,11 +42,15 @@ class QAAgent(BaseAgent):
         self.code_quality_tools = ["mypy", "ruff", "bandit", "safety", "pylint"]
         self.coverage_tools = ["pytest-cov", "coverage"]
 
+        # AI Test Generator integration
+        self.ai_test_generator = AITestGenerator()
+
         # Performance tracking
         self.tests_run = 0
         self.tests_passed = 0
         self.tests_failed = 0
         self.code_issues_found = 0
+        self.ai_tests_generated = 0
 
         logger.info("QA Agent initialized", agent=self.name)
 
@@ -591,6 +597,67 @@ class QAAgent(BaseAgent):
                 total_score -= len(issues) * 2  # 2 points per issue
 
         return max(0.0, total_score)
+
+    async def generate_ai_tests(
+        self, source_code: str, target_file: str, test_types: list[TestType] = None
+    ) -> dict[str, Any]:
+        """Generate comprehensive AI tests for given source code."""
+        if test_types is None:
+            test_types = [
+                TestType.UNIT,
+                TestType.INTEGRATION,
+                TestType.PERFORMANCE,
+                TestType.SECURITY,
+            ]
+
+        try:
+            all_generated_tests = []
+            test_generation_results = {}
+
+            for test_type in test_types:
+                logger.info(
+                    "Generating AI tests",
+                    test_type=test_type.value,
+                    target_file=target_file,
+                )
+
+                result = await self.ai_test_generator.generate_tests(
+                    source_code=source_code, test_type=test_type
+                )
+
+                test_generation_results[test_type.value] = {
+                    "success": result.success,
+                    "test_count": len(result.generated_tests),
+                    "error": result.error_message if not result.success else None,
+                }
+
+                if result.success:
+                    all_generated_tests.extend(result.generated_tests)
+                    self.ai_tests_generated += len(result.generated_tests)
+
+            logger.info(
+                "AI test generation completed",
+                total_tests=len(all_generated_tests),
+                target_file=target_file,
+            )
+
+            return {
+                "success": True,
+                "generated_tests": all_generated_tests,
+                "generation_results": test_generation_results,
+                "total_tests_generated": len(all_generated_tests),
+            }
+
+        except Exception as e:
+            logger.error(
+                "AI test generation failed", error=str(e), target_file=target_file
+            )
+            return {
+                "success": False,
+                "error": str(e),
+                "generated_tests": [],
+                "total_tests_generated": 0,
+            }
 
     def _extract_coverage_from_output(self, output: str) -> float:
         """Extract coverage percentage from pytest output."""
