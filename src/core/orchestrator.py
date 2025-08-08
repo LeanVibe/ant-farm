@@ -5,12 +5,14 @@ import subprocess
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Dict
 
 import structlog
 
+from .message_broker import message_broker
 from .models import Agent, get_database_manager
 from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
