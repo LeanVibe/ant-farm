@@ -27,6 +27,8 @@ dependencies = [
     "scikit-learn>=1.3.0",
     "sentence-transformers>=2.2.0",
     "psutil>=5.9.0",
+    "greenlet>=3.2.3",
+    "pyjwt>=2.10.1",
 ]
 
 [project.optional-dependencies]

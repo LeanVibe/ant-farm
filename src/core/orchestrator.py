@@ -336,22 +336,29 @@ class AgentSpawner:
         session_name = f"hive-{agent_name}"
 
         try:
-            # Create tmux session - use full Python path and environment
+            # Create tmux session using uv to manage dependencies
             import sys
+            import os
 
+            # Get current environment variables
+            current_env = os.environ.copy()
+
+            # Use uv run to ensure proper dependency management
             cmd = [
                 "tmux",
                 "new-session",
                 "-d",
                 "-s",
                 session_name,
-                f"cd {self.project_root} && {sys.executable} -m src.agents.runner --type {agent_type} --name {agent_name}",
+                f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}",
             ]
 
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd, check=True, capture_output=True, text=True, env=current_env
+            )
 
-            # Wait a moment for the session to initialize
-            await asyncio.sleep(1)
+            # Wait longer for the session to initialize (uv needs time to set up environment)
+            await asyncio.sleep(3)
 
             # Verify session exists
             check_cmd = ["tmux", "has-session", "-t", session_name]
