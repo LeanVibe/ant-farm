@@ -342,7 +342,12 @@ class HealthMonitor:
         dead_agents = []
 
         for agent_name, agent_info in self.registry.agents.items():
-            # Check heartbeat timeout
+            # For agents in STARTING status, check if their tmux session is actually running
+            if agent_info.status == AgentStatus.STARTING:
+                await self._check_starting_agent(agent_name, agent_info)
+                continue
+
+            # Check heartbeat timeout for active agents
             time_since_heartbeat = current_time - agent_info.last_heartbeat
 
             if time_since_heartbeat > self.heartbeat_interval * 2:
@@ -360,6 +365,50 @@ class HealthMonitor:
         # Handle dead agents
         for agent_name in dead_agents:
             await self._handle_dead_agent(agent_name)
+
+    async def _check_starting_agent(
+        self, agent_name: str, agent_info: AgentInfo
+    ) -> None:
+        """Check if a starting agent has actually become active."""
+        import subprocess
+
+        try:
+            # Check if tmux session exists and is running
+            session_name = agent_info.tmux_session
+            if session_name:
+                # Check if session exists
+                check_cmd = ["tmux", "has-session", "-t", session_name]
+                result = subprocess.run(check_cmd, capture_output=True)
+
+                if result.returncode == 0:
+                    # Session exists, check if agent process is running (basic check)
+                    # If it's been more than 10 seconds since spawn, assume it should be active
+                    time_since_start = time.time() - agent_info.created_at
+                    if time_since_start > 10:  # Give agent 10 seconds to start
+                        logger.info(
+                            "Marking long-running agent as active",
+                            agent_name=agent_name,
+                            time_since_start=time_since_start,
+                        )
+                        await self.registry.update_agent_status(
+                            agent_name, AgentStatus.ACTIVE
+                        )
+                else:
+                    # Session doesn't exist, agent failed to start
+                    logger.warning(
+                        "Agent tmux session not found, marking as stopped",
+                        agent_name=agent_name,
+                        session_name=session_name,
+                    )
+                    await self.registry.update_agent_status(
+                        agent_name, AgentStatus.STOPPED
+                    )
+        except Exception as e:
+            logger.warning(
+                "Failed to check starting agent status",
+                agent_name=agent_name,
+                error=str(e),
+            )
 
     async def _ping_agent(self, agent_name: str) -> bool:
         """Ping an agent to check if it's responsive."""
