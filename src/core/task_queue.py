@@ -618,6 +618,32 @@ class TaskQueue:
             logger.error("Failed to mark task as failed", task_id=task_id, error=str(e))
             return False
 
+    async def start_task(self, task_id: str) -> bool:
+        """Mark a task as started/in progress."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                logger.warning("Task not found for starting", task_id=task_id)
+                return False
+
+            task = await self._dict_to_task(task_data)
+            task.status = TaskStatus.IN_PROGRESS
+            task.started_at = time.time()
+
+            await self._update_task(task)
+            await self._update_stats("started")
+
+            logger.info("Task marked as started", task_id=task_id)
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Failed to mark task as started", task_id=task_id, error=str(e)
+            )
+            return False
+
     async def complete_task(self, task_id: str, result: dict = None) -> bool:
         """Mark a task as completed."""
         try:

@@ -297,7 +297,7 @@ class MetaAgent(BaseAgent):
         try:
             # Task completion rate
             total_tasks = await task_queue.get_total_tasks()
-            completed_tasks = await task_queue.get_completed_tasks()
+            completed_tasks = await task_queue.get_completed_tasks_count()
 
             if total_tasks > 0:
                 metrics["task_completion_rate"] = completed_tasks / total_tasks
