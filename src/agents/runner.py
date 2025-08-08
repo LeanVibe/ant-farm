@@ -16,6 +16,7 @@ try:
     from .meta_agent import MetaAgent
     from .qa_agent import QAAgent
     from .architect_agent import ArchitectAgent
+    from .devops_agent import DevOpsAgent
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
@@ -24,6 +25,7 @@ except ImportError:
     from agents.meta_agent import MetaAgent
     from agents.qa_agent import QAAgent
     from agents.architect_agent import ArchitectAgent
+    from agents.devops_agent import DevOpsAgent
     from core.task_queue import task_queue
 
 logger = structlog.get_logger()
@@ -276,10 +278,9 @@ class ResearchAgent(BaseAgent):
 # Agent registry
 AGENT_TYPES: dict[str, type[BaseAgent]] = {
     "meta": MetaAgent,
-    "developer": DeveloperAgent,
     "qa": QAAgent,
     "architect": ArchitectAgent,
-    "research": ResearchAgent,
+    "devops": DevOpsAgent,
 }
 
 

@@ -91,9 +91,7 @@ class QAAgent(BaseAgent):
             "validate_changes",
         ]
 
-        return await task_queue.get_next_task(
-            agent_capabilities=qa_task_types, agent_id=self.name
-        )
+        return await task_queue.get_task(agent_id=self.name)
 
     async def _process_task_implementation(self, task: Task) -> TaskResult:
         """QA-specific task processing."""

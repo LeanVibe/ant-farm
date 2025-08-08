@@ -1737,6 +1737,85 @@ async def get_agent_context(agent_id: str, limit: int = 10):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.post("/api/v1/context/{agent_id}/search", response_model=APIResponse)
+async def search_context(agent_id: str, query: str, limit: int = 10):
+    """Perform semantic search on agent context."""
+    try:
+        from ..core.context_engine import get_context_engine
+
+        context_engine = await get_context_engine(settings.database_url)
+        results = await context_engine.search_context(
+            agent_id=agent_id, query=query, limit=limit
+        )
+
+        return APIResponse(
+            success=True,
+            data={
+                "agent_id": agent_id,
+                "query": query,
+                "results": [
+                    {
+                        "id": str(result.id),
+                        "content": result.content,
+                        "similarity_score": result.similarity_score,
+                        "importance_score": result.importance_score,
+                        "category": result.category,
+                        "created_at": result.created_at.isoformat()
+                        if result.created_at
+                        else None,
+                    }
+                    for result in results
+                ],
+            },
+        )
+
+    except Exception as e:
+        logger.error(
+            "Failed to search context", agent_id=agent_id, query=query, error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/context/{agent_id}/add", response_model=APIResponse)
+async def add_context(
+    agent_id: str,
+    content: str,
+    content_type: str = "text",
+    category: str = "general",
+    importance_score: float = 0.5,
+    topic: str = None,
+    metadata: dict = None,
+):
+    """Add a document to the context engine."""
+    try:
+        from ..core.context_engine import get_context_engine
+
+        context_engine = await get_context_engine(settings.database_url)
+        context_id = await context_engine.store_context(
+            agent_id=agent_id,
+            content=content,
+            content_type=content_type,
+            category=category,
+            importance_score=importance_score,
+            topic=topic,
+            metadata=metadata or {},
+        )
+
+        return APIResponse(
+            success=True,
+            data={
+                "agent_id": agent_id,
+                "context_id": str(context_id),
+                "content_length": len(content),
+                "category": category,
+            },
+        )
+
+    except Exception as e:
+        logger.error("Failed to add context", agent_id=agent_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.post("/api/v1/context/{agent_id}/consolidate", response_model=APIResponse)
 async def consolidate_agent_memory(agent_id: str):
     """Trigger memory consolidation for an agent."""

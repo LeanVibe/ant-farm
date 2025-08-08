@@ -31,13 +31,48 @@ def search(
 async def _search_context(query: str, limit: int):
     """Internal async context search"""
     try:
-        # TODO: Implement when context search API endpoint is available
         info_message(f"Searching for: '{query}'")
-        info_message("Context search API endpoint not yet implemented")
 
-        # This would call something like:
-        # response = await client.get(f"/api/v1/context/search", params={"query": query, "limit": limit})
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"http://localhost:9001/api/v1/context/meta-agent/search",
+                params={"query": query, "limit": limit},
+            )
 
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                    results = data.get("data", {}).get("results", [])
+
+                    if results:
+                        console.print(
+                            f"\n🔍 [bold cyan]Found {len(results)} results:[/bold cyan]"
+                        )
+                        for i, result in enumerate(results, 1):
+                            console.print(f"\n[bold]{i}. [/bold]", end="")
+                            console.print(
+                                f"[cyan]Score: {result.get('similarity_score', 0):.3f}[/cyan]"
+                            )
+                            console.print(
+                                f"[dim]Category: {result.get('category', 'unknown')}[/dim]"
+                            )
+                            content = result.get("content", "")[:200]
+                            console.print(
+                                f"{content}{'...' if len(result.get('content', '')) > 200 else ''}"
+                            )
+                    else:
+                        info_message("No results found")
+                else:
+                    error_handler(Exception(data.get("error", "Unknown API error")))
+            else:
+                error_handler(Exception(f"API returned status {response.status_code}"))
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
     except Exception as e:
         error_handler(e)
 
@@ -63,14 +98,41 @@ async def _add_context(file_path: str, agent_id: str):
 
         info_message(f"Adding {file_path} to context engine for agent {agent_id}")
 
-        # TODO: Implement when context add API endpoint is available
-        info_message("Context add API endpoint not yet implemented")
+        # Read file content
+        content = file_path_obj.read_text(encoding="utf-8")
 
-        # This would:
-        # 1. Read the file content
-        # 2. Send it to the context engine API
-        # 3. Generate embeddings and store in vector database
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"http://localhost:9001/api/v1/context/{agent_id}/add",
+                params={
+                    "content": content,
+                    "content_type": "file",
+                    "category": file_path_obj.suffix.lstrip(".") or "text",
+                    "importance_score": 0.7,
+                    "topic": file_path_obj.stem,
+                },
+            )
 
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                    result = data.get("data", {})
+                    success_message(f"Successfully added {file_path} to context engine")
+                    console.print(f"Context ID: {result.get('context_id')}")
+                    console.print(
+                        f"Content length: {result.get('content_length')} characters"
+                    )
+                else:
+                    error_handler(Exception(data.get("error", "Unknown API error")))
+            else:
+                error_handler(Exception(f"API returned status {response.status_code}"))
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
     except Exception as e:
         error_handler(e)
 
@@ -90,7 +152,7 @@ async def _show_context_stats(agent_id: str):
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"http://localhost:8001/api/v1/context/{agent_id}"
+                f"http://localhost:9001/api/v1/context/{agent_id}"
             )
 
             if response.status_code == 200:
@@ -158,7 +220,7 @@ async def _consolidate_memory(agent_id: str):
             timeout=60.0
         ) as client:  # Longer timeout for consolidation
             response = await client.post(
-                f"http://localhost:8001/api/v1/context/{agent_id}/consolidate"
+                f"http://localhost:9001/api/v1/context/{agent_id}/consolidate"
             )
 
             if response.status_code == 200:

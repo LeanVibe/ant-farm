@@ -96,9 +96,7 @@ class DevOpsAgent(BaseAgent):
             "incident_response",
         ]
 
-        return await task_queue.get_next_task(
-            agent_capabilities=devops_task_types, agent_id=self.name
-        )
+        return await task_queue.get_task(agent_id=self.name)
 
     async def _process_task_implementation(self, task: Task) -> TaskResult:
         """DevOps-specific task processing."""
