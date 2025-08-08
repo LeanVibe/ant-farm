@@ -15,6 +15,7 @@ import structlog
 
 # Handle both module and direct execution imports
 try:
+    from ..core.async_db import get_async_database_manager
     from ..core.config import CLIToolType, settings
     from ..core.context_engine import ContextSearchResult, get_context_engine
     from ..core.message_broker import (
@@ -24,17 +25,18 @@ try:
         message_broker,
     )
     from ..core.models import Agent as AgentModel
-    from ..core.models import SystemMetric, get_database_manager
+    from ..core.persistent_cli import get_persistent_cli_manager
     from ..core.task_queue import Task, task_queue
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
+    from core.async_db import get_async_database_manager
     from core.config import CLIToolType, settings
     from core.context_engine import ContextSearchResult, get_context_engine
     from core.message_broker import Message, MessageHandler, MessageType, message_broker
     from core.models import Agent as AgentModel
-    from core.models import SystemMetric, get_database_manager
+    from core.persistent_cli import get_persistent_cli_manager
     from core.task_queue import Task, task_queue
 
 logger = structlog.get_logger()
@@ -335,7 +337,10 @@ class BaseAgent(ABC):
         # Initialize components
         self.cli_tools = CLIToolManager()
         self.message_handler = MessageHandler(name)
-        self.db_manager = get_database_manager(settings.database_url)
+        self.async_db_manager = None  # Will be initialized in start()
+        self.persistent_cli = get_persistent_cli_manager()
+        self.cli_session_id = f"{name}_{int(time.time())}"
+        self.cli_session = None
 
         # Performance tracking
         self.tasks_completed = 0
@@ -388,6 +393,63 @@ class BaseAgent(ABC):
         logger.info("Agent starting", agent=self.name)
 
         try:
+            # Create persistent CLI session
+            logger.info("Creating persistent CLI session", agent=self.name)
+            try:
+                preferred_tool = self.cli_tools.preferred_tool
+                if preferred_tool:
+                    tool_type = preferred_tool.value
+                    self.cli_session = await asyncio.wait_for(
+                        self.persistent_cli.create_session(
+                            session_id=self.cli_session_id,
+                            tool_type=tool_type,
+                            initial_prompt=f"Hello! I'm {self.name}, a {self.agent_type} agent. I'm ready to work on coding tasks.",
+                        ),
+                        timeout=30.0,
+                    )
+                    logger.info(
+                        "Persistent CLI session created",
+                        agent=self.name,
+                        session_id=self.cli_session_id,
+                        tool_type=tool_type,
+                    )
+                else:
+                    logger.warning(
+                        "No CLI tools available for persistent session", agent=self.name
+                    )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "CLI session creation timeout - continuing without persistent session",
+                    agent=self.name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to create persistent CLI session - continuing",
+                    agent=self.name,
+                    error=str(e),
+                )
+
+            # Initialize async database manager
+            logger.info("Initializing database manager", agent=self.name)
+            try:
+                self.async_db_manager = await asyncio.wait_for(
+                    get_async_database_manager(settings.database_url), timeout=10.0
+                )
+                logger.info("Database manager initialized", agent=self.name)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Database manager initialization timeout - continuing without DB",
+                    agent=self.name,
+                )
+                self.async_db_manager = None
+            except Exception as e:
+                logger.warning(
+                    "Database manager initialization failed - continuing",
+                    agent=self.name,
+                    error=str(e),
+                )
+                self.async_db_manager = None
+
             # Initialize context engine with timeout (optional)
             logger.info("Initializing context engine", agent=self.name)
             try:
@@ -478,6 +540,17 @@ class BaseAgent(ABC):
     async def cleanup(self) -> None:
         """Cleanup resources."""
         self.status = "inactive"
+
+        # Close persistent CLI session
+        if self.cli_session:
+            try:
+                await self.persistent_cli.close_session(self.cli_session_id)
+                logger.info("Persistent CLI session closed", agent=self.name)
+            except Exception as e:
+                logger.warning(
+                    "Failed to close CLI session", agent=self.name, error=str(e)
+                )
+
         await message_broker.stop_listening(self.name)
         logger.info("Agent stopped", agent=self.name)
 
@@ -489,7 +562,7 @@ class BaseAgent(ABC):
     async def execute_with_cli_tool(
         self, prompt: str, tool_override: CLIToolType | None = None
     ) -> ToolResult:
-        """Execute prompt using CLI tools with rate limiting."""
+        """Execute prompt using CLI tools with persistent session support."""
 
         # Rate limiting
         current_time = time.time()
@@ -503,22 +576,64 @@ class BaseAgent(ABC):
         self._last_cli_call = current_time
         self._cli_call_count += 1
 
-        # Execute with CLI tools
-        result = await self.cli_tools.execute_prompt(prompt, tool_override)
+        # Try persistent session first
+        if self.cli_session and self.cli_session.status == "active":
+            try:
+                logger.info(
+                    "Using persistent CLI session",
+                    agent=self.name,
+                    session_id=self.cli_session_id,
+                )
+
+                start_time = time.time()
+                response = await self.persistent_cli.send_command(
+                    self.cli_session_id, prompt
+                )
+                execution_time = time.time() - start_time
+
+                result = ToolResult(
+                    success=True,
+                    output=response,
+                    tool_used=self.cli_session.tool_type,
+                    execution_time=execution_time,
+                )
+
+                logger.info(
+                    "Persistent CLI execution successful",
+                    agent=self.name,
+                    execution_time=execution_time,
+                )
+
+            except Exception as e:
+                logger.warning(
+                    "Persistent CLI session failed, falling back to standard execution",
+                    agent=self.name,
+                    error=str(e),
+                )
+                # Fall back to standard CLI execution
+                result = await self.cli_tools.execute_prompt(prompt, tool_override)
+        else:
+            # Use standard CLI execution
+            result = await self.cli_tools.execute_prompt(prompt, tool_override)
 
         # Store execution context
-        if result.success:
-            await self.store_context(
-                content=f"CLI Execution:\nPrompt: {prompt[:200]}...\nResult: {result.output[:500]}...",
-                importance_score=0.6,
-                category="cli_execution",
-                metadata={
-                    "tool_used": result.tool_used,
-                    "execution_time": result.execution_time,
-                    "prompt_length": len(prompt),
-                    "output_length": len(result.output),
-                },
-            )
+        if result.success and self.context_engine and self.agent_uuid:
+            try:
+                await self.store_context(
+                    content=f"CLI Execution:\nPrompt: {prompt[:200]}...\nResult: {result.output[:500]}...",
+                    importance_score=0.6,
+                    category="cli_execution",
+                    metadata={
+                        "tool_used": result.tool_used,
+                        "execution_time": result.execution_time,
+                        "prompt_length": len(prompt),
+                        "output_length": len(result.output),
+                        "used_persistent_session": self.cli_session is not None
+                        and self.cli_session.status == "active",
+                    },
+                )
+            except Exception as e:
+                logger.warning("Failed to store CLI execution context", error=str(e))
 
         return result
 
@@ -532,16 +647,22 @@ class BaseAgent(ABC):
             await task_queue.start_task(task.id)
 
             # Store task context
-            await self.store_context(
-                content=f"Processing task: {task.title}\n{task.description}",
-                importance_score=0.7,
-                category="task_processing",
-                metadata={
-                    "task_id": task.id,
-                    "task_type": task.task_type,
-                    "priority": task.priority,
-                },
-            )
+            if self.context_engine and self.agent_uuid:
+                try:
+                    await self.store_context(
+                        content=f"Processing task: {task.title}\n{task.description}",
+                        importance_score=0.7,
+                        category="task_processing",
+                        metadata={
+                            "task_id": task.id,
+                            "task_type": task.task_type,
+                            "priority": task.priority,
+                        },
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to store task processing context", error=str(e)
+                    )
 
             # Process the task
             result = await self._process_task_implementation(task)
@@ -555,31 +676,43 @@ class BaseAgent(ABC):
                 await task_queue.complete_task(task.id, result.data)
 
                 # Store success context
-                await self.store_context(
-                    content=f"Task completed successfully: {task.title}",
-                    importance_score=0.8,
-                    category="task_completion",
-                    metadata={
-                        "task_id": task.id,
-                        "execution_time": execution_time,
-                        "result_data": result.data,
-                    },
-                )
+                if self.context_engine and self.agent_uuid:
+                    try:
+                        await self.store_context(
+                            content=f"Task completed successfully: {task.title}",
+                            importance_score=0.8,
+                            category="task_completion",
+                            metadata={
+                                "task_id": task.id,
+                                "execution_time": execution_time,
+                                "result_data": result.data,
+                            },
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to store task completion context", error=str(e)
+                        )
             else:
                 self.tasks_failed += 1
                 await task_queue.fail_task(task.id, result.error or "Unknown error")
 
                 # Store failure context
-                await self.store_context(
-                    content=f"Task failed: {task.title}\nError: {result.error}",
-                    importance_score=0.9,  # Failures are important to remember
-                    category="task_failure",
-                    metadata={
-                        "task_id": task.id,
-                        "error": result.error,
-                        "execution_time": execution_time,
-                    },
-                )
+                if self.context_engine and self.agent_uuid:
+                    try:
+                        await self.store_context(
+                            content=f"Task failed: {task.title}\nError: {result.error}",
+                            importance_score=0.9,  # Failures are important to remember
+                            category="task_failure",
+                            metadata={
+                                "task_id": task.id,
+                                "error": result.error,
+                                "execution_time": execution_time,
+                            },
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to store task failure context", error=str(e)
+                        )
 
             # Record metrics
             await self._record_task_metrics(task, result, execution_time)
@@ -604,9 +737,14 @@ class BaseAgent(ABC):
         # This is a basic implementation - subclasses should override
 
         # Retrieve relevant context
-        context_results = await self.retrieve_context(
-            f"task {task.task_type} {task.title}", limit=5
-        )
+        context_results = []
+        if self.context_engine and self.agent_uuid:
+            try:
+                context_results = await self.retrieve_context(
+                    f"task {task.task_type} {task.title}", limit=5
+                )
+            except Exception as e:
+                logger.warning("Failed to retrieve context", error=str(e))
 
         # Build prompt with context
         context_text = "\n".join(
@@ -684,8 +822,13 @@ class BaseAgent(ABC):
         metadata: dict[str, Any] = None,
     ) -> str:
         """Store context in semantic memory."""
+        if not self.async_db_manager or not self.agent_uuid:
+            logger.warning(
+                "Cannot store context - database manager or agent UUID not available"
+            )
+            return ""
 
-        context_id = await self.context_engine.store_context(
+        return await self.async_db_manager.store_context(
             agent_id=self.agent_uuid,
             content=content,
             importance_score=importance_score,
@@ -693,8 +836,6 @@ class BaseAgent(ABC):
             topic=topic,
             metadata=metadata,
         )
-
-        return context_id
 
     async def retrieve_context(
         self,
@@ -704,6 +845,11 @@ class BaseAgent(ABC):
         min_importance: float = 0.0,
     ) -> list[ContextSearchResult]:
         """Retrieve relevant context from semantic memory."""
+        if not self.context_engine or not self.agent_uuid:
+            logger.warning(
+                "Cannot retrieve context - context engine or agent UUID not available"
+            )
+            return []
 
         return await self.context_engine.retrieve_context(
             query=query,
@@ -724,16 +870,27 @@ class BaseAgent(ABC):
             if not self.cli_tools.preferred_tool:
                 return HealthStatus.DEGRADED
 
+            # Check CLI session health
+            if self.cli_session:
+                try:
+                    session_status = await self.persistent_cli.get_session_status(
+                        self.cli_session_id
+                    )
+                    if session_status.get("status") != "active":
+                        return HealthStatus.DEGRADED
+                except Exception as e:
+                    logger.warning("CLI session health check failed", error=str(e))
+                    return HealthStatus.DEGRADED
+
             # Check database connection
-            try:
-                db_session = self.db_manager.get_session()
-                db_session.execute("SELECT 1")
-            except (ConnectionError, OSError, Exception) as e:
-                logger.warning("Database health check failed", error=str(e))
-                return HealthStatus.UNHEALTHY
-            finally:
-                if "db_session" in locals():
-                    db_session.close()
+            if self.async_db_manager:
+                try:
+                    db_healthy = await self.async_db_manager.health_check()
+                    if not db_healthy:
+                        return HealthStatus.UNHEALTHY
+                except Exception as e:
+                    logger.warning("Database health check failed", error=str(e))
+                    return HealthStatus.DEGRADED
 
             # Check recent performance
             if (
@@ -748,73 +905,67 @@ class BaseAgent(ABC):
 
     async def _register_agent(self):
         """Register agent in database."""
+        if not self.async_db_manager:
+            logger.warning(
+                "Cannot register agent - async database manager not available"
+            )
+            return
+
         try:
-            # Run database operations in executor to avoid greenlet issues
-            import asyncio
-            from functools import partial
-
-            def sync_register():
-                db_session = self.db_manager.get_session()
-                try:
-                    # Check if agent exists
-                    existing_agent = (
-                        db_session.query(AgentModel).filter_by(name=self.name).first()
-                    )
-
-                    if existing_agent:
-                        # Update existing agent
-                        existing_agent.status = "active"
-                        existing_agent.last_heartbeat = datetime.fromtimestamp(
-                            time.time()
-                        )
-                        self.agent_uuid = str(existing_agent.id)  # Store the UUID
-                    else:
-                        # Create new agent
-                        agent = AgentModel(
-                            name=self.name,
-                            type=self.agent_type,
-                            role=self.role,
-                            capabilities=self._get_capabilities(),
-                            status="active",
-                        )
-                        db_session.add(agent)
-                        db_session.flush()  # Flush to get the ID
-                        self.agent_uuid = str(agent.id)  # Store the UUID
-
-                    db_session.commit()
-                    logger.info(f"Agent registered in database: {self.name}")
-
-                finally:
-                    db_session.close()
-
-            # Run in executor to avoid blocking async loop
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, sync_register)
+            self.agent_uuid = await self.async_db_manager.register_agent(
+                name=self.name,
+                agent_type=self.agent_type,
+                role=self.role,
+                capabilities=self._get_capabilities(),
+                tmux_session=f"hive-{self.name}",
+            )
+            logger.info(
+                "Agent registered in database", agent=self.name, uuid=self.agent_uuid
+            )
 
         except Exception as e:
-            logger.warning(f"Failed to register agent in database: {e}")
+            logger.warning(
+                "Failed to register agent in database", agent=self.name, error=str(e)
+            )
             # Continue without database registration - agent can still function
 
     def _get_capabilities(self) -> dict[str, Any]:
         """Get agent capabilities."""
-        return {
+        capabilities = {
             "cli_tools": list(self.cli_tools.available_tools.keys()),
             "preferred_tool": self.cli_tools.preferred_tool.value
             if self.cli_tools.preferred_tool
             else None,
             "supports_context": True,
             "supports_messaging": True,
+            "supports_persistent_sessions": True,
             "agent_version": "2.0.0",
         }
+
+        # Add CLI session info if available
+        if self.cli_session:
+            capabilities["cli_session"] = {
+                "session_id": self.cli_session_id,
+                "tool_type": self.cli_session.tool_type,
+                "status": self.cli_session.status,
+                "created_at": self.cli_session.created_at,
+            }
+
+        return capabilities
 
     async def _record_task_metrics(
         self, task: Task, result: TaskResult, execution_time: float
     ):
         """Record task execution metrics."""
-        db_session = self.db_manager.get_session()
+        if not self.async_db_manager or not self.agent_uuid:
+            logger.warning(
+                "Cannot record metrics - database manager or agent UUID not available"
+            )
+            return
+
         try:
             # Record execution time metric
-            metric = SystemMetric(
+            await self.async_db_manager.record_system_metric(
                 metric_name="task_execution_time",
                 metric_type="histogram",
                 value=execution_time,
@@ -827,10 +978,9 @@ class BaseAgent(ABC):
                     "success": str(result.success).lower(),
                 },
             )
-            db_session.add(metric)
 
             # Record success/failure metric
-            success_metric = SystemMetric(
+            await self.async_db_manager.record_system_metric(
                 metric_name="task_completion",
                 metric_type="counter",
                 value=1.0 if result.success else 0.0,
@@ -843,15 +993,9 @@ class BaseAgent(ABC):
                     "result": "success" if result.success else "failure",
                 },
             )
-            db_session.add(success_metric)
-
-            db_session.commit()
 
         except Exception as e:
-            db_session.rollback()
             logger.error("Failed to record metrics", agent=self.name, error=str(e))
-        finally:
-            db_session.close()
 
     # Collaboration support
     async def initiate_collaboration(
@@ -1181,7 +1325,7 @@ class BaseAgent(ABC):
         """Handle health check message."""
         health = await self.health_check()
 
-        return {
+        response = {
             "health_status": health.value,
             "agent_name": self.name,
             "agent_type": self.agent_type,
@@ -1194,6 +1338,18 @@ class BaseAgent(ABC):
             if self.cli_tools.preferred_tool
             else None,
         }
+
+        # Add CLI session info if available
+        if self.cli_session:
+            try:
+                session_status = await self.persistent_cli.get_session_status(
+                    self.cli_session_id
+                )
+                response["cli_session"] = session_status
+            except Exception as e:
+                response["cli_session"] = {"error": str(e)}
+
+        return response
 
     async def _handle_shutdown(self, message: Message) -> dict[str, Any]:
         """Handle shutdown message."""
