@@ -141,11 +141,11 @@ class MetaAgent(BaseAgent):
 
         # Cache is invalid, fetch from database
         try:
-            db_session = self.db_manager.get_session()
-            try:
+            # Use async database manager if available
+            if self.async_db_manager:
                 # Query active agents with performance monitoring
                 query_start = time.time()
-                agents = db_session.query(AgentModel).filter_by(status="active").all()
+                agents = await self.async_db_manager.get_active_agents()
                 query_time = time.time() - query_start
 
                 if query_time > 1.0:  # Log slow queries
@@ -156,8 +156,12 @@ class MetaAgent(BaseAgent):
                 self._cache_timestamp = current_time
 
                 return agents
-            finally:
-                db_session.close()
+            else:
+                # Fallback - return empty list if no database manager
+                logger.warning(
+                    "No async database manager available for fetching agents"
+                )
+                return []
 
         except Exception as e:
             logger.error("Failed to fetch active agents", error=str(e))
