@@ -119,54 +119,35 @@ class PersistentCLIManager:
     ):
         """Start an OpenCode session in the workspace."""
 
-        # Create a startup script that keeps OpenCode running
-        startup_script = os.path.join(workspace, "startup.sh")
+        # For now, OpenCode doesn't support true persistent sessions
+        # So we'll simulate persistence by maintaining conversation history
+        # and using the regular CLI execution with context
 
-        with open(startup_script, "w") as f:
-            f.write(f"""#!/bin/bash
-cd "{workspace}"
+        session.conversation_history = []
 
-# Start opencode in interactive mode
-# We'll pipe commands through named pipes
-mkfifo input_pipe output_pipe 2>/dev/null || true
+        # Mark as active without creating a persistent process
+        # We'll handle commands on-demand with context
 
-# Start opencode with workspace context
-opencode --workspace="{workspace}" < input_pipe > output_pipe 2>&1 &
-OPENCODE_PID=$!
-
-# Keep the session alive and monitor for commands
-while kill -0 $OPENCODE_PID 2>/dev/null; do
-    if [ -f "input.txt" ] && [ -s "input.txt" ]; then
-        # Send the command to opencode
-        cat "input.txt" > input_pipe
-        # Wait for response and capture it
-        timeout 30 cat output_pipe > "output.txt" 2>&1 || echo "Command timed out" > "output.txt"
-        # Clear the input file
-        > "input.txt"
-        # Update last activity
-        echo "$(date +%s)" > "last_activity.txt"
-    fi
-    sleep 1
-done
-""")
-
-        os.chmod(startup_script, 0o755)
-
-        # Start the session script
-        session.process = await asyncio.create_subprocess_exec(
-            "bash",
-            startup_script,
-            cwd=workspace,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        # Wait a moment for startup
-        await asyncio.sleep(2)
-
-        # Send initial prompt if provided
         if initial_prompt:
-            await self.send_command(session.session_id, initial_prompt)
+            # Store the initial prompt in history
+            session.conversation_history.append(
+                {"role": "user", "content": initial_prompt, "timestamp": time.time()}
+            )
+
+            # For OpenCode, we'll simulate the initial response
+            initial_response = f"OpenCode session initialized in workspace: {workspace}. Ready for coding tasks."
+            session.conversation_history.append(
+                {
+                    "role": "assistant",
+                    "content": initial_response,
+                    "timestamp": time.time(),
+                }
+            )
+
+        logger.info(
+            "OpenCode session initialized (simulated persistence)",
+            session_id=session.session_id,
+        )
 
     async def _start_claude_session(
         self, session: CLISession, workspace: str, initial_prompt: str = None
@@ -228,50 +209,57 @@ done
     async def _send_opencode_command(self, session: CLISession, command: str) -> str:
         """Send command to OpenCode session."""
 
-        # Add command to conversation history
-        session.conversation_history.append(
-            {"role": "user", "content": command, "timestamp": time.time()}
-        )
+        # Build context from conversation history for OpenCode
+        context_parts = []
+        for msg in session.conversation_history[-10:]:  # Last 10 messages for context
+            role = msg["role"]
+            content = msg["content"]
+            context_parts.append(f"{role}: {content}")
 
-        # Write command to input file
-        with open(session.input_file, "w") as f:
-            f.write(command + "\n")
+        # Prepare full prompt with context
+        full_prompt = f"""
+Previous conversation:
+{chr(10).join(context_parts)}
 
-        # Wait for response with timeout
-        response_timeout = 60  # 1 minute
-        start_time = time.time()
+Current request: {command}
 
-        while time.time() - start_time < response_timeout:
-            if (
-                os.path.exists(session.output_file)
-                and os.path.getsize(session.output_file) > 0
-            ):
-                with open(session.output_file, "r") as f:
-                    response = f.read().strip()
+Please provide a response that takes into account the previous conversation context and any ongoing work.
+"""
 
-                if response:
-                    # Add response to conversation history
-                    session.conversation_history.append(
-                        {
-                            "role": "assistant",
-                            "content": response,
-                            "timestamp": time.time(),
-                        }
-                    )
+        try:
+            # Execute OpenCode command using subprocess
+            process = await asyncio.create_subprocess_exec(
+                "opencode",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
-                    # Clear output file for next command
-                    open(session.output_file, "w").close()
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(input=full_prompt.encode()), timeout=60
+            )
 
-                    return response
+            if process.returncode == 0:
+                response = stdout.decode().strip()
+            else:
+                response = f"Error: {stderr.decode().strip()}"
 
-            await asyncio.sleep(0.5)
+            # Add to conversation history
+            session.conversation_history.append(
+                {"role": "user", "content": command, "timestamp": time.time()}
+            )
+            session.conversation_history.append(
+                {"role": "assistant", "content": response, "timestamp": time.time()}
+            )
 
-        # Timeout occurred
-        timeout_msg = "Command timed out - no response received"
-        session.conversation_history.append(
-            {"role": "system", "content": timeout_msg, "timestamp": time.time()}
-        )
-        return timeout_msg
+            return response
+
+        except asyncio.TimeoutError:
+            timeout_msg = "OpenCode command timed out"
+            session.conversation_history.append(
+                {"role": "system", "content": timeout_msg, "timestamp": time.time()}
+            )
+            return timeout_msg
 
     async def _execute_claude_command(self, session: CLISession, command: str) -> str:
         """Execute command using Claude CLI with conversation history."""

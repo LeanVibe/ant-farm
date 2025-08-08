@@ -1,13 +1,23 @@
 """DevOps Agent for LeanVibe Agent Hive 2.0."""
 
 import asyncio
+import sys
 import time
+from pathlib import Path
 from typing import Any
 
 import structlog
 
-from ..core.task_queue import Task
-from .base_agent import BaseAgent, HealthStatus, TaskResult
+# Handle both module and direct execution imports
+try:
+    from ..core.task_queue import Task
+    from .base_agent import BaseAgent, HealthStatus, TaskResult
+except ImportError:
+    # Direct execution - add src to path
+    src_path = Path(__file__).parent.parent
+    sys.path.insert(0, str(src_path))
+    from core.task_queue import Task
+    from agents.base_agent import BaseAgent, HealthStatus, TaskResult
 
 logger = structlog.get_logger()
 
@@ -801,3 +811,21 @@ class DevOpsAgent(BaseAgent):
 
         except Exception:
             return HealthStatus.DEGRADED
+
+    async def _on_collaboration_completed(self, result: dict[str, Any]) -> None:
+        """Called when a collaboration is completed."""
+        logger.info(
+            "DevOps collaboration completed",
+            agent=self.name,
+            collaboration_id=result.get("collaboration_id"),
+            success=result.get("success"),
+        )
+
+    async def _on_collaboration_failed(self, failure_info: dict[str, Any]) -> None:
+        """Called when a collaboration fails."""
+        logger.warning(
+            "DevOps collaboration failed",
+            agent=self.name,
+            collaboration_id=failure_info.get("collaboration_id"),
+            reason=failure_info.get("reason"),
+        )
