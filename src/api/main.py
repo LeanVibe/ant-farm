@@ -1064,7 +1064,9 @@ async def spawn_agent(
         )
 
     except Exception as e:
-        logger.error("Failed to spawn agent", agent_type=agent_type, error=str(e))
+        logger.error(
+            f"Failed to search context for agent {agent_id} with query '{query}': {str(e)}"
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1714,7 +1716,7 @@ async def trigger_optimization():
 async def get_agent_context(agent_id: str, limit: int = 10):
     """Get context/memory for a specific agent."""
     try:
-        from ..core.context_engine import get_context_engine
+        from core.context_engine import get_context_engine
 
         context_engine = await get_context_engine(settings.database_url)
         memory_stats = await context_engine.get_memory_stats(agent_id)
@@ -1733,7 +1735,7 @@ async def get_agent_context(agent_id: str, limit: int = 10):
         )
 
     except Exception as e:
-        logger.error("Failed to get agent context", agent_id=agent_id, error=str(e))
+        logger.error(f"Failed to add context for agent {agent_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1741,18 +1743,24 @@ async def get_agent_context(agent_id: str, limit: int = 10):
 async def search_context(agent_id: str, query: str, limit: int = 10):
     """Perform semantic search on agent context."""
     try:
-        from ..core.context_engine import get_context_engine
+        from core.context_engine import get_context_engine
+        import uuid
 
         context_engine = await get_context_engine(settings.database_url)
+
+        # Convert agent name to consistent UUID
+        agent_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"agent.{agent_id}"))
 
         # Search contexts and filter by agent_id
         all_results = await context_engine.search_context(
             query=query, limit=limit * 3
         )  # Get more to filter
 
-        # Filter results by agent_id
+        # Filter results by agent_uuid
         agent_results = [
-            result for result in all_results if str(result.context.agent_id) == agent_id
+            result
+            for result in all_results
+            if str(result.context.agent_id) == agent_uuid
         ]
 
         # Take only the requested limit
@@ -1762,6 +1770,7 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
             success=True,
             data={
                 "agent_id": agent_id,
+                "agent_uuid": agent_uuid,
                 "query": query,
                 "results": [
                     {
@@ -1781,7 +1790,7 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
 
     except Exception as e:
         logger.error(
-            "Failed to search context", agent_id=agent_id, query=query, error=str(e)
+            f"Failed to search context for agent {agent_id} with query '{query}': {str(e)}"
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -1798,12 +1807,17 @@ async def add_context(
 ):
     """Add a document to the context engine."""
     try:
-        from ..core.context_engine import get_context_engine
+        from core.context_engine import get_context_engine
+        import uuid
 
         context_engine = await get_context_engine(settings.database_url)
+
+        # Convert agent name to consistent UUID
+        agent_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"agent.{agent_id}"))
+
         context_id = await context_engine.store_context(
             content=content,
-            agent_id=agent_id,
+            agent_id=agent_uuid,
             content_type=content_type,
             category=category,
             importance_score=importance_score,
@@ -1815,6 +1829,7 @@ async def add_context(
             success=True,
             data={
                 "agent_id": agent_id,
+                "agent_uuid": agent_uuid,
                 "context_id": str(context_id),
                 "content_length": len(content),
                 "category": category,
@@ -1822,7 +1837,7 @@ async def add_context(
         )
 
     except Exception as e:
-        logger.error("Failed to add context", agent_id=agent_id, error=str(e))
+        logger.error(f"Failed to add context for agent {agent_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1830,7 +1845,7 @@ async def add_context(
 async def consolidate_agent_memory(agent_id: str):
     """Trigger memory consolidation for an agent."""
     try:
-        from ..core.context_engine import get_context_engine
+        from core.context_engine import get_context_engine
 
         context_engine = await get_context_engine(settings.database_url)
         consolidation_stats = await context_engine.consolidate_memory(agent_id)
@@ -1841,7 +1856,7 @@ async def consolidate_agent_memory(agent_id: str):
         )
 
     except Exception as e:
-        logger.error("Failed to consolidate memory", agent_id=agent_id, error=str(e))
+        logger.error(f"Failed to add context for agent {agent_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
