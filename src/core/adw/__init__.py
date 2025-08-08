@@ -5,6 +5,11 @@ sessions with built-in safety mechanisms and continuous improvement.
 """
 
 from .session_manager import ADWSession, ADWSessionConfig, SessionPhase
+from .session_persistence import (
+    SessionStatePersistence,
+    SessionStateManager,
+    SessionCheckpoint,
+)
 from .reconnaissance import ReconnaissanceEngine, ReconnaissanceReport
 from .micro_development import MicroDevelopmentEngine, MicroIterationResult
 from .integration_validation import (
@@ -18,6 +23,9 @@ __all__ = [
     "ADWSession",
     "ADWSessionConfig",
     "SessionPhase",
+    "SessionStatePersistence",
+    "SessionStateManager",
+    "SessionCheckpoint",
     "ReconnaissanceEngine",
     "ReconnaissanceReport",
     "MicroDevelopmentEngine",

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from ..safety import AutoRollbackSystem, AutonomousQualityGates, ResourceGuardian
+from .session_persistence import SessionStatePersistence
 
 logger = structlog.get_logger()
 
@@ -116,6 +117,9 @@ class ADWSession:
         self.active = False
         self.consecutive_failures = 0
 
+        # Session persistence
+        self.persistence = SessionStatePersistence(project_path, self.session_id)
+
         # Phase handlers
         self.phase_handlers = {
             SessionPhase.RECONNAISSANCE: self._run_reconnaissance_phase,
@@ -131,13 +135,26 @@ class ADWSession:
         )
 
     async def start_session(
-        self, target_goals: Optional[List[str]] = None
+        self, target_goals: Optional[List[str]] = None, resume: bool = False
     ) -> Dict[str, Any]:
         """Start a complete ADW session."""
         if self.active:
             raise RuntimeError("Session already active")
 
         self.active = True
+
+        # Attempt to restore from checkpoint if resuming
+        if resume:
+            restored = await self.persistence.restore_session(self)
+            if restored:
+                logger.info(
+                    "Resumed ADW session from checkpoint",
+                    session_id=self.session_id,
+                    phase=self.metrics.current_phase.value,
+                )
+            else:
+                logger.info("No checkpoint found, starting fresh session")
+
         logger.info(
             "Starting ADW session", session_id=self.session_id, goals=target_goals
         )
@@ -163,6 +180,13 @@ class ADWSession:
                     break
 
                 await self._run_phase(phase)
+
+                # Save checkpoint after each phase
+                await self.persistence.save_checkpoint(
+                    self,
+                    phase_progress={f"{phase.value}_completed": True},
+                    additional_context={"goals": target_goals},
+                )
 
                 # Check for critical failures
                 if self.consecutive_failures >= self.config.max_consecutive_failures:
@@ -369,6 +393,13 @@ class ADWSession:
             # Create iteration checkpoint
             checkpoint = await self.rollback_system.create_safety_checkpoint(
                 f"Micro-iteration {iteration_num} start"
+            )
+
+            # Save iteration recovery point
+            await self.persistence.create_recovery_point(
+                self,
+                "micro_iteration_start",
+                {"iteration": iteration_num, "checkpoint": checkpoint},
             )
 
             # Step 1: Write failing test (5 minutes)
@@ -658,6 +689,11 @@ class ADWSession:
 
         # Create final checkpoint
         await self.rollback_system.create_safety_checkpoint("ADW session completed")
+        await self.persistence.save_checkpoint(
+            self,
+            phase_progress={"session_completed": True},
+            additional_context={"final_status": self.metrics.current_phase.value},
+        )
 
         # Compile session summary
         summary = {
