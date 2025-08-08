@@ -51,6 +51,7 @@ async def _list_agents():
                     for agent in agents:
                         table_data.append(
                             {
+                                "short_id": agent.get("short_id", "n/a"),
                                 "name": agent.get("name", "unknown"),
                                 "type": agent.get("type", "unknown"),
                                 "status": agent.get("status", "unknown"),
@@ -80,24 +81,37 @@ async def _list_agents():
 
 @app.command()
 def describe(
-    agent_name: str = typer.Argument(..., help="Name of the agent to describe"),
+    agent_identifier: str = typer.Argument(
+        ..., help="Name, short ID, or UUID of the agent to describe"
+    ),
 ):
     """Show detailed information about a specific agent"""
-    asyncio.run(_describe_agent(agent_name))
+    asyncio.run(_describe_agent(agent_identifier))
 
 
-async def _describe_agent(agent_name: str):
+async def _describe_agent(agent_identifier: str):
     """Internal async agent description"""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{API_BASE_URL}/api/v1/agents/{agent_name}")
+            response = await client.get(
+                f"{API_BASE_URL}/api/v1/agents/{agent_identifier}"
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
                     agent = data.get("data", {})
 
-                    console.print(f"\n🤖 [bold cyan]Agent: {agent_name}[/bold cyan]")
+                    console.print(
+                        f"\n🤖 [bold cyan]Agent: {agent.get('name', 'unknown')}[/bold cyan]"
+                    )
+
+                    # Show short ID prominently
+                    short_id = agent.get("short_id")
+                    if short_id:
+                        console.print(f"[bold green]Short ID: {short_id}[/bold green]")
+
+                    console.print(f"UUID: {agent.get('id', 'unknown')}")
                     console.print(f"Type: {agent.get('type', 'unknown')}")
                     console.print(f"Role: {agent.get('role', 'unknown')}")
                     console.print(f"Status: {agent.get('status', 'unknown')}")
@@ -117,7 +131,7 @@ async def _describe_agent(agent_name: str):
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))
             elif response.status_code == 404:
-                error_handler(Exception(f"Agent '{agent_name}' not found"))
+                error_handler(Exception(f"Agent '{agent_identifier}' not found"))
             else:
                 error_handler(Exception(f"API returned status {response.status_code}"))
 
@@ -182,27 +196,33 @@ async def _spawn_agent(agent_type: str, name: str = None):
 
 
 @app.command()
-def stop(agent_name: str = typer.Argument(..., help="Name of the agent to stop")):
+def stop(
+    agent_identifier: str = typer.Argument(
+        ..., help="Name, short ID, or UUID of the agent to stop"
+    ),
+):
     """Stop a specific agent"""
-    asyncio.run(_stop_agent(agent_name))
+    asyncio.run(_stop_agent(agent_identifier))
 
 
-async def _stop_agent(agent_name: str):
+async def _stop_agent(agent_identifier: str):
     """Internal async agent stopping"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/agents/{agent_name}/stop"
+                f"{API_BASE_URL}/api/v1/agents/{agent_identifier}/stop"
             )
 
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
+                    result = data.get("data", {})
+                    agent_name = result.get("agent_name", agent_identifier)
                     success_message(f"Agent '{agent_name}' stopped successfully!")
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))
             elif response.status_code == 404:
-                error_handler(Exception(f"Agent '{agent_name}' not found"))
+                error_handler(Exception(f"Agent '{agent_identifier}' not found"))
             else:
                 error_handler(Exception(f"API returned status {response.status_code}"))
 
@@ -218,29 +238,100 @@ async def _stop_agent(agent_name: str):
 
 @app.command()
 def health(
-    agent_name: str = typer.Argument(..., help="Name of the agent to health check"),
+    agent_identifier: str = typer.Argument(
+        ..., help="Name, short ID, or UUID of the agent to health check"
+    ),
 ):
     """Check the health of a specific agent"""
-    asyncio.run(_check_agent_health(agent_name))
+    asyncio.run(_check_agent_health(agent_identifier))
 
 
-async def _check_agent_health(agent_name: str):
+async def _check_agent_health(agent_identifier: str):
     """Internal async agent health check"""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/agents/{agent_name}/health"
+                f"{API_BASE_URL}/api/v1/agents/{agent_identifier}/health"
             )
 
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
-                    success_message(f"Health check sent to agent '{agent_name}'")
+                    success_message(f"Health check sent to agent '{agent_identifier}'")
                     info_message("Check agent logs for response")
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))
             elif response.status_code == 404:
-                error_handler(Exception(f"Agent '{agent_name}' not found"))
+                error_handler(Exception(f"Agent '{agent_identifier}' not found"))
+            else:
+                error_handler(Exception(f"API returned status {response.status_code}"))
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
+    except Exception as e:
+        error_handler(e)
+
+
+@app.command()
+def search(
+    query: str = typer.Argument(..., help="Search term (partial short ID or name)"),
+):
+    """Search for agents by partial short ID or name"""
+    asyncio.run(_search_agents(query))
+
+
+async def _search_agents(query: str):
+    """Internal async agent search"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{API_BASE_URL}/api/v1/search/agents", params={"q": query}
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                    agents = data.get("data", {}).get("agents", [])
+
+                    if not agents:
+                        info_message(f"No agents found matching '{query}'")
+                        return
+
+                    console.print(
+                        f"\n🔍 [bold cyan]Search Results for '{query}'[/bold cyan]"
+                    )
+
+                    # Create table data
+                    table_data = []
+                    for agent in agents:
+                        table_data.append(
+                            {
+                                "short_id": agent.get("short_id", "n/a"),
+                                "name": agent.get("name", "unknown"),
+                                "type": agent.get("type", "unknown"),
+                                "status": agent.get("status", "unknown"),
+                            }
+                        )
+
+                    table = create_status_table("🤖 Matching Agents", table_data)
+                    console.print(table)
+
+                    success_message(f"Found {len(agents)} matching agents")
+
+                    if len(agents) == 1:
+                        agent = agents[0]
+                        short_id = agent.get("short_id")
+                        name = agent.get("name")
+                        console.print(
+                            f"\n💡 [dim]Tip: Use 'hive agent describe {short_id or name}' for more details[/dim]"
+                        )
+
+                else:
+                    error_handler(Exception(data.get("error", "Unknown API error")))
             else:
                 error_handler(Exception(f"API returned status {response.status_code}"))
 

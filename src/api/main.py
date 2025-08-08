@@ -34,6 +34,7 @@ try:
     from ..core.orchestrator import get_orchestrator
     from ..core.security import User, create_default_admin, security_manager
     from ..core.task_queue import Task, TaskPriority, task_queue
+    from ..core.short_id_resolver import ShortIDResolver
 except ImportError:  # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
@@ -56,6 +57,7 @@ except ImportError:  # Direct execution - add src to path
     from core.orchestrator import get_orchestrator
     from core.security import User, create_default_admin, security_manager
     from core.task_queue import Task, TaskPriority, task_queue
+    from core.short_id_resolver import ShortIDResolver
 
 from fastapi import (
     BackgroundTasks,
@@ -68,6 +70,42 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+
+# Dependency for short ID resolution
+async def get_short_id_resolver() -> ShortIDResolver:
+    """Get a ShortIDResolver instance with database session."""
+    from core.async_db import get_async_database_manager
+
+    db_manager = await get_async_database_manager()
+    async_session = db_manager.async_session_maker()
+    return ShortIDResolver(async_session)
+
+
+# Dependency for agent ID resolution
+async def resolve_agent_identifier(
+    agent_identifier: str, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+) -> dict:
+    """Resolve agent identifier (short ID, name, or UUID) to agent info."""
+    agent = await resolver.get_agent_by_identifier(agent_identifier)
+    if not agent:
+        raise HTTPException(
+            status_code=404, detail=f"Agent not found: {agent_identifier}"
+        )
+    return agent
+
+
+# Dependency for task ID resolution
+async def resolve_task_identifier(
+    task_identifier: str, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+) -> dict:
+    """Resolve task identifier (short ID or UUID) to task info."""
+    task = await resolver.get_task_by_identifier(task_identifier)
+    if not task:
+        raise HTTPException(
+            status_code=404, detail=f"Task not found: {task_identifier}"
+        )
+    return task
 
 
 # WebSocket connection manager
@@ -983,39 +1021,46 @@ async def list_agents(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/agents/{agent_name}", response_model=APIResponse)
+@app.get("/api/v1/agents/{agent_identifier}", response_model=APIResponse)
 # @Permissions.agent_read()  # Temporarily disabled for CLI testing
 async def get_agent(
-    agent_name: str,
+    agent_identifier: str,
+    resolver: ShortIDResolver = Depends(get_short_id_resolver),
     # current_user: User = Depends(get_current_user)  # Temporarily disabled
 ):
-    """Get specific agent information."""
+    """Get specific agent information by short ID, name, or UUID."""
     try:
-        from pathlib import Path
+        # Use short ID resolver to get agent data
+        agent_data = await resolver.get_agent_by_identifier(agent_identifier)
+        if not agent_data:
+            raise HTTPException(
+                status_code=404, detail=f"Agent not found: {agent_identifier}"
+            )
 
-        orchestrator = await get_orchestrator(settings.database_url, Path("."))
-        agent = await orchestrator.registry.get_agent(
-            agent_name
-        )  # Fixed: use registry.get_agent
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-
+        # Convert to AgentInfo format for response
         info = AgentInfo(
-            name=agent.name,
-            type=agent.type,
-            role=agent.role,
-            status=AgentStatus(agent.status),
-            capabilities=agent.capabilities or {},
-            last_heartbeat=agent.last_heartbeat,
-            uptime=time.time() - agent.created_at if agent.created_at else 0.0,
+            name=agent_data["name"],
+            type=agent_data["type"],
+            role=agent_data["role"],
+            status=AgentStatus(agent_data["status"]),
+            capabilities=agent_data["capabilities"] or {},
+            last_heartbeat=agent_data.get("last_heartbeat"),
+            uptime=time.time() - (agent_data.get("created_at") or time.time()),
         )
 
-        return APIResponse(success=True, data=info.dict())
+        # Add short_id to response
+        response_data = info.dict()
+        response_data["short_id"] = agent_data.get("short_id")
+        response_data["id"] = agent_data["id"]
+
+        return APIResponse(success=True, data=response_data)
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get agent", agent_name=agent_name, error=str(e))
+        logger.error(
+            "Failed to get agent", agent_identifier=agent_identifier, error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1070,11 +1115,24 @@ async def spawn_agent(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/api/v1/agents/{agent_name}/stop", response_model=APIResponse)
+@app.post("/api/v1/agents/{agent_identifier}/stop", response_model=APIResponse)
 @Permissions.agent_terminate()
-async def stop_agent(agent_name: str, current_user: User = Depends(get_current_user)):
-    """Stop a specific agent."""
+async def stop_agent(
+    agent_identifier: str,
+    resolver: ShortIDResolver = Depends(get_short_id_resolver),
+    current_user: User = Depends(get_current_user),
+):
+    """Stop a specific agent by short ID, name, or UUID."""
     try:
+        # Resolve agent identifier to get agent info
+        agent_data = await resolver.get_agent_by_identifier(agent_identifier)
+        if not agent_data:
+            raise HTTPException(
+                status_code=404, detail=f"Agent not found: {agent_identifier}"
+            )
+
+        agent_name = agent_data["name"]
+
         from pathlib import Path
 
         orchestrator = await get_orchestrator(settings.database_url, Path("."))
@@ -1088,6 +1146,8 @@ async def stop_agent(agent_name: str, current_user: User = Depends(get_current_u
                     "action": "stopped",
                     "agent": {
                         "name": agent_name,
+                        "short_id": agent_data.get("short_id"),
+                        "id": agent_data["id"],
                         "status": "stopping",
                         "timestamp": time.time(),
                     },
@@ -1095,7 +1155,12 @@ async def stop_agent(agent_name: str, current_user: User = Depends(get_current_u
             )
 
             return APIResponse(
-                success=True, data={"agent_name": agent_name, "status": "stopping"}
+                success=True,
+                data={
+                    "agent_name": agent_name,
+                    "short_id": agent_data.get("short_id"),
+                    "status": "stopping",
+                },
             )
         else:
             raise HTTPException(status_code=404, detail="Agent not found")
@@ -1103,14 +1168,27 @@ async def stop_agent(agent_name: str, current_user: User = Depends(get_current_u
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to stop agent", agent_name=agent_name, error=str(e))
+        logger.error(
+            "Failed to stop agent", agent_identifier=agent_identifier, error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/api/v1/agents/{agent_name}/health", response_model=APIResponse)
-async def check_agent_health(agent_name: str):
-    """Check agent health."""
+@app.post("/api/v1/agents/{agent_identifier}/health", response_model=APIResponse)
+async def check_agent_health(
+    agent_identifier: str, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+):
+    """Check agent health by short ID, name, or UUID."""
     try:
+        # Resolve agent identifier to get agent info
+        agent_data = await resolver.get_agent_by_identifier(agent_identifier)
+        if not agent_data:
+            raise HTTPException(
+                status_code=404, detail=f"Agent not found: {agent_identifier}"
+            )
+
+        agent_name = agent_data["name"]
+
         # Send health check message to agent
         response = await message_broker.send_message(
             from_agent="api-server",
@@ -1126,7 +1204,9 @@ async def check_agent_health(agent_name: str):
 
     except Exception as e:
         logger.error(
-            "Failed to check agent health", agent_name=agent_name, error=str(e)
+            "Failed to check agent health",
+            agent_identifier=agent_identifier,
+            error=str(e),
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -1294,47 +1374,73 @@ async def create_self_improvement_task(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/tasks/{task_id}", response_model=APIResponse)
-async def get_task(task_id: str):
-    """Get specific task information."""
+@app.get("/api/v1/tasks/{task_identifier}", response_model=APIResponse)
+async def get_task(
+    task_identifier: str, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+):
+    """Get specific task information by short ID or UUID."""
     try:
-        task = await task_queue.get_task(task_id)
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
+        # Use short ID resolver to get task data
+        task_data = await resolver.get_task_by_identifier(task_identifier)
+        if not task_data:
+            raise HTTPException(
+                status_code=404, detail=f"Task not found: {task_identifier}"
+            )
 
+        # Convert to TaskInfo format for response
         info = TaskInfo(
-            id=task.id,
-            title=task.title,
-            description=task.description,
-            type=task.task_type,  # This is correct
-            status=task.status,
-            priority=task.priority,
-            assigned_to=task.agent_id,  # Fixed: use agent_id
-            created_at=task.created_at,
-            started_at=task.started_at,
-            completed_at=task.completed_at,
-            result=task.result,
-            error=task.error_message,  # Fixed: use error_message
+            id=task_data["id"],
+            title=task_data["title"],
+            description=task_data["description"],
+            type=task_data["type"],
+            status=task_data["status"],
+            priority=task_data["priority"],
+            assigned_to=task_data.get("agent_id"),
+            created_at=task_data.get("created_at"),
+            started_at=task_data.get("started_at"),
+            completed_at=task_data.get("completed_at"),
+            result=task_data.get("result"),
+            error=task_data.get("error"),
         )
 
-        return APIResponse(success=True, data=info.dict())
+        # Add short_id to response
+        response_data = info.dict()
+        response_data["short_id"] = task_data.get("short_id")
+
+        return APIResponse(success=True, data=response_data)
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get task", task_id=task_id, error=str(e))
+        logger.error(
+            "Failed to get task", task_identifier=task_identifier, error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/api/v1/tasks/{task_id}/cancel", response_model=APIResponse)
-async def cancel_task(task_id: str):
-    """Cancel a task."""
+@app.post("/api/v1/tasks/{task_identifier}/cancel", response_model=APIResponse)
+async def cancel_task(
+    task_identifier: str, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+):
+    """Cancel a task by short ID or UUID."""
     try:
-        success = await task_queue.cancel_task(task_id)
+        # Resolve task identifier to get task UUID
+        task_uuid = await resolver.resolve_task_id(task_identifier)
+        if not task_uuid:
+            raise HTTPException(
+                status_code=404, detail=f"Task not found: {task_identifier}"
+            )
+
+        success = await task_queue.cancel_task(str(task_uuid))
 
         if success:
             return APIResponse(
-                success=True, data={"task_id": task_id, "status": "cancelled"}
+                success=True,
+                data={
+                    "task_id": str(task_uuid),
+                    "task_identifier": task_identifier,
+                    "status": "cancelled",
+                },
             )
         else:
             raise HTTPException(status_code=404, detail="Task not found")
@@ -1342,7 +1448,57 @@ async def cancel_task(task_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to cancel task", task_id=task_id, error=str(e))
+        logger.error(
+            "Failed to cancel task", task_identifier=task_identifier, error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# Short ID management endpoints
+@app.get("/api/v1/search/agents", response_model=APIResponse)
+async def search_agents(
+    q: str, limit: int = 10, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+):
+    """Search agents by partial short ID or name."""
+    try:
+        agents = await resolver.search_agents_by_partial_id(q, limit)
+        return APIResponse(success=True, data={"agents": agents, "query": q})
+    except Exception as e:
+        logger.error("Failed to search agents", query=q, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/search/tasks", response_model=APIResponse)
+async def search_tasks(
+    q: str, limit: int = 10, resolver: ShortIDResolver = Depends(get_short_id_resolver)
+):
+    """Search tasks by partial short ID or title."""
+    try:
+        tasks = await resolver.search_tasks_by_partial_id(q, limit)
+        return APIResponse(success=True, data={"tasks": tasks, "query": q})
+    except Exception as e:
+        logger.error("Failed to search tasks", query=q, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/admin/generate-short-ids", response_model=APIResponse)
+# @require_admin  # Temporarily disabled for testing
+async def generate_short_ids(
+    resolver: ShortIDResolver = Depends(get_short_id_resolver),
+    # current_user: User = Depends(get_current_user)  # Temporarily disabled
+):
+    """Generate short IDs for existing records that don't have them."""
+    try:
+        updated_counts = await resolver.generate_and_assign_short_ids()
+        return APIResponse(
+            success=True,
+            data={
+                "message": "Short IDs generated successfully",
+                "updated_counts": updated_counts,
+            },
+        )
+    except Exception as e:
+        logger.error("Failed to generate short IDs", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

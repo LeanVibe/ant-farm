@@ -65,7 +65,7 @@ async def _list_tasks(status_filter: str = None, assigned_filter: str = None):
                     for task in tasks:
                         table_data.append(
                             {
-                                "id": task.get("id", "unknown")[:8] + "...",
+                                "short_id": task.get("short_id", "n/a"),
                                 "title": task.get("title", "untitled")[:30],
                                 "type": task.get("type", "unknown"),
                                 "status": task.get("status", "unknown"),
@@ -209,21 +209,25 @@ async def _submit_task(
 
 @app.command()
 def logs(
-    task_id: str = typer.Argument(..., help="Task ID to show logs for"),
+    task_identifier: str = typer.Argument(
+        ..., help="Task short ID or UUID to show logs for"
+    ),
     follow: bool = typer.Option(
         False, "--follow", "-f", help="Follow logs in real-time"
     ),
 ):
     """Show logs for a specific task"""
-    asyncio.run(_show_task_logs(task_id, follow))
+    asyncio.run(_show_task_logs(task_identifier, follow))
 
 
-async def _show_task_logs(task_id: str, follow: bool):
+async def _show_task_logs(task_identifier: str, follow: bool):
     """Internal async task log viewing"""
     try:
         # First, get task info
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{API_BASE_URL}/api/v1/tasks/{task_id}")
+            response = await client.get(
+                f"{API_BASE_URL}/api/v1/tasks/{task_identifier}"
+            )
 
             if response.status_code == 200:
                 data = response.json()
@@ -233,7 +237,13 @@ async def _show_task_logs(task_id: str, follow: bool):
                     console.print(
                         f"\n📋 [bold cyan]Task: {task.get('title', 'Unknown')}[/bold cyan]"
                     )
-                    console.print(f"ID: {task_id}")
+
+                    # Show both short ID and UUID if available
+                    short_id = task.get("short_id")
+                    if short_id:
+                        console.print(f"[bold green]Short ID: {short_id}[/bold green]")
+                    console.print(f"UUID: {task.get('id', 'unknown')}")
+
                     console.print(f"Status: {task.get('status', 'unknown')}")
                     console.print(f"Type: {task.get('type', 'unknown')}")
                     console.print(
@@ -260,7 +270,7 @@ async def _show_task_logs(task_id: str, follow: bool):
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))
             elif response.status_code == 404:
-                error_handler(Exception(f"Task '{task_id}' not found"))
+                error_handler(Exception(f"Task '{task_identifier}' not found"))
             else:
                 error_handler(Exception(f"API returned status {response.status_code}"))
 
@@ -276,27 +286,27 @@ async def _show_task_logs(task_id: str, follow: bool):
 
 @app.command()
 def cancel(
-    task_id: str = typer.Argument(..., help="Task ID to cancel"),
+    task_identifier: str = typer.Argument(..., help="Task short ID or UUID to cancel"),
     force: bool = typer.Option(
         False, "--force", help="Force cancellation without confirmation"
     ),
 ):
     """Cancel a specific task"""
-    asyncio.run(_cancel_task(task_id, force))
+    asyncio.run(_cancel_task(task_identifier, force))
 
 
-async def _cancel_task(task_id: str, force: bool):
+async def _cancel_task(task_identifier: str, force: bool):
     """Internal async task cancellation"""
     try:
         # Confirm cancellation unless forced
         if not force:
-            if not confirm_action(f"Cancel task {task_id}?"):
+            if not confirm_action(f"Cancel task {task_identifier}?"):
                 info_message("Cancellation aborted")
                 return
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/tasks/{task_id}/cancel"
+                f"{API_BASE_URL}/api/v1/tasks/{task_identifier}/cancel"
             )
 
             if response.status_code == 200:
@@ -361,6 +371,76 @@ async def _submit_self_improvement(title: str, description: str):
                     console.print(
                         f"\n💡 [dim]Use 'hive task logs {task_id}' to monitor progress[/dim]"
                     )
+
+                else:
+                    error_handler(Exception(data.get("error", "Unknown API error")))
+            else:
+                error_handler(Exception(f"API returned status {response.status_code}"))
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
+    except Exception as e:
+        error_handler(e)
+
+
+@app.command()
+def search(
+    query: str = typer.Argument(..., help="Search term (partial short ID or title)"),
+):
+    """Search for tasks by partial short ID or title"""
+    asyncio.run(_search_tasks(query))
+
+
+async def _search_tasks(query: str):
+    """Internal async task search"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{API_BASE_URL}/api/v1/search/tasks", params={"q": query}
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                    tasks = data.get("data", {}).get("tasks", [])
+
+                    if not tasks:
+                        info_message(f"No tasks found matching '{query}'")
+                        return
+
+                    console.print(
+                        f"\n🔍 [bold cyan]Search Results for '{query}'[/bold cyan]"
+                    )
+
+                    # Create table data
+                    table_data = []
+                    for task in tasks:
+                        table_data.append(
+                            {
+                                "short_id": task.get("short_id", "n/a"),
+                                "title": task.get("title", "untitled")[:30],
+                                "type": task.get("type", "unknown"),
+                                "status": task.get("status", "unknown"),
+                                "priority": task.get("priority", "normal"),
+                            }
+                        )
+
+                    table = create_status_table("📋 Matching Tasks", table_data)
+                    console.print(table)
+
+                    success_message(f"Found {len(tasks)} matching tasks")
+
+                    if len(tasks) == 1:
+                        task = tasks[0]
+                        short_id = task.get("short_id")
+                        task_id = task.get("id")
+                        console.print(
+                            f"\n💡 [dim]Tip: Use 'hive task logs {short_id or task_id}' for more details[/dim]"
+                        )
 
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))

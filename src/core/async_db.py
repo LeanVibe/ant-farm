@@ -234,15 +234,17 @@ _async_db_manager: Optional[AsyncDatabaseManager] = None
 
 
 async def get_async_database_manager(database_url: str = None) -> AsyncDatabaseManager:
-    """Get the global async database manager instance."""
-    global _async_db_manager
+    """Get the async database manager instance."""
+    if database_url is None:
+        database_url = settings.database_url
 
-    if _async_db_manager is None:
-        url = database_url or settings.database_url
-        _async_db_manager = AsyncDatabaseManager(url)
-        await _async_db_manager.initialize()
+    return AsyncDatabaseManager(database_url)
 
-    return _async_db_manager
+
+async def get_async_session(database_url: str = None) -> AsyncSession:
+    """Get an async database session."""
+    db_manager = await get_async_database_manager(database_url)
+    return db_manager.async_session_maker()
 
 
 async def close_async_database():

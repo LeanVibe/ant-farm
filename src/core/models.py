@@ -35,6 +35,14 @@ except ImportError:
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
+try:
+    from .short_id import generate_short_id
+except ImportError:
+    # Fallback if short_id module not available
+    def generate_short_id(name: str, uuid_str: str, id_type: str) -> str:
+        return f"{id_type[:3]}{str(uuid_str)[:4]}"
+
+
 Base = declarative_base()
 
 
@@ -44,6 +52,7 @@ class Agent(Base):
     __tablename__ = "agents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    short_id = Column(String(10), unique=True, index=True)  # Human-friendly short ID
     name = Column(String(255), nullable=False, unique=True, index=True)
     type = Column(String(100), nullable=False, index=True)
     role = Column(String(100), nullable=False)
@@ -94,6 +103,7 @@ class Agent(Base):
         """Convert agent to dictionary."""
         return {
             "id": str(self.id),
+            "short_id": self.short_id,
             "name": self.name,
             "type": self.type,
             "role": self.role,
@@ -114,6 +124,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    short_id = Column(String(10), unique=True, index=True)  # Human-friendly short ID
     title = Column(String(500), nullable=False)
     description = Column(Text)
     type = Column(String(100), nullable=False, index=True)
@@ -159,6 +170,7 @@ class Task(Base):
         """Convert task to dictionary."""
         return {
             "id": str(self.id),
+            "short_id": self.short_id,
             "title": self.title,
             "description": self.description,
             "type": self.type,
@@ -181,6 +193,7 @@ class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    short_id = Column(String(10), unique=True, index=True)  # Human-friendly short ID
     name = Column(String(255), nullable=False)
     type = Column(String(100), nullable=False, index=True)
     description = Column(Text)
@@ -534,6 +547,27 @@ class DatabaseManager:
 
 
 # Event listeners for automatic updates
+@event.listens_for(Agent, "before_insert")
+def generate_agent_short_id(mapper, connection, target):
+    """Generate short ID for agent before insert."""
+    if not target.short_id and target.id and target.name:
+        target.short_id = generate_short_id(target.name, str(target.id), "agent")
+
+
+@event.listens_for(Task, "before_insert")
+def generate_task_short_id(mapper, connection, target):
+    """Generate short ID for task before insert."""
+    if not target.short_id and target.id and target.title:
+        target.short_id = generate_short_id(target.title, str(target.id), "task")
+
+
+@event.listens_for(Session, "before_insert")
+def generate_session_short_id(mapper, connection, target):
+    """Generate short ID for session before insert."""
+    if not target.short_id and target.id and target.name:
+        target.short_id = generate_short_id(target.name, str(target.id), "session")
+
+
 @event.listens_for(Agent, "before_update")
 def receive_before_update(mapper, connection, target):
     """Update the updated_at timestamp on agent updates."""
