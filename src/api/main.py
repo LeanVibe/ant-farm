@@ -955,12 +955,22 @@ async def list_agents(
             elif agent.status.value == "error":
                 api_status = "error"
 
+            # Convert capabilities list to dict format for API compatibility
+            capabilities_dict = {}
+            if agent.capabilities:
+                if isinstance(agent.capabilities, list):
+                    capabilities_dict = {cap: True for cap in agent.capabilities}
+                elif isinstance(agent.capabilities, dict):
+                    capabilities_dict = agent.capabilities
+                else:
+                    capabilities_dict = {}
+
             info = AgentInfo(
                 name=agent.name,
                 type=agent.type,
                 role=agent.role,
                 status=AgentStatus(api_status),
-                capabilities=agent.capabilities or {},
+                capabilities=capabilities_dict,
                 last_heartbeat=agent.last_heartbeat,
                 uptime=time.time() - agent.created_at if agent.created_at else 0.0,
             )

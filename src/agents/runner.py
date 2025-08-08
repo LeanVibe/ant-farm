@@ -14,12 +14,16 @@ try:
     from ..core.task_queue import task_queue
     from .base_agent import BaseAgent
     from .meta_agent import MetaAgent
+    from .qa_agent import QAAgent
+    from .architect_agent import ArchitectAgent
 except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
     from agents.base_agent import BaseAgent
     from agents.meta_agent import MetaAgent
+    from agents.qa_agent import QAAgent
+    from agents.architect_agent import ArchitectAgent
     from core.task_queue import task_queue
 
 logger = structlog.get_logger()

@@ -341,13 +341,37 @@ class CacheManager:
         self.default_config = CacheConfig()
 
     async def initialize(self):
-        """Initialize the cache manager."""
-        try:
-            await self.redis_client.ping()
-            logger.info("Cache manager initialized")
-        except Exception as e:
-            logger.error("Cache manager initialization failed", error=str(e))
-            raise ConnectionError(f"Failed to connect to Redis: {e}") from e
+        """Initialize the cache manager with timeout and retry logic."""
+        max_retries = 3
+        base_timeout = 5.0
+
+        for attempt in range(max_retries):
+            try:
+                # Add timeout to Redis ping
+                await asyncio.wait_for(self.redis_client.ping(), timeout=base_timeout)
+                logger.info("Cache manager initialized")
+                return
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"Redis ping timeout on attempt {attempt + 1}/{max_retries}"
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1.0 * (attempt + 1))  # Progressive backoff
+                    continue
+                else:
+                    logger.error("Redis connection failed after all retries")
+                    raise ConnectionError("Redis connection timeout after retries")
+            except Exception as e:
+                logger.error(
+                    "Cache manager initialization failed",
+                    error=str(e),
+                    attempt=attempt + 1,
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1.0 * (attempt + 1))
+                    continue
+                else:
+                    raise ConnectionError(f"Failed to connect to Redis: {e}") from e
 
     def get_cache(
         self, namespace: str, config: CacheConfig | None = None

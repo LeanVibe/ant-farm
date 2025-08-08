@@ -388,19 +388,83 @@ class BaseAgent(ABC):
         logger.info("Agent starting", agent=self.name)
 
         try:
-            # Initialize context engine
-            self.context_engine = await get_context_engine(settings.database_url)
+            # Initialize context engine with timeout (optional)
+            logger.info("Initializing context engine", agent=self.name)
+            try:
+                self.context_engine = await asyncio.wait_for(
+                    get_context_engine(settings.database_url), timeout=15.0
+                )
+                logger.info("Context engine initialized", agent=self.name)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Context engine initialization timeout - continuing without context engine",
+                    agent=self.name,
+                )
+                self.context_engine = None
+            except Exception as e:
+                logger.warning(
+                    "Context engine initialization failed - continuing",
+                    agent=self.name,
+                    error=str(e),
+                )
+                self.context_engine = None
 
-            # Initialize task queue
-            await task_queue.initialize()
+            # Initialize task queue with timeout (optional)
+            logger.info("Initializing task queue", agent=self.name)
+            try:
+                await asyncio.wait_for(task_queue.initialize(), timeout=10.0)
+                logger.info("Task queue initialized", agent=self.name)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Task queue initialization timeout - continuing", agent=self.name
+                )
+            except Exception as e:
+                logger.warning(
+                    "Task queue initialization failed - continuing",
+                    agent=self.name,
+                    error=str(e),
+                )
 
-            # Register with message broker
-            await message_broker.initialize()
-            await message_broker.start_listening(self.name, self.message_handler)
+            # Register with message broker with timeout (optional)
+            logger.info("Initializing message broker", agent=self.name)
+            try:
+                await asyncio.wait_for(message_broker.initialize(), timeout=5.0)
+                await asyncio.wait_for(
+                    message_broker.start_listening(self.name, self.message_handler),
+                    timeout=5.0,
+                )
+                logger.info("Message broker initialized", agent=self.name)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Message broker initialization timeout - continuing",
+                    agent=self.name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Message broker initialization failed - continuing",
+                    agent=self.name,
+                    error=str(e),
+                )
 
-            # Register agent in database
-            await self._register_agent()
+            # Register agent in database (non-blocking, best effort)
+            logger.info("Registering agent in database", agent=self.name)
+            try:
+                await asyncio.wait_for(self._register_agent(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Database registration timeout - continuing without DB registration",
+                    agent=self.name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Database registration failed - continuing",
+                    agent=self.name,
+                    error=str(e),
+                )
 
+            logger.info(
+                "Agent initialization complete - starting main loop", agent=self.name
+            )
             # Start main execution loop
             await self.run()
 

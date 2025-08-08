@@ -253,23 +253,46 @@ class AgentSpawner:
         session_name = f"hive-{agent_name}"
 
         try:
-            # Create tmux session
+            # Create tmux session - use full Python path and environment
+            import sys
+
             cmd = [
                 "tmux",
                 "new-session",
                 "-d",
                 "-s",
                 session_name,
-                f"cd {self.project_root} && python -m src.agents.runner --type {agent_type} --name {agent_name}",
+                f"cd {self.project_root} && {sys.executable} -m src.agents.runner --type {agent_type} --name {agent_name}",
             ]
 
-            subprocess.run(cmd, check=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+            # Wait a moment for the session to initialize
+            await asyncio.sleep(1)
+
+            # Verify session exists
+            check_cmd = ["tmux", "has-session", "-t", session_name]
+            check_result = subprocess.run(check_cmd, capture_output=True)
+
+            if check_result.returncode != 0:
+                logger.error(
+                    "Session not found after creation",
+                    agent_name=agent_name,
+                    session=session_name,
+                )
+                return None
 
             logger.info("Agent spawned", agent_name=agent_name, session=session_name)
             return session_name
 
         except subprocess.CalledProcessError as e:
-            logger.error("Failed to spawn agent", agent_name=agent_name, error=str(e))
+            logger.error(
+                "Failed to spawn agent",
+                agent_name=agent_name,
+                error=str(e),
+                stderr=e.stderr,
+                stdout=e.stdout,
+            )
             return None
 
     async def terminate_agent(self, agent_name: str, session_name: str) -> bool:

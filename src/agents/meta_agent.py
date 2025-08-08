@@ -176,10 +176,18 @@ class MetaAgent(BaseAgent):
         """Main meta-agent execution loop."""
         logger.info("Meta-Agent starting main loop", agent=self.name)
 
+        # Set last analysis time to now + 60 seconds to delay initial analysis
+        self.last_analysis_time = time.time() + 60
+        logger.info(
+            "Meta-Agent initial analysis delayed by 60 seconds for stability",
+            agent=self.name,
+        )
+
         while self.status == "active":
             try:
                 # Periodic system analysis
                 if time.time() - self.last_analysis_time > self.analysis_interval:
+                    logger.info("Starting periodic system analysis", agent=self.name)
                     await self._perform_system_analysis()
                     self.last_analysis_time = time.time()
 
