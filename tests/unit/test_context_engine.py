@@ -1,6 +1,7 @@
 """Tests for ContextEngine functionality."""
 
 import datetime
+import time
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
