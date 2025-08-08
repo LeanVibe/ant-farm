@@ -43,25 +43,10 @@ class AsyncDatabaseManager:
             expire_on_commit=False,
         )
 
-    async def initialize(self):
-        """Initialize database with tables."""
-        try:
-            # Create tables if they don't exist
-            async with self.engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database initialized successfully")
-        except Exception as e:
-            logger.error("Failed to initialize database", error=str(e))
-            raise
-
-    async def get_session(self) -> AsyncSession:
-        """Get an async database session."""
-        return self.async_session_maker()
-
     async def health_check(self) -> bool:
         """Check database health."""
         try:
-            async with self.get_session() as session:
+            async with self.async_session_maker() as session:
                 result = await session.execute(text("SELECT 1"))
                 return result.scalar() == 1
         except Exception as e:
@@ -77,7 +62,7 @@ class AsyncDatabaseManager:
         tmux_session: str = None,
     ) -> str:
         """Register an agent in the database."""
-        async with self.get_session() as session:
+        async with self.async_session_maker() as session:
             try:
                 # Check if agent exists
                 from sqlalchemy import select
@@ -118,7 +103,7 @@ class AsyncDatabaseManager:
 
     async def update_agent_heartbeat(self, agent_name: str) -> bool:
         """Update agent heartbeat."""
-        async with self.get_session() as session:
+        async with self.async_session_maker() as session:
             try:
                 from sqlalchemy import select, update
 
@@ -140,7 +125,7 @@ class AsyncDatabaseManager:
 
     async def get_agent_by_name(self, name: str) -> Optional[AgentModel]:
         """Get agent by name."""
-        async with self.get_session() as session:
+        async with self.async_session_maker() as session:
             try:
                 from sqlalchemy import select
 
@@ -163,7 +148,7 @@ class AsyncDatabaseManager:
         session_id: str = None,
     ) -> str:
         """Store context in the database."""
-        async with self.get_session() as session:
+        async with self.async_session_maker() as session:
             try:
                 context = Context(
                     agent_id=uuid.UUID(agent_id),
@@ -198,7 +183,7 @@ class AsyncDatabaseManager:
         labels: dict[str, str] = None,
     ) -> str:
         """Record a system metric."""
-        async with self.get_session() as session:
+        async with self.async_session_maker() as session:
             try:
                 metric = SystemMetric(
                     metric_name=metric_name,
@@ -225,7 +210,7 @@ class AsyncDatabaseManager:
 
     async def get_active_agents(self) -> list[AgentModel]:
         """Get all active agents."""
-        async with self.get_session() as session:
+        async with self.async_session_maker() as session:
             try:
                 from sqlalchemy import select
 
