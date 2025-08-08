@@ -1066,9 +1066,7 @@ async def spawn_agent(
         )
 
     except Exception as e:
-        logger.error(
-            f"Failed to search context for agent {agent_id} with query '{query}': {str(e)}"
-        )
+        logger.error(f"Failed to spawn agent type '{agent_type}': {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

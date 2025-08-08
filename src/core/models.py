@@ -1,7 +1,7 @@
 """SQLAlchemy models for LeanVibe Agent Hive 2.0."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,
@@ -550,36 +550,42 @@ class DatabaseManager:
 @event.listens_for(Agent, "before_insert")
 def generate_agent_short_id(mapper, connection, target):
     """Generate short ID for agent before insert."""
-    if not target.short_id and target.id and target.name:
+    if not target.id:
+        target.id = uuid.uuid4()
+    if not target.short_id and target.name:
         target.short_id = generate_short_id(target.name, str(target.id), "agent")
 
 
 @event.listens_for(Task, "before_insert")
 def generate_task_short_id(mapper, connection, target):
     """Generate short ID for task before insert."""
-    if not target.short_id and target.id and target.title:
+    if not target.id:
+        target.id = uuid.uuid4()
+    if not target.short_id and target.title:
         target.short_id = generate_short_id(target.title, str(target.id), "task")
 
 
 @event.listens_for(Session, "before_insert")
 def generate_session_short_id(mapper, connection, target):
     """Generate short ID for session before insert."""
-    if not target.short_id and target.id and target.name:
+    if not target.id:
+        target.id = uuid.uuid4()
+    if not target.short_id and target.name:
         target.short_id = generate_short_id(target.name, str(target.id), "session")
 
 
 @event.listens_for(Agent, "before_update")
 def receive_before_update(mapper, connection, target):
     """Update the updated_at timestamp on agent updates."""
-    target.updated_at = datetime.utcnow()
+    target.updated_at = datetime.now(timezone.utc)
 
 
 @event.listens_for(Context, "before_update")
 def receive_before_update_context(mapper, connection, target):
     """Update timestamps and access tracking on context updates."""
-    target.updated_at = datetime.utcnow()
+    target.updated_at = datetime.now(timezone.utc)
     target.access_count += 1
-    target.last_accessed = datetime.utcnow()
+    target.last_accessed = datetime.now(timezone.utc)
 
 
 # Global database manager instance

@@ -74,7 +74,7 @@ class AsyncDatabaseManager:
                 if existing_agent:
                     # Update existing agent
                     existing_agent.status = "active"
-                    existing_agent.last_heartbeat = datetime.utcnow()
+                    existing_agent.last_heartbeat = datetime.now(timezone.utc)
                     existing_agent.tmux_session = tmux_session
                     if capabilities:
                         existing_agent.capabilities = capabilities
@@ -89,7 +89,7 @@ class AsyncDatabaseManager:
                         capabilities=capabilities or {},
                         status="active",
                         tmux_session=tmux_session,
-                        last_heartbeat=datetime.utcnow(),
+                        last_heartbeat=datetime.now(timezone.utc),
                     )
                     session.add(agent)
                     await session.commit()
@@ -110,7 +110,7 @@ class AsyncDatabaseManager:
                 stmt = (
                     update(AgentModel)
                     .where(AgentModel.name == agent_name)
-                    .values(last_heartbeat=datetime.utcnow())
+                    .values(last_heartbeat=datetime.now(timezone.utc))
                 )
                 result = await session.execute(stmt)
                 await session.commit()
@@ -158,8 +158,8 @@ class AsyncDatabaseManager:
                     category=category,
                     topic=topic,
                     meta_data=metadata or {},
-                    created_at=datetime.utcnow(),
-                    last_accessed=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    last_accessed=datetime.now(timezone.utc),
                 )
                 session.add(context)
                 await session.commit()
@@ -194,7 +194,7 @@ class AsyncDatabaseManager:
                     task_id=uuid.UUID(task_id) if task_id else None,
                     session_id=uuid.UUID(session_id) if session_id else None,
                     labels=labels or {},
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                 )
                 session.add(metric)
                 await session.commit()

@@ -151,6 +151,15 @@ async def _submit_task(
                 error_handler(Exception(f"Invalid JSON in {file}: {e}"))
                 return
 
+        # Map string priority to integer values for API
+        priority_mapping = {
+            "critical": 1,
+            "high": 3,
+            "normal": 5,
+            "low": 7,
+            "background": 9,
+        }
+
         # Override with command line arguments
         if title:
             task_data["title"] = title
@@ -159,7 +168,11 @@ async def _submit_task(
         if task_type != "general":
             task_data["type"] = task_type
         if priority != "normal":
-            task_data["priority"] = priority
+            task_data["priority"] = priority_mapping.get(
+                priority, 5
+            )  # Convert to integer
+        else:
+            task_data["priority"] = 5  # Default normal priority
         if assigned_to != "meta-agent":
             task_data["assigned_to"] = assigned_to
 

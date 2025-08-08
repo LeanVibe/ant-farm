@@ -120,9 +120,9 @@ class AgentRegistry:
                     role=agent_info.role,
                     status=agent_info.status.value,
                     capabilities=agent_info.capabilities,
-                    last_heartbeat=datetime.utcnow(),
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    last_heartbeat=datetime.now(datetime.UTC),
+                    created_at=datetime.now(datetime.UTC),
+                    updated_at=datetime.now(datetime.UTC),
                 )
                 session.add(agent)
                 session.commit()
@@ -171,8 +171,8 @@ class AgentRegistry:
                 agent = session.query(Agent).filter_by(name=agent_name).first()
                 if agent:
                     agent.status = status.value
-                    agent.last_heartbeat = datetime.utcnow()
-                    agent.updated_at = datetime.utcnow()
+                    agent.last_heartbeat = datetime.now(datetime.UTC)
+                    agent.updated_at = datetime.now(datetime.UTC)
                     session.commit()
             finally:
                 session.close()

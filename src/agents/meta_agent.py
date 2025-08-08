@@ -5,7 +5,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -278,7 +278,10 @@ class MetaAgent(BaseAgent):
                 # Check if agent is responsive (simplified)
                 if (
                     agent.last_heartbeat
-                    and (datetime.utcnow() - agent.last_heartbeat).total_seconds() < 300
+                    and (
+                        datetime.now(timezone.utc) - agent.last_heartbeat
+                    ).total_seconds()
+                    < 300
                 ):
                     healthy_agents += 1
 
@@ -403,7 +406,8 @@ class MetaAgent(BaseAgent):
                 agent.name
                 for agent in agents
                 if agent.last_heartbeat
-                and (datetime.utcnow() - agent.last_heartbeat).total_seconds() > 300
+                and (datetime.now(timezone.utc) - agent.last_heartbeat).total_seconds()
+                > 300
             ]
 
             if unresponsive_agents:
