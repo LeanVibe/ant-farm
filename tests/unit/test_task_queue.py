@@ -31,9 +31,7 @@ async def test_submit_and_get_task(task_queue_instance: TaskQueue):
     task_id = await task_queue_instance.submit_task(task)
     assert task_id == task.id
 
-    retrieved_task = await task_queue_instance.get_task(
-        "test_agent", priorities=[TaskPriority.NORMAL]
-    )
+    retrieved_task = await task_queue_instance.get_task("test_agent")
     assert retrieved_task is not None
     assert retrieved_task.id == task.id
     assert retrieved_task.title == "Test Task"
