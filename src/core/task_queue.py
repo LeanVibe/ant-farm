@@ -428,19 +428,12 @@ class TaskQueue:
 
         return count
 
-    async def get_task(
-        self, agent_id: str = None, priorities: list[TaskPriority] = None
-    ) -> Task | None:
+    async def get_task(self, agent_id: str = None) -> Task | None:
         """Get next available task from priority queues using BRPOP."""
         try:
             # Check queues in priority order (lower number = higher priority)
             queue_keys = []
-            # Use provided priorities or all priorities
-            target_priorities = (
-                priorities if priorities is not None else sorted(TaskPriority)
-            )
-
-            for priority in target_priorities:
+            for priority in sorted(TaskPriority):
                 queue_key = f"{self.queue_prefix}:p{priority.value}"
                 queue_keys.append(queue_key)
 
@@ -650,27 +643,6 @@ class TaskQueue:
                 "Failed to mark task as started", task_id=task_id, error=str(e)
             )
             return False
-
-    async def get_task_by_id(self, task_id: str) -> Task | None:
-        """Get a specific task by ID (alias for get_task_status for convenience)."""
-        return await self.get_task_status(task_id)
-
-    async def get_task_status(self, task_id: str) -> Task | None:
-        """Get current status and details of a specific task."""
-        try:
-            task_key = f"{self.task_prefix}:{task_id}"
-            task_data = await self.redis_client.hgetall(task_key)
-
-            if not task_data:
-                logger.warning("Task not found for status check", task_id=task_id)
-                return None
-
-            task = await self._dict_to_task(task_data)
-            return task
-
-        except Exception as e:
-            logger.error("Failed to get task status", task_id=task_id, error=str(e))
-            return None
 
     async def complete_task(self, task_id: str, result: dict = None) -> bool:
         """Mark a task as completed."""
