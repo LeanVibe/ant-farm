@@ -415,7 +415,10 @@ class SecurityScanner:
                     issues.append(f"Potential hardcoded secret in {change.file_path}")
 
             # Check for SQL injection vulnerabilities
-            if "sql" in content and any(
+            if any(
+                keyword in content
+                for keyword in ["sql", "select", "insert", "update", "delete"]
+            ) and any(
                 pattern in content
                 for pattern in ["execute(", "query(", ".format(", "% "]
             ):

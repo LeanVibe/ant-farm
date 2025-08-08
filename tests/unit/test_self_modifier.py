@@ -86,9 +86,12 @@ class TestSelfModifier:
         self, self_modifier, sample_code_change
     ):
         """Test rate limiting for modification proposals."""
-        # Fill up the rate limit
+        import time
+
+        # Fill up the rate limit with current time - these won't be cleaned up
+        current_time = time.time()
         self_modifier.modification_history = [
-            1234567890.0
+            current_time - 100  # Recent timestamps within the hour
         ] * 5  # max_modifications_per_hour
 
         with pytest.raises(RuntimeError, match="Modification rate limit exceeded"):
@@ -138,7 +141,6 @@ class TestSelfModifier:
             result = await self_modifier.propose_and_apply_change(
                 file_path="new_test.py",
                 change_description="Update print statement",
-                modified_content="print('modified')\n",
             )
 
             assert result["success"] is True
@@ -190,26 +192,25 @@ class TestSelfModifier:
             mock_quality.return_value = 0.8
             mock_security.return_value = []
 
-            result = await self_modifier.propose_and_apply_change(
-                file_path="failing_test.py",
-                change_description="Breaking change",
-                modified_content="invalid syntax here!\n",
-            )
+        result = await self_modifier.propose_and_apply_change(
+            file_path="test.py",
+            change_description="Test validation failure",
+        )
 
-            assert result["success"] is False
-            assert "Validation failed" in result["error"]
+        assert result["success"] is False
+        assert "Validation failed" in result["error"]
 
-            # Check that we're back on the main branch after validation failure
-            import subprocess
+        # Check that we're back on the main branch after validation failure
+        import subprocess
 
-            git_result = subprocess.run(
-                ["git", "branch", "--show-current"],
-                cwd=temp_workspace,
-                capture_output=True,
-                text=True,
-            )
-            current_branch = git_result.stdout.strip()
-            assert current_branch == "main"
+        git_result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=temp_workspace,
+            capture_output=True,
+            text=True,
+        )
+        current_branch = git_result.stdout.strip()
+        assert current_branch == "main"
 
     @pytest.mark.asyncio
     async def test_validate_modification_with_security_issues(
@@ -302,26 +303,25 @@ class TestSelfModifier:
             original_content = test_file.read_text()
 
             # Apply modification
-            result = await self_modifier.propose_and_apply_change(
-                file_path="test.py",
-                change_description="Test change for rollback",
-                modified_content="print('This will be rolled back')\n",
-            )
+        result = await self_modifier.propose_and_apply_change(
+            file_path="test.py",
+            change_description="Test rollback",
+        )
 
-            assert result["success"] is True
-            proposal_id = result["proposal_id"]
+        assert result["success"] is True
+        proposal_id = result["proposal_id"]
 
-            # Verify change was applied
-            assert test_file.read_text() == "print('This will be rolled back')\n"
+        # Verify change was applied
+        assert test_file.read_text() == "print('This will be rolled back')\n"
 
-            # Rollback the modification
-            rollback_success = await self_modifier.rollback_modification(
-                proposal_id, "Testing rollback functionality"
-            )
+        # Rollback the modification
+        rollback_success = await self_modifier.rollback_modification(
+            proposal_id, "Testing rollback functionality"
+        )
 
-            assert rollback_success is True
-            # Verify content was restored
-            assert test_file.read_text() == original_content
+        assert rollback_success is True
+        # Verify content was restored
+        assert test_file.read_text() == original_content
 
     def test_assess_risk_level(self, self_modifier):
         """Test risk level assessment logic."""
@@ -386,7 +386,7 @@ class TestSelfModifier:
     ):
         """Test getting stats with actual modification data."""
         # Create a proposal to have some data
-        await self_modifier.propose_modification(
+        proposal_id = await self_modifier.propose_modification(
             title="Test for stats",
             description="Creating data for stats test",
             modification_type=ModificationType.BUG_FIX,
@@ -398,6 +398,7 @@ class TestSelfModifier:
 
         assert stats["total_proposals"] == 0  # No records yet, only proposal
         assert stats["active_proposals"] == 1
+        assert proposal_id in self_modifier.active_proposals
 
 
 class TestCodeChange:

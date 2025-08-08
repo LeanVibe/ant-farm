@@ -93,45 +93,62 @@ def context_engine(mock_db_manager, mock_db_session):
 class TestContextEngine:
     """Test suite for ContextEngine."""
 
-    async def test_store_context_basic(self, context_engine, mock_db_session):
+    async def test_store_context_basic(self, context_engine):
         """Test basic context storage."""
         # Setup
         await context_engine.initialize()
 
         agent_id = str(uuid4())
+        mock_context_id = str(uuid4())
 
-        # Mock the database session
+        # Mock the async session to return our test context ID
         mock_context = Mock()
-        mock_context.id = uuid4()
-        mock_db_session.add.side_effect = lambda ctx: setattr(
-            ctx, "id", mock_context.id
+        mock_context.id = mock_context_id
+        context_engine.AsyncSessionLocal().__aenter__.return_value.add = Mock()
+        context_engine.AsyncSessionLocal().__aenter__.return_value.commit = AsyncMock()
+
+        # Setup the context creation to set the ID
+        def add_side_effect(ctx):
+            ctx.id = mock_context_id
+
+        context_engine.AsyncSessionLocal().__aenter__.return_value.add.side_effect = (
+            add_side_effect
         )
 
-        # Store context
+        # Execute
         context_id = await context_engine.store_context(
             agent_id=agent_id,
-            content="This is a test context for storing data",
+            content="This is a test context.",
+            category="general",
             importance_score=0.8,
-            category="test",
             topic="testing",
         )
 
         # Verify
-        assert context_id is not None
-        mock_db_session.add.assert_called_once()
-        mock_db_session.commit.assert_called_once()
+        assert context_id == mock_context_id
+        assert context_engine.AsyncSessionLocal().__aenter__.return_value.add.called
+        assert context_engine.AsyncSessionLocal().__aenter__.return_value.commit.called
 
-    async def test_store_context_with_metadata(self, context_engine, mock_db_session):
+    async def test_store_context_with_metadata(self, context_engine):
         """Test context storage with metadata."""
         await context_engine.initialize()
 
         agent_id = str(uuid4())
         metadata = {"source_file": "test.py", "line_number": 42}
+        mock_context_id = str(uuid4())
 
+        # Mock the async session
         mock_context = Mock()
-        mock_context.id = uuid4()
-        mock_db_session.add.side_effect = lambda ctx: setattr(
-            ctx, "id", mock_context.id
+        mock_context.id = mock_context_id
+        context_engine.AsyncSessionLocal().__aenter__.return_value.add = Mock()
+        context_engine.AsyncSessionLocal().__aenter__.return_value.commit = AsyncMock()
+
+        # Setup the context creation to set the ID
+        def add_side_effect(ctx):
+            ctx.id = mock_context_id
+
+        context_engine.AsyncSessionLocal().__aenter__.return_value.add.side_effect = (
+            add_side_effect
         )
 
         context_id = await context_engine.store_context(
@@ -142,11 +159,15 @@ class TestContextEngine:
             category="code",
         )
 
-        assert context_id is not None
-        mock_db_session.add.assert_called_once()
+        assert context_id == mock_context_id
+        assert context_engine.AsyncSessionLocal().__aenter__.return_value.add.called
 
         # Check the context that was added
-        added_context = mock_db_session.add.call_args[0][0]
+        added_context = (
+            context_engine.AsyncSessionLocal().__aenter__.return_value.add.call_args[0][
+                0
+            ]
+        )
         assert added_context.content_type == "code"
         assert added_context.metadata == metadata
 
@@ -242,7 +263,7 @@ class TestContextEngine:
         assert len(results) >= 0  # May be filtered by importance
         mock_db_session.commit.assert_called()
 
-    async def test_update_context_importance(self, context_engine, mock_db_session):
+    async def test_update_context_importance(self, context_engine):
         """Test updating context importance scores."""
         await context_engine.initialize()
 
@@ -253,23 +274,22 @@ class TestContextEngine:
         mock_context.importance_score = 0.5
         mock_context.agent_id = uuid4()
 
+        # Mock the async session
+        mock_session = context_engine.AsyncSessionLocal().__aenter__.return_value
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
         mock_query.first.return_value = mock_context
-        mock_db_session.query.return_value = mock_query
+        mock_session.query.return_value = mock_query
+        mock_session.commit = AsyncMock()
 
         # Update importance
-        with patch(
-            "src.core.context_engine.ContextEngine.cache_manager",
-            new_callable=MagicMock,
-        ):
-            success = await context_engine.update_context_importance(context_id, 0.9)
-            success = await context_engine.update_context_importance(context_id, 0.9)
-            success = await context_engine.update_context_importance(context_id, 0.9)
-            success = await context_engine.update_context_importance(context_id, 0.9)
-            success = await context_engine.update_context_importance(context_id, 0.9)
+        success = await context_engine.update_context_importance(
+            context_id=context_id, importance_score=0.9
+        )
 
-        assert success is True
+        assert success
+        assert mock_context.importance_score == 0.9
+        mock_session.commit.assert_called_once()
         assert mock_context.importance_score == 0.9
         mock_db_session.commit.assert_called_once()
 

@@ -1712,19 +1712,61 @@ async def trigger_optimization():
 
 
 # Context and memory endpoints
+
+
+# Context helper function
+async def resolve_agent_uuid(agent_identifier: str) -> str:
+    """Resolve agent identifier to UUID for context operations."""
+    from core.async_db import get_async_database_manager
+    from core.models import Agent as AgentModel
+    from sqlalchemy import select
+    import uuid
+
+    # First try to resolve using the database
+    try:
+        db_manager = await get_async_database_manager()
+        async with db_manager.async_session_maker() as session:
+            # Try exact UUID match first
+            try:
+                uuid_obj = uuid.UUID(agent_identifier)
+                return str(uuid_obj)
+            except ValueError:
+                pass
+
+            # Try to find by name or short_id
+            stmt = select(AgentModel).where(
+                (AgentModel.name == agent_identifier)
+                | (AgentModel.short_id == agent_identifier)
+            )
+            result = await session.execute(stmt)
+            agent = result.scalar_one_or_none()
+
+            if agent:
+                return str(agent.id)
+    except Exception as e:
+        logger.warning(f"Database agent lookup failed: {e}")
+
+    # Fallback to uuid5 for backward compatibility
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"agent.{agent_identifier}"))
+
+
 @app.get("/api/v1/context/{agent_id}", response_model=APIResponse)
 async def get_agent_context(agent_id: str, limit: int = 10):
     """Get context/memory for a specific agent."""
     try:
         from core.context_engine import get_context_engine
 
+        # Resolve agent identifier to proper UUID
+        agent_uuid = await resolve_agent_uuid(agent_id)
+
         context_engine = await get_context_engine(settings.database_url)
-        memory_stats = await context_engine.get_memory_stats(agent_id)
+        memory_stats = await context_engine.get_memory_stats(agent_uuid)
 
         return APIResponse(
             success=True,
             data={
                 "agent_id": agent_id,
+                "resolved_uuid": agent_uuid,
                 "total_contexts": memory_stats.total_contexts,
                 "contexts_by_importance": memory_stats.contexts_by_importance,
                 "contexts_by_category": memory_stats.contexts_by_category,
@@ -1744,12 +1786,11 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
     """Perform semantic search on agent context."""
     try:
         from core.context_engine import get_context_engine
-        import uuid
+
+        # Resolve agent identifier to proper UUID
+        agent_uuid = await resolve_agent_uuid(agent_id)
 
         context_engine = await get_context_engine(settings.database_url)
-
-        # Convert agent name to consistent UUID
-        agent_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"agent.{agent_id}"))
 
         # Search contexts and filter by agent_id
         all_results = await context_engine.search_context(
@@ -1770,15 +1811,16 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
             success=True,
             data={
                 "agent_id": agent_id,
-                "agent_uuid": agent_uuid,
+                "resolved_uuid": agent_uuid,
                 "query": query,
+                "total_results": len(results),
                 "results": [
                     {
-                        "id": str(result.context.id),
-                        "content": result.content or result.context.content,
-                        "similarity_score": result.similarity_score,
-                        "importance_score": result.context.importance_score,
+                        "context_id": str(result.context.id),
+                        "content": result.context.content,
                         "category": result.context.category,
+                        "importance_score": result.context.importance_score,
+                        "similarity_score": result.similarity_score,
                         "created_at": result.context.created_at.isoformat()
                         if result.context.created_at
                         else None,
@@ -1808,12 +1850,11 @@ async def add_context(
     """Add a document to the context engine."""
     try:
         from core.context_engine import get_context_engine
-        import uuid
+
+        # Resolve agent identifier to proper UUID
+        agent_uuid = await resolve_agent_uuid(agent_id)
 
         context_engine = await get_context_engine(settings.database_url)
-
-        # Convert agent name to consistent UUID
-        agent_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"agent.{agent_id}"))
 
         context_id = await context_engine.store_context(
             content=content,
@@ -1823,6 +1864,18 @@ async def add_context(
             importance_score=importance_score,
             topic=topic,
             metadata=metadata or {},
+        )
+
+        return APIResponse(
+            success=True,
+            data={
+                "context_id": str(context_id),
+                "agent_id": agent_id,
+                "resolved_uuid": agent_uuid,
+                "content_length": len(content),
+                "category": category,
+                "importance_score": importance_score,
+            },
         )
 
         return APIResponse(
