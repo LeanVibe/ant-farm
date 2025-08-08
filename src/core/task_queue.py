@@ -725,6 +725,100 @@ class TaskQueue:
             logger.error("Failed to cancel task", task_id=task_id, error=str(e))
             return False
 
+    async def update_task_status(
+        self, task_id: str, status: str, agent_id: str = None
+    ) -> bool:
+        """Update a task's status and optionally assign to agent."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                logger.warning("Task not found for status update", task_id=task_id)
+                return False
+
+            task = await self._dict_to_task(task_data)
+            old_status = task.status
+            task.status = status
+
+            if agent_id:
+                task.agent_id = agent_id
+
+            if status == TaskStatus.IN_PROGRESS:
+                task.started_at = time.time()
+            elif status in [
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.CANCELLED,
+            ]:
+                task.completed_at = time.time()
+
+            await self._update_task(task)
+
+            # Update stats if status changed
+            if old_status != status:
+                await self._update_stats(f"status_change_{status}")
+
+            logger.info(
+                "Task status updated",
+                task_id=task_id,
+                old_status=old_status,
+                new_status=status,
+            )
+            return True
+
+        except Exception as e:
+            logger.error("Failed to update task status", task_id=task_id, error=str(e))
+            return False
+
+    async def fail_task(self, task_id: str, error_message: str = None) -> bool:
+        """Mark a task as failed with optional error message."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                return False
+
+            task = await self._dict_to_task(task_data)
+            task.status = TaskStatus.FAILED
+            task.completed_at = time.time()
+            task.error_message = error_message
+            task.retry_count += 1
+
+            await self._update_task(task)
+            await self._update_stats("failed")
+
+            # Check if task should be retried
+            if task.retry_count < task.max_retries:
+                logger.info(
+                    "Task failed, will retry",
+                    task_id=task_id,
+                    retry_count=task.retry_count,
+                )
+                # Reset task for retry
+                task.status = TaskStatus.PENDING
+                task.started_at = None
+                task.completed_at = None
+                task.agent_id = None
+                await self._update_task(task)
+
+                # Re-add to appropriate priority queue
+                queue_key = f"{self.queue_prefix}:p{task.priority.value}"
+                await self.redis_client.lpush(queue_key, task_id)
+            else:
+                logger.error(
+                    "Task failed permanently",
+                    task_id=task_id,
+                    max_retries=task.max_retries,
+                )
+
+            return True
+
+        except Exception as e:
+            logger.error("Failed to mark task as failed", task_id=task_id, error=str(e))
+            return False
+
     async def cleanup_expired_tasks(self) -> int:
         """Clean up expired tasks and return count of cleaned tasks."""
         cleaned_count = 0
