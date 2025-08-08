@@ -55,12 +55,38 @@ def context_engine(mock_db_manager, mock_db_session):
     """Create a ContextEngine with mocked dependencies."""
     mock_db_manager.get_session.return_value = mock_db_session
 
+    # Mock the async database components
+    mock_async_engine = AsyncMock()
+    mock_async_session = AsyncMock()
+
+    # Mock the async session context manager
+    mock_async_session.__aenter__ = AsyncMock(return_value=mock_async_session)
+    mock_async_session.__aexit__ = AsyncMock(return_value=None)
+    mock_async_session.execute = AsyncMock()
+    mock_async_session.commit = AsyncMock()
+    mock_async_session.rollback = AsyncMock()
+    mock_async_session.close = AsyncMock()
+
+    # Mock the sessionmaker to return the mock session
+    mock_async_sessionmaker = Mock()
+    mock_async_sessionmaker.return_value = mock_async_session
+
     with patch(
         "src.core.context_engine.get_database_manager", return_value=mock_db_manager
     ):
         with patch("src.core.context_engine.get_cache_manager", return_value=None):
-            engine = ContextEngine("mock://test")
-            return engine
+            with patch(
+                "src.core.context_engine.create_async_engine",
+                return_value=mock_async_engine,
+            ):
+                with patch(
+                    "src.core.context_engine.async_sessionmaker",
+                    return_value=mock_async_sessionmaker,
+                ):
+                    engine = ContextEngine("mock://test")
+                    engine.async_engine = mock_async_engine
+                    engine.AsyncSessionLocal = mock_async_sessionmaker
+                    return engine
 
 
 @pytest.mark.asyncio
