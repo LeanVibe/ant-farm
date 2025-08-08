@@ -75,6 +75,23 @@ class QueueStats:
 
 
 class TaskQueue:
+    """
+    Redis-based priority task queue with advanced features.
+
+    Required interface:
+    - async def get_failed_tasks(self) -> list[Task]: Returns a list of failed tasks.
+    - async def get_failed_tasks_count(self) -> int: Returns the count of failed tasks.
+    - async def get_total_tasks(self) -> int: Returns the total number of tasks.
+    - async def get_completed_tasks(self) -> int: Returns the count of completed tasks.
+    - async def get_queue_depth(self) -> int: Returns the current queue depth.
+
+    Any mock or subclass used in tests or other components must implement these methods.
+    """
+
+    async def get_failed_tasks(self) -> list[Task]:
+        """Return a list of failed tasks."""
+        return await self.list_tasks(status=TaskStatus.FAILED)
+
     """Redis-based priority task queue with advanced features."""
 
     def __init__(self, redis_url: str = None):

@@ -951,7 +951,7 @@ async def get_system_status():
         return APIResponse(success=True, data=status.dict())
 
     except Exception as e:
-        logger.error("Failed to get system status", error=str(e))
+        logger.error(f"Failed to get system status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
