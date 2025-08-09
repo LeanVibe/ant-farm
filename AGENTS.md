@@ -26,12 +26,12 @@
 - Populate context: `hive context populate`
 - Search context: `hive context search "query"`
 
-## ⚠️ Non-Standard Ports (Security Through Obscurity)
+## 🔧 Service Ports Configuration
 
-**All services use non-standard ports for enhanced security:**
-- **API**: 9001 (instead of 80/443/8000)
-- **PostgreSQL**: 5433 (instead of 5432)
-- **Redis**: 6381 (instead of 6379)
+**Current service port configuration:**
+- **API**: 9001 (non-standard for security)
+- **PostgreSQL**: 5432 (standard port)
+- **Redis**: 6379 (standard port)
 - **pgAdmin**: 9050 (development only)
 
 ## CLI Agentic Coding Tools
