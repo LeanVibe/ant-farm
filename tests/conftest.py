@@ -1,6 +1,7 @@
 """Test fixtures and configuration for LeanVibe Agent Hive tests."""
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,9 +10,11 @@ import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# Test configuration
-TEST_DATABASE_URL = "postgresql+asyncpg://bogdan@localhost:5432/leanvibe_hive"
-TEST_REDIS_URL = "redis://localhost:6379"
+# Test configuration - use environment variables with fallbacks
+TEST_DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql+asyncpg://bogdan@localhost:5432/leanvibe_hive"
+)
+TEST_REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 
 @pytest.fixture(scope="session")
