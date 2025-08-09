@@ -796,3 +796,51 @@ class QAAgent(BaseAgent):
 
         # Track collaboration failures for improvement
         self.code_issues_found += 1
+
+    async def handle_collaboration(
+        self, collaboration_request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Handle collaboration requests from other agents."""
+        logger.info(
+            "Handling collaboration request",
+            request=collaboration_request,
+            agent=self.name,
+        )
+
+        try:
+            partner_agent = collaboration_request.get("partner_agent")
+            task_type = collaboration_request.get("task")
+            message = collaboration_request.get("message", "")
+
+            # Create collaboration prompt based on QA specialization
+            prompt = f"""
+I'm collaborating with {partner_agent} on a {task_type} task.
+
+Request: {message}
+
+As a QA Agent, I specialize in:
+- Creating comprehensive test suites
+- Validating security requirements  
+- Testing edge cases and error scenarios
+- Verifying performance requirements
+- Conducting code quality reviews
+- Ensuring compliance with standards
+
+Please provide my QA perspective and recommendations for this collaboration.
+"""
+
+            result = await self.execute_with_cli_tool(prompt)
+
+            return {
+                "success": result.success,
+                "response": result.output if result.success else result.error,
+                "agent": self.name,
+                "collaboration_type": task_type,
+                "specialization": "quality_assurance",
+            }
+
+        except Exception as e:
+            logger.error(
+                "QA collaboration handling failed", error=str(e), agent=self.name
+            )
+            return {"success": False, "error": str(e), "agent": self.name}
