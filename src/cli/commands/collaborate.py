@@ -5,15 +5,13 @@ CLI commands for enhanced AI pair programming and collaboration.
 import asyncio
 import json
 from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
-from rich.live import Live
-from rich.table import Table
-from rich.panel import Panel
 from rich.layout import Layout
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
 
 from ..utils import error_handler, info_message, success_message, warning_message
 
@@ -23,12 +21,12 @@ console = Console()
 
 @app.command()
 def start_session(
-    participants: List[str] = typer.Argument(
+    participants: list[str] = typer.Argument(
         ..., help="Agent IDs participating in the session"
     ),
     mode: str = typer.Option("driver_navigator", help="Collaboration mode"),
     task: str = typer.Argument(..., help="Task description"),
-    project_context_file: Optional[str] = typer.Option(
+    project_context_file: str | None = typer.Option(
         None, help="JSON file with project context"
     ),
 ):
@@ -42,16 +40,16 @@ def start_session(
 
 
 async def _start_collaboration_session(
-    participants: List[str], mode: str, task: str, project_context_file: Optional[str]
+    participants: list[str], mode: str, task: str, project_context_file: str | None
 ):
     """Async implementation of starting collaboration session."""
-    from ...core.collaboration import get_enhanced_pair_programming, CollaborationMode
+    from ...core.collaboration import CollaborationMode, get_enhanced_pair_programming
 
     # Load project context if provided
     project_context = {}
     if project_context_file:
         try:
-            with open(project_context_file, "r") as f:
+            with open(project_context_file) as f:
                 project_context = json.load(f)
         except Exception as e:
             warning_message(f"Could not load project context: {e}")
@@ -67,7 +65,7 @@ async def _start_collaboration_session(
 
     enhanced_system = await get_enhanced_pair_programming()
 
-    info_message(f"Starting enhanced collaboration session...")
+    info_message("Starting enhanced collaboration session...")
     info_message(f"Participants: {', '.join(participants)}")
     info_message(f"Mode: {mode}")
     info_message(f"Task: {task}")
@@ -79,7 +77,7 @@ async def _start_collaboration_session(
         task_description=task,
     )
 
-    success_message(f"Enhanced collaboration session started!")
+    success_message("Enhanced collaboration session started!")
     info_message(f"Session ID: {session_id}")
 
 
@@ -89,7 +87,7 @@ def share_context(
     source_agent: str = typer.Argument(..., help="Source agent ID"),
     context_type: str = typer.Argument(..., help="Type of context to share"),
     content_file: str = typer.Argument(..., help="JSON file with context content"),
-    tags: List[str] = typer.Option([], help="Tags for the context"),
+    tags: list[str] = typer.Option([], help="Tags for the context"),
 ):
     """Share context between agents in a collaboration session."""
     try:
@@ -107,14 +105,14 @@ async def _share_collaboration_context(
     source_agent: str,
     context_type: str,
     content_file: str,
-    tags: List[str],
+    tags: list[str],
 ):
     """Async implementation of sharing context."""
-    from ...core.collaboration import get_enhanced_pair_programming, ContextShareType
+    from ...core.collaboration import ContextShareType, get_enhanced_pair_programming
 
     # Load content from file
     try:
-        with open(content_file, "r") as f:
+        with open(content_file) as f:
             content = json.load(f)
     except Exception as e:
         raise ValueError(f"Could not load content file: {e}")
@@ -153,8 +151,8 @@ def get_context(
     session_id: str = typer.Argument(..., help="Session ID"),
     agent_id: str = typer.Argument(..., help="Requesting agent ID"),
     query: str = typer.Argument(..., help="Query for relevant context"),
-    context_types: List[str] = typer.Option([], help="Filter by context types"),
-    output_file: Optional[str] = typer.Option(None, help="Save results to JSON file"),
+    context_types: list[str] = typer.Option([], help="Filter by context types"),
+    output_file: str | None = typer.Option(None, help="Save results to JSON file"),
 ):
     """Get relevant context for an agent."""
     try:
@@ -171,11 +169,11 @@ async def _get_relevant_context(
     session_id: str,
     agent_id: str,
     query: str,
-    context_types: List[str],
-    output_file: Optional[str],
+    context_types: list[str],
+    output_file: str | None,
 ):
     """Async implementation of getting relevant context."""
-    from ...core.collaboration import get_enhanced_pair_programming, ContextShareType
+    from ...core.collaboration import ContextShareType, get_enhanced_pair_programming
 
     # Convert context types if provided
     parsed_context_types = None
@@ -267,7 +265,7 @@ async def _suggest_code_patterns(session_id: str, code_file: str, context: str):
 
     # Read code from file
     try:
-        with open(code_file, "r") as f:
+        with open(code_file) as f:
             current_code = f.read()
     except Exception as e:
         raise ValueError(f"Could not read code file: {e}")

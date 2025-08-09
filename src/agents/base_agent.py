@@ -17,7 +17,7 @@ import structlog
 try:
     from ..core.async_db import get_async_database_manager
     from ..core.config import CLIToolType, settings
-    from ..core.constants import Intervals, Timeouts
+    from ..core.constants import Intervals
     from ..core.context_engine import ContextSearchResult, get_context_engine
     from ..core.message_broker import (
         Message,
@@ -25,7 +25,6 @@ try:
         MessageType,
         message_broker,
     )
-    from ..core.models import Agent as AgentModel
     from ..core.persistent_cli import get_persistent_cli_manager
     from ..core.task_queue import Task, task_queue
 except ImportError:
@@ -36,7 +35,6 @@ except ImportError:
     from core.config import CLIToolType, settings
     from core.context_engine import ContextSearchResult, get_context_engine
     from core.message_broker import Message, MessageHandler, MessageType, message_broker
-    from core.models import Agent as AgentModel
     from core.persistent_cli import get_persistent_cli_manager
     from core.task_queue import Task, task_queue
 
@@ -418,7 +416,7 @@ class BaseAgent(ABC):
                     logger.warning(
                         "No CLI tools available for persistent session", agent=self.name
                     )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "CLI session creation timeout - continuing without persistent session",
                     agent=self.name,
@@ -437,7 +435,7 @@ class BaseAgent(ABC):
                     get_async_database_manager(settings.database_url), timeout=10.0
                 )
                 logger.info("Database manager initialized", agent=self.name)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Database manager initialization timeout - continuing without DB",
                     agent=self.name,
@@ -458,7 +456,7 @@ class BaseAgent(ABC):
                     get_context_engine(settings.database_url), timeout=15.0
                 )
                 logger.info("Context engine initialized", agent=self.name)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Context engine initialization timeout - continuing without context engine",
                     agent=self.name,
@@ -477,7 +475,7 @@ class BaseAgent(ABC):
             try:
                 await asyncio.wait_for(task_queue.initialize(), timeout=10.0)
                 logger.info("Task queue initialized", agent=self.name)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Task queue initialization timeout - continuing", agent=self.name
                 )
@@ -497,7 +495,7 @@ class BaseAgent(ABC):
                     timeout=5.0,
                 )
                 logger.info("Message broker initialized", agent=self.name)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Message broker initialization timeout - continuing",
                     agent=self.name,
@@ -513,7 +511,7 @@ class BaseAgent(ABC):
             logger.info("Registering agent in database", agent=self.name)
             try:
                 await asyncio.wait_for(self._register_agent(), timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Database registration timeout - continuing without DB registration",
                     agent=self.name,

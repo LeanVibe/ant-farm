@@ -1,8 +1,7 @@
-import uuid
-from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.types import JSON
+
 from src.core import models
 
 # Monkeypatch JSONB to JSON for SQLite
@@ -10,7 +9,6 @@ models.JSONB = JSON
 Base = models.Base
 Agent = models.Agent
 Task = models.Task
-from src.core.short_id import generate_short_id
 
 
 def patch_jsonb_to_json():

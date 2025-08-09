@@ -1,5 +1,7 @@
 import os
+
 import pytest
+
 from src.core import config
 
 # TDD Step 1: Failing test for config loading and validation

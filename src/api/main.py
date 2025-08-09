@@ -6,9 +6,8 @@ import logging
 import sys
 import time
 import uuid
-from enum import Enum
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,8 +24,8 @@ try:
         AuthenticationError,
         Permissions,
         SecurityMiddleware,
-        get_current_user,
         get_cli_user,
+        get_current_user,
         rate_limit,
         require_admin,
     )
@@ -38,19 +37,8 @@ try:
 except ImportError:  # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from src.core.analytics import (
-        analytics_manager,
-        track_api_call,
-        track_agent_event,
-        track_websocket_event,
-    )
     from src.core.auth import (
-        AuthScope,
-        Permission,
-        auth_required,
         get_current_user,
-        get_user_permissions,
-        validate_permissions,
     )
     from src.core.config import settings
     from src.core.message_broker import MessageType, get_message_broker
@@ -982,7 +970,7 @@ async def list_agents(current_user: User = Depends(get_cli_user)):
             capabilities_dict = {}
             if agent.capabilities:
                 if isinstance(agent.capabilities, list):
-                    capabilities_dict = {cap: True for cap in agent.capabilities}
+                    capabilities_dict = dict.fromkeys(agent.capabilities, True)
                 elif isinstance(agent.capabilities, dict):
                     capabilities_dict = agent.capabilities
                 else:
@@ -1735,10 +1723,12 @@ async def trigger_optimization():
 # Context helper function
 async def resolve_agent_uuid(agent_identifier: str) -> str:
     """Resolve agent identifier to UUID for context operations."""
+    import uuid
+
+    from sqlalchemy import select
+
     from src.core.async_db import get_async_database_manager
     from src.core.models import Agent as AgentModel
-    from sqlalchemy import select
-    import uuid
 
     # First try to resolve using the database
     try:
@@ -2348,7 +2338,7 @@ async def create_project_workspace(
 ):
     """Create a new large project workspace."""
     try:
-        from ..core.collaboration import get_large_project_coordinator, ProjectScale
+        from ..core.collaboration import ProjectScale, get_large_project_coordinator
 
         coordinator = await get_large_project_coordinator()
 
@@ -2545,8 +2535,8 @@ async def start_enhanced_collaboration(
     """Start an enhanced AI pair programming session."""
     try:
         from ..core.collaboration.enhanced_pair_programming import (
-            get_enhanced_pair_programming,
             CollaborationMode,
+            get_enhanced_pair_programming,
         )
 
         enhanced_system = await get_enhanced_pair_programming()
@@ -2601,8 +2591,8 @@ async def share_collaboration_context(
     """Share context between agents in a collaboration session."""
     try:
         from ..core.collaboration.enhanced_pair_programming import (
-            get_enhanced_pair_programming,
             ContextShareType,
+            get_enhanced_pair_programming,
         )
 
         enhanced_system = await get_enhanced_pair_programming()
@@ -2651,14 +2641,14 @@ async def get_relevant_context(
     session_id: str,
     requesting_agent: str,
     query: str,
-    context_types: List[str] = None,
+    context_types: list[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """Get relevant context for an agent."""
     try:
         from ..core.collaboration.enhanced_pair_programming import (
-            get_enhanced_pair_programming,
             ContextShareType,
+            get_enhanced_pair_programming,
         )
 
         enhanced_system = await get_enhanced_pair_programming()
@@ -2932,6 +2922,7 @@ async def get_system_diagnostics():
 def start_server():
     """Start the API server."""
     import uvicorn
+
     from ..core.config import get_settings
 
     settings = get_settings()

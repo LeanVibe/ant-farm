@@ -5,12 +5,10 @@ Enables sessions to survive interruptions and resume from where they left off.
 
 import asyncio
 import json
-import pickle
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -24,12 +22,12 @@ class SessionCheckpoint:
     session_id: str
     timestamp: float
     current_phase: str
-    phase_progress: Dict[str, Any]
-    metrics: Dict[str, Any]
-    git_commit_hash: Optional[str]
+    phase_progress: dict[str, Any]
+    metrics: dict[str, Any]
+    git_commit_hash: str | None
     iteration_count: int
     consecutive_failures: int
-    context_data: Dict[str, Any]
+    context_data: dict[str, Any]
 
 
 class SessionStatePersistence:
@@ -47,8 +45,8 @@ class SessionStatePersistence:
     async def save_checkpoint(
         self,
         session: "ADWSession",
-        phase_progress: Dict[str, Any] = None,
-        additional_context: Dict[str, Any] = None,
+        phase_progress: dict[str, Any] = None,
+        additional_context: dict[str, Any] = None,
     ) -> bool:
         """Save a session checkpoint."""
         try:
@@ -102,13 +100,13 @@ class SessionStatePersistence:
             )
             return False
 
-    async def load_checkpoint(self) -> Optional[SessionCheckpoint]:
+    async def load_checkpoint(self) -> SessionCheckpoint | None:
         """Load the most recent session checkpoint."""
         try:
             if not self.checkpoint_file.exists():
                 return None
 
-            with open(self.checkpoint_file, "r") as f:
+            with open(self.checkpoint_file) as f:
                 checkpoint_data = json.load(f)
 
             checkpoint = SessionCheckpoint(**checkpoint_data)
@@ -206,7 +204,7 @@ class SessionStatePersistence:
         self,
         session: "ADWSession",
         recovery_type: str,
-        recovery_data: Dict[str, Any],
+        recovery_data: dict[str, Any],
     ) -> bool:
         """Create a recovery point for emergency restoration."""
         try:
@@ -254,7 +252,7 @@ class SessionStatePersistence:
                     continue  # Skip recovery files
 
                 try:
-                    with open(checkpoint_file, "r") as f:
+                    with open(checkpoint_file) as f:
                         data = json.load(f)
 
                     checkpoint_time = data.get("timestamp", 0)
@@ -289,7 +287,7 @@ class SessionStatePersistence:
 
         return cleaned_count
 
-    async def _get_current_git_commit(self) -> Optional[str]:
+    async def _get_current_git_commit(self) -> str | None:
         """Get the current git commit hash."""
         try:
             process = await asyncio.create_subprocess_exec(
@@ -311,7 +309,7 @@ class SessionStatePersistence:
 
         return None
 
-    def get_checkpoint_info(self) -> Dict[str, Any]:
+    def get_checkpoint_info(self) -> dict[str, Any]:
         """Get information about existing checkpoints."""
         info = {
             "checkpoint_exists": self.checkpoint_file.exists(),
@@ -322,7 +320,7 @@ class SessionStatePersistence:
 
         try:
             if self.checkpoint_file.exists():
-                with open(self.checkpoint_file, "r") as f:
+                with open(self.checkpoint_file) as f:
                     data = json.load(f)
 
                 checkpoint_time = data.get("timestamp", 0)
@@ -348,7 +346,7 @@ class SessionStateManager:
         """Get a persistence manager for a specific session."""
         return SessionStatePersistence(self.project_path, session_id)
 
-    async def list_active_sessions(self) -> List[Dict[str, Any]]:
+    async def list_active_sessions(self) -> list[dict[str, Any]]:
         """List all active sessions with checkpoint data."""
         sessions = []
 
@@ -358,7 +356,7 @@ class SessionStateManager:
                     continue
 
                 try:
-                    with open(checkpoint_file, "r") as f:
+                    with open(checkpoint_file) as f:
                         data = json.load(f)
 
                     session_info = {
@@ -388,7 +386,7 @@ class SessionStateManager:
 
         return sessions
 
-    async def resume_latest_session(self) -> Optional[str]:
+    async def resume_latest_session(self) -> str | None:
         """Find and return the session ID of the most recent session."""
         try:
             sessions = await self.list_active_sessions()

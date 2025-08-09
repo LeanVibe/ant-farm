@@ -3,17 +3,17 @@ Unit tests for ADW Session Persistence.
 """
 
 import json
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from src.core.adw.session_manager import SessionPhase
 from src.core.adw.session_persistence import (
-    SessionStatePersistence,
     SessionStateManager,
-    SessionCheckpoint,
+    SessionStatePersistence,
 )
-from src.core.adw.session_manager import ADWSession, SessionPhase
 
 
 @pytest.mark.asyncio
@@ -152,7 +152,7 @@ async def test_recovery_point():
             assert persistence.recovery_file.exists()
 
         # Verify recovery point content
-        with open(persistence.recovery_file, "r") as f:
+        with open(persistence.recovery_file) as f:
             recovery_data = json.load(f)
 
         assert recovery_data["session_id"] == session_id

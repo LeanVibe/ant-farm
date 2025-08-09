@@ -1,10 +1,7 @@
 """Tests for the AutoRollbackSystem."""
 
-import asyncio
 import tempfile
-import time
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 

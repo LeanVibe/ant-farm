@@ -6,11 +6,11 @@ development sessions, including automatic termination and human escalation.
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any
 
 import structlog
 
@@ -59,9 +59,9 @@ class EmergencyEvent:
     intervention_level: InterventionLevel
     session_id: str
     description: str
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, Any] = field(default_factory=dict)
     resolved: bool = False
-    resolution_timestamp: Optional[float] = None
+    resolution_timestamp: float | None = None
 
 
 class EmergencyInterventionSystem:
@@ -73,16 +73,16 @@ class EmergencyInterventionSystem:
         self.active = False
 
         # Emergency state
-        self.emergency_events: List[EmergencyEvent] = []
+        self.emergency_events: list[EmergencyEvent] = []
         self.current_intervention_level = InterventionLevel.WARNING
         self.human_intervention_requested = False
-        self.emergency_contacts: List[str] = []
+        self.emergency_contacts: list[str] = []
 
         # Callbacks for emergency actions
-        self.session_termination_callback: Optional[Callable] = None
-        self.rollback_callback: Optional[Callable] = None
-        self.pause_callback: Optional[Callable] = None
-        self.alert_callback: Optional[Callable] = None
+        self.session_termination_callback: Callable | None = None
+        self.rollback_callback: Callable | None = None
+        self.pause_callback: Callable | None = None
+        self.alert_callback: Callable | None = None
 
         # Configure default emergency triggers
         self.triggers = self._configure_default_triggers()
@@ -91,7 +91,7 @@ class EmergencyInterventionSystem:
         self.monitoring_active = False
         self.last_check_time = time.time()
 
-    def _configure_default_triggers(self) -> List[EmergencyTrigger]:
+    def _configure_default_triggers(self) -> list[EmergencyTrigger]:
         """Configure default emergency triggers."""
         return [
             EmergencyTrigger(
@@ -371,7 +371,7 @@ class EmergencyInterventionSystem:
             contacts_notified=len(self.emergency_contacts),
         )
 
-    async def _collect_emergency_metrics(self) -> Dict[str, Any]:
+    async def _collect_emergency_metrics(self) -> dict[str, Any]:
         """Collect metrics at time of emergency."""
         metrics = {}
 
@@ -426,7 +426,7 @@ class EmergencyInterventionSystem:
                 resolution_notes=resolution_notes,
             )
 
-    def get_emergency_status(self) -> Dict[str, Any]:
+    def get_emergency_status(self) -> dict[str, Any]:
         """Get current emergency status."""
         unresolved_events = [e for e in self.emergency_events if not e.resolved]
 
@@ -451,10 +451,10 @@ class EmergencyInterventionSystem:
 
     def register_callbacks(
         self,
-        session_termination_callback: Optional[Callable] = None,
-        rollback_callback: Optional[Callable] = None,
-        pause_callback: Optional[Callable] = None,
-        alert_callback: Optional[Callable] = None,
+        session_termination_callback: Callable | None = None,
+        rollback_callback: Callable | None = None,
+        pause_callback: Callable | None = None,
+        alert_callback: Callable | None = None,
     ):
         """Register callbacks for emergency actions."""
         if session_termination_callback:

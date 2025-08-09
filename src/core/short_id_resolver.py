@@ -1,9 +1,9 @@
 """Database service for short ID resolution."""
 
-from typing import Optional, Dict, Any
 import uuid
+from typing import Any
 
-from .models import Agent, Task, Session
+from .models import Agent, Session, Task
 from .short_id import ShortIDGenerator
 
 
@@ -21,7 +21,7 @@ class ShortIDResolver:
         db_manager = await get_async_database_manager(self.database_url)
         return db_manager.async_session_maker()
 
-    async def resolve_agent_id(self, identifier: str) -> Optional[uuid.UUID]:
+    async def resolve_agent_id(self, identifier: str) -> uuid.UUID | None:
         """Resolve agent identifier (short ID, name, or UUID) to UUID."""
         # Check if it's already a UUID
         try:
@@ -30,7 +30,7 @@ class ShortIDResolver:
             pass
 
         async with (await self._get_session())() as session:
-            from sqlalchemy import select, or_
+            from sqlalchemy import select
 
             # Check if it's a valid short ID format
             if self.generator.is_valid_short_id(identifier, "agent"):
@@ -45,7 +45,7 @@ class ShortIDResolver:
             agent_uuid = result.scalar_one_or_none()
             return agent_uuid
 
-    async def resolve_task_id(self, identifier: str) -> Optional[uuid.UUID]:
+    async def resolve_task_id(self, identifier: str) -> uuid.UUID | None:
         """Resolve task identifier (short ID or UUID) to UUID."""
         # Check if it's already a UUID
         try:
@@ -65,7 +65,7 @@ class ShortIDResolver:
 
             return None
 
-    async def resolve_session_id(self, identifier: str) -> Optional[uuid.UUID]:
+    async def resolve_session_id(self, identifier: str) -> uuid.UUID | None:
         """Resolve session identifier (short ID, name, or UUID) to UUID."""
         # Check if it's already a UUID
         try:
@@ -91,7 +91,7 @@ class ShortIDResolver:
 
     async def get_agent_by_identifier(
         self, identifier: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get agent by any identifier and return as dict."""
         agent_id = await self.resolve_agent_id(identifier)
         if not agent_id:
@@ -105,7 +105,7 @@ class ShortIDResolver:
             agent = result.scalar_one_or_none()
             return agent.to_dict() if agent else None
 
-    async def get_task_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
+    async def get_task_by_identifier(self, identifier: str) -> dict[str, Any] | None:
         """Get task by any identifier and return as dict."""
         task_id = await self.resolve_task_id(identifier)
         if not task_id:
@@ -121,10 +121,10 @@ class ShortIDResolver:
 
     async def search_agents_by_partial_id(
         self, partial: str, limit: int = 10
-    ) -> list[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search agents by partial short ID or name."""
         async with (await self._get_session())() as session:
-            from sqlalchemy import select, or_
+            from sqlalchemy import or_, select
 
             conditions = []
 
@@ -146,10 +146,10 @@ class ShortIDResolver:
 
     async def search_tasks_by_partial_id(
         self, partial: str, limit: int = 10
-    ) -> list[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search tasks by partial short ID or title."""
         async with (await self._get_session())() as session:
-            from sqlalchemy import select, or_
+            from sqlalchemy import or_, select
 
             conditions = []
 
@@ -169,7 +169,7 @@ class ShortIDResolver:
 
             return [task.to_dict() for task in tasks]
 
-    async def generate_and_assign_short_ids(self) -> Dict[str, int]:
+    async def generate_and_assign_short_ids(self) -> dict[str, int]:
         """Generate short IDs for existing records that don't have them."""
         updated_counts = {"agents": 0, "tasks": 0, "sessions": 0}
 

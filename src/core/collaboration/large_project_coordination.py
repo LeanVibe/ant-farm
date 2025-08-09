@@ -5,22 +5,17 @@ This module extends the basic coordination system with capabilities specifically
 designed for large-scale development projects requiring sophisticated coordination.
 """
 
-import asyncio
-import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import structlog
 
-from ..agent_coordination import CollaborationCoordinator, CollaborationType, TaskPhase
-from ..constants import Intervals, Thresholds
+from ..agent_coordination import CollaborationCoordinator
 from ..message_broker import MessageType, message_broker
-from ..models import get_database_manager
 
 logger = structlog.get_logger()
 
@@ -70,35 +65,35 @@ class ProjectWorkspace:
 
     # Agent coordination
     lead_agent: str
-    participating_agents: Set[str] = field(default_factory=set)
-    agent_roles: Dict[str, List[str]] = field(default_factory=dict)
+    participating_agents: set[str] = field(default_factory=set)
+    agent_roles: dict[str, list[str]] = field(default_factory=dict)
 
     # Task and dependency management
-    task_graph: Dict[str, Set[str]] = field(
+    task_graph: dict[str, set[str]] = field(
         default_factory=dict
     )  # task_id -> dependencies
-    completed_tasks: Set[str] = field(default_factory=set)
-    active_tasks: Dict[str, str] = field(default_factory=dict)  # task_id -> agent_id
+    completed_tasks: set[str] = field(default_factory=set)
+    active_tasks: dict[str, str] = field(default_factory=dict)  # task_id -> agent_id
 
     # Resource management
-    resource_pools: Dict[ResourceType, Dict[str, Any]] = field(default_factory=dict)
-    resource_allocations: Dict[str, Dict[ResourceType, float]] = field(
+    resource_pools: dict[ResourceType, dict[str, Any]] = field(default_factory=dict)
+    resource_allocations: dict[str, dict[ResourceType, float]] = field(
         default_factory=dict
     )
 
     # Progress tracking
-    milestones: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    progress_metrics: Dict[str, float] = field(default_factory=dict)
+    milestones: dict[str, dict[str, Any]] = field(default_factory=dict)
+    progress_metrics: dict[str, float] = field(default_factory=dict)
 
     # Collaboration features
-    shared_context: Dict[str, Any] = field(default_factory=dict)
-    communication_channels: List[str] = field(default_factory=list)
-    conflict_resolution_rules: Dict[str, str] = field(default_factory=dict)
+    shared_context: dict[str, Any] = field(default_factory=dict)
+    communication_channels: list[str] = field(default_factory=list)
+    conflict_resolution_rules: dict[str, str] = field(default_factory=dict)
 
     # Metadata
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
-    deadline: Optional[float] = None
+    deadline: float | None = None
     priority: int = 5
 
 
@@ -109,10 +104,10 @@ class ResourcePool:
     resource_type: ResourceType
     total_capacity: float
     available_capacity: float
-    allocations: Dict[str, float] = field(
+    allocations: dict[str, float] = field(
         default_factory=dict
     )  # agent_id -> allocated_amount
-    queue: List[Dict[str, Any]] = field(
+    queue: list[dict[str, Any]] = field(
         default_factory=list
     )  # pending allocation requests
 
@@ -142,15 +137,15 @@ class ResourcePool:
 class TaskDependencyGraph:
     """Manages complex task dependencies for large projects."""
 
-    dependencies: Dict[str, Set[str]] = field(default_factory=dict)
-    reverse_dependencies: Dict[str, Set[str]] = field(default_factory=dict)
-    task_metadata: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    dependencies: dict[str, set[str]] = field(default_factory=dict)
+    reverse_dependencies: dict[str, set[str]] = field(default_factory=dict)
+    task_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def add_task(
         self,
         task_id: str,
-        dependencies: List[str] = None,
-        metadata: Dict[str, Any] = None,
+        dependencies: list[str] = None,
+        metadata: dict[str, Any] = None,
     ):
         """Add a task to the dependency graph."""
         dependencies = dependencies or []
@@ -163,7 +158,7 @@ class TaskDependencyGraph:
                 self.reverse_dependencies[dep] = set()
             self.reverse_dependencies[dep].add(task_id)
 
-    def get_ready_tasks(self, completed_tasks: Set[str]) -> List[str]:
+    def get_ready_tasks(self, completed_tasks: set[str]) -> list[str]:
         """Get tasks that are ready to execute (all dependencies completed)."""
         ready_tasks = []
         for task_id, deps in self.dependencies.items():
@@ -171,14 +166,14 @@ class TaskDependencyGraph:
                 ready_tasks.append(task_id)
         return ready_tasks
 
-    def get_critical_path(self) -> List[str]:
+    def get_critical_path(self) -> list[str]:
         """Calculate the critical path through the task graph."""
         # Simplified critical path calculation
         # In a real implementation, this would use more sophisticated algorithms
         visited = set()
         path = []
 
-        def dfs_longest_path(task_id: str, current_path: List[str]) -> List[str]:
+        def dfs_longest_path(task_id: str, current_path: list[str]) -> list[str]:
             if task_id in visited:
                 return current_path
 
@@ -211,9 +206,9 @@ class LargeProjectCoordinator:
 
     def __init__(self, base_coordinator: CollaborationCoordinator):
         self.base_coordinator = base_coordinator
-        self.active_projects: Dict[str, ProjectWorkspace] = {}
-        self.resource_pools: Dict[ResourceType, ResourcePool] = {}
-        self.dependency_graphs: Dict[str, TaskDependencyGraph] = {}
+        self.active_projects: dict[str, ProjectWorkspace] = {}
+        self.resource_pools: dict[ResourceType, ResourcePool] = {}
+        self.dependency_graphs: dict[str, TaskDependencyGraph] = {}
 
         # Initialize resource pools
         self._initialize_resource_pools()
@@ -303,7 +298,7 @@ class LargeProjectCoordinator:
         return project_id
 
     async def join_project(
-        self, project_id: str, agent_id: str, roles: List[str] = None
+        self, project_id: str, agent_id: str, roles: list[str] = None
     ) -> bool:
         """Add an agent to a project workspace."""
         if project_id not in self.active_projects:
@@ -391,8 +386,8 @@ class LargeProjectCoordinator:
         project_id: str,
         task_description: str,
         estimated_complexity: int,
-        target_agents: List[str] = None,
-    ) -> Dict[str, Any]:
+        target_agents: list[str] = None,
+    ) -> dict[str, Any]:
         """Decompose a large task into coordinated sub-tasks."""
         if project_id not in self.active_projects:
             raise ValueError(f"Project {project_id} not found")
@@ -543,9 +538,9 @@ class LargeProjectCoordinator:
     async def _assign_tasks_to_agents(
         self,
         project_id: str,
-        sub_tasks: List[Dict[str, Any]],
-        target_agents: List[str] = None,
-    ) -> Dict[str, str]:
+        sub_tasks: list[dict[str, Any]],
+        target_agents: list[str] = None,
+    ) -> dict[str, str]:
         """Assign sub-tasks to appropriate agents."""
         workspace = self.active_projects[project_id]
         assignments = {}
@@ -589,7 +584,7 @@ class LargeProjectCoordinator:
 
         return assignments
 
-    async def monitor_project_progress(self, project_id: str) -> Dict[str, Any]:
+    async def monitor_project_progress(self, project_id: str) -> dict[str, Any]:
         """Monitor and report on project progress."""
         if project_id not in self.active_projects:
             raise ValueError(f"Project {project_id} not found")
@@ -665,9 +660,9 @@ class LargeProjectCoordinator:
         self,
         project_id: str,
         conflict_type: str,
-        involved_agents: List[str],
-        context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        involved_agents: list[str],
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
         """Handle conflicts in large project coordination."""
         if project_id not in self.active_projects:
             raise ValueError(f"Project {project_id} not found")
@@ -728,7 +723,7 @@ class LargeProjectCoordinator:
 
         return resolution_result
 
-    async def get_project_status(self, project_id: str) -> Dict[str, Any]:
+    async def get_project_status(self, project_id: str) -> dict[str, Any]:
         """Get comprehensive status of a large project."""
         if project_id not in self.active_projects:
             raise ValueError(f"Project {project_id} not found")

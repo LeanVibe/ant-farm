@@ -1,17 +1,16 @@
 """Unit tests for AutonomousRefactoring engine with TDD approach."""
 
-import asyncio
-import ast
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.refactoring.autonomous_refactoring import (
     AutonomousRefactoringEngine,
+    CodeSmell,
+    RefactoringConfidence,
+    RefactoringOpportunity,
     RefactoringResult,
     RefactoringType,
-    CodeSmell,
-    RefactoringOpportunity,
-    RefactoringConfidence,
 )
 
 

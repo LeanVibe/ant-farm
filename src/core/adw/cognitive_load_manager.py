@@ -4,13 +4,11 @@ This module manages agent cognitive load and performance during extended
 development sessions (16+ hours) to prevent degradation and maintain quality.
 """
 
-import asyncio
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -48,7 +46,7 @@ class CognitiveLoadMetrics:
 class SessionFatigueIndicators:
     """Indicators of session fatigue and cognitive overload."""
 
-    repetitive_error_patterns: List[str] = field(default_factory=list)
+    repetitive_error_patterns: list[str] = field(default_factory=list)
     increased_rollback_frequency: bool = False
     declining_test_coverage: bool = False
     longer_task_completion_times: bool = False
@@ -60,7 +58,7 @@ class ContextCompressionEngine:
     """Compresses and manages context for memory efficiency."""
 
     def __init__(self):
-        self.compression_history: List[Dict[str, Any]] = []
+        self.compression_history: list[dict[str, Any]] = []
         self.critical_context_keys = [
             "current_task_objectives",
             "recent_decisions_rationale",
@@ -70,8 +68,8 @@ class ContextCompressionEngine:
         ]
 
     async def compress_session_context(
-        self, full_context: Dict[str, Any], target_compression_ratio: float = 0.3
-    ) -> Dict[str, Any]:
+        self, full_context: dict[str, Any], target_compression_ratio: float = 0.3
+    ) -> dict[str, Any]:
         """Compress session context while preserving critical information."""
         try:
             start_size = len(str(full_context))
@@ -124,8 +122,8 @@ class ContextCompressionEngine:
             return full_context  # Return original on failure
 
     async def _calculate_importance_scores(
-        self, context: Dict[str, Any]
-    ) -> Dict[str, float]:
+        self, context: dict[str, Any]
+    ) -> dict[str, float]:
         """Calculate importance scores for context items."""
         scores = {}
         current_time = time.time()
@@ -170,7 +168,7 @@ class TaskComplexityAdapter:
     """Adapts task complexity based on cognitive load and session duration."""
 
     def __init__(self):
-        self.complexity_history: List[Dict[str, Any]] = []
+        self.complexity_history: list[dict[str, Any]] = []
         self.base_complexity_scores = {
             "refactoring": 0.3,
             "bug_fixing": 0.4,
@@ -183,10 +181,10 @@ class TaskComplexityAdapter:
 
     async def adapt_task_complexity(
         self,
-        available_tasks: List[Dict[str, Any]],
+        available_tasks: list[dict[str, Any]],
         current_mode: SessionMode,
         cognitive_metrics: CognitiveLoadMetrics,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Adapt task selection based on current cognitive state."""
         try:
             # Define complexity limits per mode
@@ -259,7 +257,7 @@ class TaskComplexityAdapter:
         # Clamp between 0.1 and 1.0
         return max(0.1, min(1.0, multiplier))
 
-    def _calculate_task_complexity(self, task: Dict[str, Any]) -> float:
+    def _calculate_task_complexity(self, task: dict[str, Any]) -> float:
         """Calculate complexity score for a task."""
         task_type = task.get("type", "unknown").lower()
         base_score = self.base_complexity_scores.get(task_type, 0.5)
@@ -298,15 +296,15 @@ class CognitiveLoadManager:
         self.context_compressor = ContextCompressionEngine()
         self.task_adapter = TaskComplexityAdapter()
 
-        self.cognitive_history: List[CognitiveLoadMetrics] = []
+        self.cognitive_history: list[CognitiveLoadMetrics] = []
         self.fatigue_indicators = SessionFatigueIndicators()
-        self.mode_transitions: List[Dict[str, Any]] = []
+        self.mode_transitions: list[dict[str, Any]] = []
 
         # Performance baselines
-        self.baseline_metrics: Optional[CognitiveLoadMetrics] = None
+        self.baseline_metrics: CognitiveLoadMetrics | None = None
 
     async def assess_cognitive_load(
-        self, recent_performance_data: Dict[str, Any]
+        self, recent_performance_data: dict[str, Any]
     ) -> CognitiveLoadMetrics:
         """Assess current cognitive load based on performance indicators."""
         try:
@@ -375,8 +373,8 @@ class CognitiveLoadManager:
             )
 
     async def optimize_for_extended_session(
-        self, session_context: Dict[str, Any], available_tasks: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, session_context: dict[str, Any], available_tasks: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Optimize operations for extended session duration."""
         try:
             optimization_actions = []
@@ -439,7 +437,7 @@ class CognitiveLoadManager:
             }
 
     async def _calculate_complexity_handling_score(
-        self, performance_data: Dict[str, Any]
+        self, performance_data: dict[str, Any]
     ) -> float:
         """Calculate how well the agent is handling task complexity."""
         # Base score on recent task outcomes
@@ -469,7 +467,7 @@ class CognitiveLoadManager:
             return success_rate
 
     async def _update_fatigue_indicators(
-        self, current_metrics: CognitiveLoadMetrics, performance_data: Dict[str, Any]
+        self, current_metrics: CognitiveLoadMetrics, performance_data: dict[str, Any]
     ) -> None:
         """Update fatigue indicators based on current performance."""
         if self.baseline_metrics is None:
@@ -558,7 +556,7 @@ class CognitiveLoadManager:
                 duration_hours=duration_hours,
             )
 
-    def _get_mode_constraints(self) -> Dict[str, Any]:
+    def _get_mode_constraints(self) -> dict[str, Any]:
         """Get operational constraints for current mode."""
         constraints = {
             SessionMode.NORMAL: {
@@ -612,7 +610,7 @@ class CognitiveLoadManager:
 
         return constraints.get(self.current_mode, constraints[SessionMode.NORMAL])
 
-    def get_cognitive_load_statistics(self) -> Dict[str, Any]:
+    def get_cognitive_load_statistics(self) -> dict[str, Any]:
         """Get cognitive load and performance statistics."""
         if not self.cognitive_history:
             return {"session_duration_hours": 0, "mode": "normal"}

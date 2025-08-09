@@ -1,6 +1,5 @@
 """Tests for Failure Prediction System."""
 
-import asyncio
 import json
 import time
 from pathlib import Path
@@ -514,7 +513,7 @@ class TestFailurePredictionSystem:
         assert history_file.exists()
 
         # Load and verify data
-        with open(history_file, "r") as f:
+        with open(history_file) as f:
             data = json.load(f)
 
         assert "failure_history" in data

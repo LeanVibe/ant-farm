@@ -1,17 +1,17 @@
 """Tests for Emergency Intervention System."""
 
-import asyncio
-import pytest
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.core.safety.emergency_intervention import (
-    EmergencyInterventionSystem,
     CriticalFailureType,
-    InterventionLevel,
-    EmergencyTrigger,
     EmergencyEvent,
+    EmergencyInterventionSystem,
+    EmergencyTrigger,
+    InterventionLevel,
 )
 
 

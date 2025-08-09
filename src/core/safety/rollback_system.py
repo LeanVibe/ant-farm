@@ -8,10 +8,10 @@ import asyncio
 import json
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -75,7 +75,7 @@ class GitCheckpoint:
     async def create_checkpoint(self, description: str = "") -> str:
         """Create a git checkpoint with automated tagging."""
         try:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
             tag_name = f"{self.checkpoint_prefix}-{timestamp}"
 
             # Add all changes
@@ -119,7 +119,7 @@ class GitCheckpoint:
             )
             return False
 
-    async def get_last_stable_checkpoint(self) -> Optional[str]:
+    async def get_last_stable_checkpoint(self) -> str | None:
         """Get the most recent stable checkpoint."""
         try:
             result = await self._run_git_command(
@@ -138,7 +138,7 @@ class GitCheckpoint:
             logger.error("Failed to get last stable checkpoint", error=str(e))
             return None
 
-    async def _run_git_command(self, cmd: List[str]) -> subprocess.CompletedProcess:
+    async def _run_git_command(self, cmd: list[str]) -> subprocess.CompletedProcess:
         """Run a git command asynchronously."""
         full_cmd = ["git"] + cmd
 
@@ -166,14 +166,14 @@ class PerformanceBaseline:
 
     def __init__(self, baseline_file: Path):
         self.baseline_file = baseline_file
-        self.baselines: Dict[str, Any] = {}
+        self.baselines: dict[str, Any] = {}
         self._load_baselines()
 
     def _load_baselines(self) -> None:
         """Load performance baselines from file."""
         try:
             if self.baseline_file.exists():
-                with open(self.baseline_file, "r") as f:
+                with open(self.baseline_file) as f:
                     self.baselines = json.load(f)
             else:
                 self.baselines = {}
@@ -197,14 +197,14 @@ class PerformanceBaseline:
         self.baselines[metric_name] = {
             "value": value,
             "tolerance": tolerance,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         self._save_baselines()
         logger.info("Performance baseline set", metric=metric_name, value=value)
 
     def check_regression(
         self, metric_name: str, current_value: float
-    ) -> Tuple[bool, float]:
+    ) -> tuple[bool, float]:
         """Check if current value represents a performance regression."""
         if metric_name not in self.baselines:
             logger.warning("No baseline found for metric", metric=metric_name)
@@ -233,7 +233,7 @@ class PerformanceBaseline:
 class AutoRollbackSystem:
     """Main rollback system for autonomous development safety."""
 
-    def __init__(self, repo_path: Path, baseline_file: Optional[Path] = None):
+    def __init__(self, repo_path: Path, baseline_file: Path | None = None):
         self.repo_path = repo_path
         self.git_checkpoint = GitCheckpoint(repo_path)
 
@@ -241,14 +241,14 @@ class AutoRollbackSystem:
             baseline_file = repo_path / ".adw" / "performance_baselines.json"
         self.performance_baseline = PerformanceBaseline(baseline_file)
 
-        self.rollback_history: List[Dict[str, Any]] = []
+        self.rollback_history: list[dict[str, Any]] = []
 
     async def create_safety_checkpoint(self, description: str = "") -> str:
         """Create a safety checkpoint before risky operations."""
         return await self.git_checkpoint.create_checkpoint(description)
 
     async def handle_failure(
-        self, failure_type: RollbackLevel, context: Dict[str, Any] = None
+        self, failure_type: RollbackLevel, context: dict[str, Any] = None
     ) -> bool:
         """Handle a failure by executing the appropriate rollback strategy."""
         if context is None:
@@ -408,14 +408,14 @@ class AutoRollbackSystem:
     def _record_rollback_attempt(
         self,
         failure_type: RollbackLevel,
-        strategy: Dict[str, Any],
+        strategy: dict[str, Any],
         success: bool,
         duration: float,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Record rollback attempt for analysis."""
         record = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "failure_type": failure_type.value,
             "strategy": strategy["action"],
             "success": success,
@@ -431,7 +431,7 @@ class AutoRollbackSystem:
 
         logger.info("Rollback attempt recorded", **record)
 
-    def get_rollback_statistics(self) -> Dict[str, Any]:
+    def get_rollback_statistics(self) -> dict[str, Any]:
         """Get rollback statistics for monitoring."""
         if not self.rollback_history:
             return {"total_attempts": 0}

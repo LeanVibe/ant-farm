@@ -2,15 +2,13 @@
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.core.async_db import AsyncDatabaseManager
-from src.core.enums import TaskStatus
 from src.core.message_broker import Message, MessageBroker, MessageType
-from src.core.models import Task
 from src.core.task_queue import TaskQueue
 
 
@@ -51,7 +49,7 @@ class MockSimpleAgent:
             {
                 "task_id": task_id,
                 "description": task_description,
-                "timestamp": datetime.now(timezone.utc),
+                "timestamp": datetime.now(UTC),
             }
         )
 
@@ -301,9 +299,9 @@ class TestCompleteAgentWorkflow:
             payload={
                 "task_id": task_id,
                 "result": result,
-                "completion_time": datetime.now(timezone.utc).isoformat(),
+                "completion_time": datetime.now(UTC).isoformat(),
             },
-            timestamp=datetime.now(timezone.utc).timestamp(),
+            timestamp=datetime.now(UTC).timestamp(),
         )
 
         await mock_message_broker.send_message(completion_message)
@@ -384,7 +382,7 @@ class TestCompleteAgentWorkflow:
                 topic="task_completed",
                 message_type=MessageType.NOTIFICATION,
                 payload={"task_id": task_ids[i], "result": result},
-                timestamp=datetime.now(timezone.utc).timestamp(),
+                timestamp=datetime.now(UTC).timestamp(),
             )
             await mock_message_broker.send_message(completion_message)
 
@@ -510,18 +508,18 @@ class TestWorkflowPerformance:
     async def test_workflow_timing(self, test_agent):
         """Test workflow timing and performance metrics."""
 
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         await test_agent.start()
 
         # Process a task and measure timing
-        task_start = datetime.now(timezone.utc)
+        task_start = datetime.now(UTC)
 
         task_data = {"description": "Performance timing test task", "priority": 1}
 
         result = await test_agent.process_task(task_data)
 
-        task_end = datetime.now(timezone.utc)
+        task_end = datetime.now(UTC)
         processing_time = (task_end - task_start).total_seconds()
 
         # Verify reasonable processing time (should be fast for mock)
@@ -530,5 +528,5 @@ class TestWorkflowPerformance:
 
         await test_agent.stop()
 
-        total_time = (datetime.now(timezone.utc) - start_time).total_seconds()
+        total_time = (datetime.now(UTC) - start_time).total_seconds()
         assert total_time < 2.0  # Total workflow under 2 seconds

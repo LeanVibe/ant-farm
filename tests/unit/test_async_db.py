@@ -1,12 +1,12 @@
+import uuid
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
-import uuid
-from datetime import datetime, timezone
+
 from src.core.async_db import (
     AsyncDatabaseManager,
-    DatabaseConnectionError,
-    DatabaseOperationError,
 )
 
 
@@ -19,9 +19,9 @@ class MockAgentModel:
         self.capabilities = capabilities or {}
         self.status = "active"
         self.tmux_session = tmux_session
-        self.last_heartbeat = datetime.now(timezone.utc)
+        self.last_heartbeat = datetime.now(UTC)
         self.short_id = None
-        self.created_at = datetime.now(timezone.utc)
+        self.created_at = datetime.now(UTC)
 
 
 class MockContext:
@@ -33,8 +33,8 @@ class MockContext:
         self.category = kwargs.get("category", "general")
         self.topic = kwargs.get("topic")
         self.meta_data = kwargs.get("metadata", {})
-        self.created_at = datetime.now(timezone.utc)
-        self.last_accessed = datetime.now(timezone.utc)
+        self.created_at = datetime.now(UTC)
+        self.last_accessed = datetime.now(UTC)
 
 
 class MockSystemMetric:
@@ -48,7 +48,7 @@ class MockSystemMetric:
         self.task_id = kwargs.get("task_id")
         self.session_id = kwargs.get("session_id")
         self.labels = kwargs.get("labels", {})
-        self.timestamp = datetime.now(timezone.utc)
+        self.timestamp = datetime.now(UTC)
 
 
 class AsyncContextManagerMock:

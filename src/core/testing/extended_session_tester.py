@@ -9,14 +9,14 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
-from ..adw.session_manager import ADWSession, ADWSessionConfig, SessionPhase
+from ..adw.session_manager import ADWSession, ADWSessionConfig
 from ..monitoring.autonomous_dashboard import AutonomousDashboard
 
 logger = structlog.get_logger()
@@ -37,7 +37,7 @@ class ExtendedSessionMetrics:
     """Metrics collected during extended session testing."""
 
     start_time: float
-    end_time: Optional[float] = None
+    end_time: float | None = None
     test_type: ExtendedSessionTestType = ExtendedSessionTestType.ENDURANCE
 
     # Session progression
@@ -46,26 +46,26 @@ class ExtendedSessionMetrics:
     total_sessions_failed: int = 0
 
     # Performance metrics
-    commits_per_hour: List[float] = field(default_factory=list)
-    test_success_rates: List[float] = field(default_factory=list)
-    quality_gate_rates: List[float] = field(default_factory=list)
+    commits_per_hour: list[float] = field(default_factory=list)
+    test_success_rates: list[float] = field(default_factory=list)
+    quality_gate_rates: list[float] = field(default_factory=list)
 
     # Resource utilization
-    memory_usage_over_time: List[Tuple[float, float]] = field(default_factory=list)
-    cpu_usage_over_time: List[Tuple[float, float]] = field(default_factory=list)
+    memory_usage_over_time: list[tuple[float, float]] = field(default_factory=list)
+    cpu_usage_over_time: list[tuple[float, float]] = field(default_factory=list)
 
     # Cognitive load progression
-    fatigue_levels_over_time: List[Tuple[float, float]] = field(default_factory=list)
-    mode_transitions: List[Tuple[float, str, str]] = field(default_factory=list)
+    fatigue_levels_over_time: list[tuple[float, float]] = field(default_factory=list)
+    mode_transitions: list[tuple[float, str, str]] = field(default_factory=list)
 
     # Failure patterns
-    failure_types: Dict[str, int] = field(default_factory=dict)
-    recovery_times: List[float] = field(default_factory=list)
-    rollback_frequency: List[float] = field(default_factory=list)
+    failure_types: dict[str, int] = field(default_factory=dict)
+    recovery_times: list[float] = field(default_factory=list)
+    rollback_frequency: list[float] = field(default_factory=list)
 
     # System health
-    component_uptime: Dict[str, float] = field(default_factory=dict)
-    error_rates: List[float] = field(default_factory=list)
+    component_uptime: dict[str, float] = field(default_factory=dict)
+    error_rates: list[float] = field(default_factory=list)
 
     def duration(self) -> float:
         """Get total test duration in hours."""
@@ -83,19 +83,19 @@ class ExtendedSessionMetrics:
 class ExtendedSessionTester:
     """Framework for testing extended autonomous development sessions."""
 
-    def __init__(self, project_path: Path, output_dir: Optional[Path] = None):
+    def __init__(self, project_path: Path, output_dir: Path | None = None):
         self.project_path = project_path
         self.output_dir = output_dir or project_path / "extended_session_tests"
         self.output_dir.mkdir(exist_ok=True)
 
         # Test state
         self.active_test = False
-        self.current_session: Optional[ADWSession] = None
-        self.metrics: Optional[ExtendedSessionMetrics] = None
+        self.current_session: ADWSession | None = None
+        self.metrics: ExtendedSessionMetrics | None = None
 
         # Monitoring
-        self.dashboard: Optional[AutonomousDashboard] = None
-        self.monitoring_task: Optional[asyncio.Task] = None
+        self.dashboard: AutonomousDashboard | None = None
+        self.monitoring_task: asyncio.Task | None = None
 
         logger.info(
             "Extended session tester initialized",
@@ -106,8 +106,8 @@ class ExtendedSessionTester:
     async def run_endurance_test(
         self,
         duration_hours: float = 16.0,
-        session_goals: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        session_goals: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Run a basic endurance test for specified duration."""
         logger.info(
             "Starting endurance test",
@@ -134,8 +134,8 @@ class ExtendedSessionTester:
     async def run_stress_test(
         self,
         duration_hours: float = 8.0,
-        stress_factors: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        stress_factors: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Run a stress test with high cognitive load."""
         logger.info(
             "Starting stress test",
@@ -169,7 +169,7 @@ class ExtendedSessionTester:
         self,
         duration_hours: float = 12.0,
         failure_injection_rate: float = 0.3,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a recovery test with injected failures."""
         logger.info(
             "Starting recovery test",
@@ -198,8 +198,8 @@ class ExtendedSessionTester:
     async def run_efficiency_test(
         self,
         duration_hours: float = 20.0,
-        efficiency_targets: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, Any]:
+        efficiency_targets: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         """Run an efficiency test measuring performance over time."""
         logger.info(
             "Starting efficiency test",
@@ -234,7 +234,7 @@ class ExtendedSessionTester:
     async def run_cognitive_progression_test(
         self,
         duration_hours: float = 18.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a test focused on cognitive load progression."""
         logger.info(
             "Starting cognitive progression test",
@@ -262,9 +262,9 @@ class ExtendedSessionTester:
         test_type: ExtendedSessionTestType,
         config: ADWSessionConfig,
         duration_hours: float,
-        session_goals: Optional[List[str]] = None,
-        test_context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        session_goals: list[str] | None = None,
+        test_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Run a specific type of extended session test."""
         if self.active_test:
             raise RuntimeError("Test already running")
@@ -361,10 +361,10 @@ class ExtendedSessionTester:
     async def _run_single_session(
         self,
         config: ADWSessionConfig,
-        session_goals: Optional[List[str]],
+        session_goals: list[str] | None,
         session_num: int,
-        test_context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        test_context: dict[str, Any],
+    ) -> dict[str, Any]:
         """Run a single ADW session as part of extended test."""
         session_start = time.time()
 
@@ -404,7 +404,7 @@ class ExtendedSessionTester:
         finally:
             self.current_session = None
 
-    async def _apply_test_modifications(self, test_context: Dict[str, Any]) -> None:
+    async def _apply_test_modifications(self, test_context: dict[str, Any]) -> None:
         """Apply test-specific modifications to the current session."""
         if not self.current_session:
             return
@@ -492,7 +492,7 @@ class ExtendedSessionTester:
         except Exception as e:
             logger.error("Monitoring task failed", error=str(e))
 
-    async def _record_session_metrics(self, session_result: Dict[str, Any]) -> None:
+    async def _record_session_metrics(self, session_result: dict[str, Any]) -> None:
         """Record metrics from a completed session."""
         if not self.metrics:
             return
@@ -531,8 +531,8 @@ class ExtendedSessionTester:
             )
 
     async def _generate_test_report(
-        self, test_id: str, test_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, test_id: str, test_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Generate comprehensive test report."""
         if not self.metrics:
             return {"error": "No metrics available"}
@@ -563,10 +563,10 @@ class ExtendedSessionTester:
             "test_id": test_id,
             "test_type": self.metrics.test_type.value,
             "start_time": datetime.fromtimestamp(
-                self.metrics.start_time, tz=timezone.utc
+                self.metrics.start_time, tz=UTC
             ).isoformat(),
             "end_time": datetime.fromtimestamp(
-                self.metrics.end_time, tz=timezone.utc
+                self.metrics.end_time, tz=UTC
             ).isoformat(),
             "duration_hours": self.metrics.duration(),
             "test_context": test_context,
@@ -587,7 +587,7 @@ class ExtendedSessionTester:
                         result * duration
                         for result, duration in zip(
                             self.metrics.commits_per_hour,
-                            [1] * len(self.metrics.commits_per_hour),
+                            [1] * len(self.metrics.commits_per_hour), strict=False,
                         )
                     ]
                 )
@@ -692,7 +692,7 @@ class ExtendedSessionTester:
 
 
 # Utility functions for test analysis
-def analyze_test_results(report_file: Path) -> Dict[str, Any]:
+def analyze_test_results(report_file: Path) -> dict[str, Any]:
     """Analyze extended session test results."""
     with open(report_file) as f:
         report = json.load(f)
@@ -731,7 +731,7 @@ def analyze_test_results(report_file: Path) -> Dict[str, Any]:
     return analysis
 
 
-def compare_test_results(report_files: List[Path]) -> Dict[str, Any]:
+def compare_test_results(report_files: list[Path]) -> dict[str, Any]:
     """Compare multiple extended session test results."""
     if len(report_files) < 2:
         raise ValueError("Need at least 2 reports to compare")

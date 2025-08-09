@@ -9,13 +9,11 @@ This module uses AI to analyze code and generate extensive test cases covering:
 - Chaos engineering scenarios
 """
 
-import re
 import ast
 import logging
-from enum import Enum
+import re
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Union
-from pathlib import Path
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -54,17 +52,17 @@ class GeneratedTest:
 class CodeAnalysis:
     """Results of code analysis for test generation."""
 
-    function_name: Optional[str] = None
-    class_name: Optional[str] = None
-    parameters: List[str] = None
-    methods: List[str] = None  # Added for class methods
-    return_type: Optional[str] = None
-    exceptions: List[str] = None
-    dependencies: List[str] = None
+    function_name: str | None = None
+    class_name: str | None = None
+    parameters: list[str] = None
+    methods: list[str] = None  # Added for class methods
+    return_type: str | None = None
+    exceptions: list[str] = None
+    dependencies: list[str] = None
     complexity_score: int = 1
-    edge_cases: List[EdgeCase] = None
-    security_risks: List[str] = None
-    performance_considerations: List[str] = None
+    edge_cases: list[EdgeCase] = None
+    security_risks: list[str] = None
+    performance_considerations: list[str] = None
 
     def __post_init__(self):
         """Initialize empty lists if None."""
@@ -89,9 +87,9 @@ class TestGenerationResult:
     """Result of test generation process."""
 
     success: bool
-    generated_tests: List[GeneratedTest]
-    error_message: Optional[str] = None
-    analysis: Optional[CodeAnalysis] = None
+    generated_tests: list[GeneratedTest]
+    error_message: str | None = None
+    analysis: CodeAnalysis | None = None
 
 
 class CodeAnalyzer:
@@ -190,7 +188,7 @@ class CodeAnalyzer:
             logger.error(f"Class analysis failed: {e}")
             raise
 
-    def _find_exceptions(self, node: ast.FunctionDef) -> List[str]:
+    def _find_exceptions(self, node: ast.FunctionDef) -> list[str]:
         """Find exceptions that the function can raise."""
         exceptions = []
 
@@ -217,7 +215,7 @@ class CodeAnalyzer:
 
     def _generate_edge_cases(
         self, node: ast.FunctionDef, analysis: CodeAnalysis
-    ) -> List[EdgeCase]:
+    ) -> list[EdgeCase]:
         """Generate edge cases based on function analysis."""
         edge_cases = []
 
@@ -243,13 +241,13 @@ class CodeAnalyzer:
 
         # Edge cases based on exceptions
         for exception in analysis.exceptions:
-            edge_cases.append(EdgeCase(f"invalid input", f"raises {exception}"))
+            edge_cases.append(EdgeCase("invalid input", f"raises {exception}"))
 
         return edge_cases
 
     def _generate_class_edge_cases(
         self, node: ast.ClassDef, analysis: CodeAnalysis
-    ) -> List[EdgeCase]:
+    ) -> list[EdgeCase]:
         """Generate edge cases for class integration testing."""
         edge_cases = []
 
@@ -274,7 +272,7 @@ class CodeAnalyzer:
 
         return edge_cases
 
-    def _identify_security_risks(self, node: ast.FunctionDef) -> List[str]:
+    def _identify_security_risks(self, node: ast.FunctionDef) -> list[str]:
         """Identify potential security risks in code."""
         risks = []
 
@@ -293,7 +291,7 @@ class CodeAnalyzer:
 
         return risks
 
-    def _identify_performance_issues(self, node: ast.FunctionDef) -> List[str]:
+    def _identify_performance_issues(self, node: ast.FunctionDef) -> list[str]:
         """Identify potential performance considerations."""
         issues = []
 
@@ -313,7 +311,7 @@ class CodeAnalyzer:
 class AITestGenerator:
     """Generates comprehensive test suites using AI analysis."""
 
-    def __init__(self, code_analyzer: Optional[CodeAnalyzer] = None):
+    def __init__(self, code_analyzer: CodeAnalyzer | None = None):
         """Initialize with optional code analyzer."""
         self.code_analyzer = code_analyzer or CodeAnalyzer()
 
@@ -321,7 +319,7 @@ class AITestGenerator:
         self,
         source_code: str,
         test_type: TestType,
-        target_function: Optional[str] = None,
+        target_function: str | None = None,
     ) -> TestGenerationResult:
         """Generate tests for the given source code."""
         try:
@@ -355,7 +353,7 @@ class AITestGenerator:
                 success=False, generated_tests=[], error_message=str(e)
             )
 
-    def _generate_unit_tests(self, analysis: CodeAnalysis) -> List[GeneratedTest]:
+    def _generate_unit_tests(self, analysis: CodeAnalysis) -> list[GeneratedTest]:
         """Generate unit tests based on analysis."""
         tests = []
         target_name = analysis.function_name or analysis.class_name
@@ -386,7 +384,7 @@ class AITestGenerator:
 
     def _generate_integration_tests(
         self, analysis: CodeAnalysis
-    ) -> List[GeneratedTest]:
+    ) -> list[GeneratedTest]:
         """Generate integration tests based on analysis."""
         tests = []
         target_name = analysis.class_name or analysis.function_name
@@ -452,7 +450,7 @@ class AITestGenerator:
 
     def _generate_performance_tests(
         self, analysis: CodeAnalysis
-    ) -> List[GeneratedTest]:
+    ) -> list[GeneratedTest]:
         """Generate performance tests based on analysis."""
         tests = []
         target_name = analysis.function_name or analysis.class_name
@@ -475,7 +473,7 @@ class AITestGenerator:
 
         return tests
 
-    def _generate_security_tests(self, analysis: CodeAnalysis) -> List[GeneratedTest]:
+    def _generate_security_tests(self, analysis: CodeAnalysis) -> list[GeneratedTest]:
         """Generate security tests based on analysis."""
         tests = []
         target_name = analysis.function_name or analysis.class_name
@@ -498,7 +496,7 @@ class AITestGenerator:
 
         return tests
 
-    def _generate_chaos_tests(self, analysis: CodeAnalysis) -> List[GeneratedTest]:
+    def _generate_chaos_tests(self, analysis: CodeAnalysis) -> list[GeneratedTest]:
         """Generate chaos engineering tests."""
         # Placeholder for chaos tests
         return []

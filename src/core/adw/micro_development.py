@@ -6,9 +6,8 @@ Implements 30-minute TDD iterations with automatic breaks and safety checks.
 import asyncio
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -24,10 +23,10 @@ class MicroIterationResult:
     end_time: float
     status: str  # "success", "timeout", "quality_failure", "critical_failure"
     tests_written: int
-    code_changes: Dict[str, Any]
+    code_changes: dict[str, Any]
     quality_score: float
-    checkpoint_hash: Optional[str] = None
-    error_message: Optional[str] = None
+    checkpoint_hash: str | None = None
+    error_message: str | None = None
 
 
 class MicroDevelopmentEngine:
@@ -37,12 +36,12 @@ class MicroDevelopmentEngine:
         self.project_path = project_path
         self.rollback_system = rollback_system
         self.quality_gates = quality_gates
-        self.iteration_history: List[MicroIterationResult] = []
+        self.iteration_history: list[MicroIterationResult] = []
 
     async def run_tdd_iteration(
         self,
         iteration_number: int,
-        target_feature: Optional[str] = None,
+        target_feature: str | None = None,
         time_limit_minutes: int = 30,
     ) -> MicroIterationResult:
         """Run a single TDD micro-iteration."""
@@ -82,7 +81,7 @@ class MicroDevelopmentEngine:
 
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Handle timeout
             result = MicroIterationResult(
                 iteration_number=iteration_number,
@@ -127,7 +126,7 @@ class MicroDevelopmentEngine:
             return result
 
     async def _execute_tdd_cycle(
-        self, iteration_number: int, target_feature: Optional[str], checkpoint_hash: str
+        self, iteration_number: int, target_feature: str | None, checkpoint_hash: str
     ) -> MicroIterationResult:
         """Execute the core TDD cycle: Red → Green → Refactor."""
         start_time = time.time()
@@ -189,8 +188,8 @@ class MicroDevelopmentEngine:
         return result
 
     async def _red_phase(
-        self, iteration_number: int, target_feature: Optional[str]
-    ) -> Dict[str, Any]:
+        self, iteration_number: int, target_feature: str | None
+    ) -> dict[str, Any]:
         """Red phase: Write a failing test."""
         # This would integrate with AI test generation
         # For now, we'll simulate the process
@@ -226,8 +225,8 @@ class MicroDevelopmentEngine:
         }
 
     async def _green_phase(
-        self, iteration_number: int, target_feature: Optional[str]
-    ) -> Dict[str, Any]:
+        self, iteration_number: int, target_feature: str | None
+    ) -> dict[str, Any]:
         """Green phase: Write minimal code to make tests pass."""
         # This would integrate with AI code generation
         # For now, we'll simulate the process
@@ -262,7 +261,7 @@ class MicroDevelopmentEngine:
             "duration": 15.0,  # Estimated 15 minutes
         }
 
-    async def _refactor_phase(self, iteration_number: int) -> Dict[str, Any]:
+    async def _refactor_phase(self, iteration_number: int) -> dict[str, Any]:
         """Refactor phase: Improve code quality without changing behavior."""
         # This would integrate with automated refactoring tools
         # For now, we'll simulate the process
@@ -320,7 +319,6 @@ class MicroDevelopmentEngine:
         """Enforce that tests are written before implementation code."""
         try:
             # Check git diff to see if tests were added before implementation
-            import subprocess
 
             # Get staged changes
             process = await asyncio.create_subprocess_exec(
@@ -434,7 +432,7 @@ class MicroDevelopmentEngine:
         except Exception as e:
             logger.debug("Minor progress update error during break", error=str(e))
 
-    def get_iteration_statistics(self) -> Dict[str, Any]:
+    def get_iteration_statistics(self) -> dict[str, Any]:
         """Get statistics for all completed iterations."""
         if not self.iteration_history:
             return {"total_iterations": 0}

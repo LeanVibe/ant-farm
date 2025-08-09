@@ -1,28 +1,25 @@
 """Pair Programming framework for Developer and QA agent collaboration."""
 
-import asyncio
-import json
 import time
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
 # Handle both module and direct execution imports
 try:
-    from ..task_queue import Task
     from ...agents.base_agent import BaseAgent
+    from ..task_queue import Task
 except ImportError:
     # Direct execution - add src to path
     import sys
 
     src_path = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(src_path))
-    from core.task_queue import Task
     from agents.base_agent import BaseAgent
+    from core.task_queue import Task
 
 logger = structlog.get_logger()
 
@@ -54,11 +51,11 @@ class CollaborationResult:
 
     success: bool
     session_id: str
-    phases_completed: List[SessionPhase] = field(default_factory=list)
-    final_deliverables: Dict[str, Any] = field(default_factory=dict)
+    phases_completed: list[SessionPhase] = field(default_factory=list)
+    final_deliverables: dict[str, Any] = field(default_factory=dict)
     collaboration_summary: str = ""
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    error_message: Optional[str] = None
+    metrics: dict[str, Any] = field(default_factory=dict)
+    error_message: str | None = None
 
 
 @dataclass
@@ -67,9 +64,9 @@ class PhaseResult:
 
     success: bool
     phase: SessionPhase
-    next_phase: Optional[SessionPhase] = None
-    output: Dict[str, Any] = field(default_factory=dict)
-    issues_found: List[str] = field(default_factory=list)
+    next_phase: SessionPhase | None = None
+    output: dict[str, Any] = field(default_factory=dict)
+    issues_found: list[str] = field(default_factory=list)
     code_generated: bool = False
     tests_generated: bool = False
     approval_status: str = "pending"
@@ -377,7 +374,7 @@ class PairProgrammingSession:
             )
             return PhaseResult(success=False, phase=SessionPhase.COMPLETION)
 
-    async def _communicate_with_developer(self, message: str) -> Dict[str, Any]:
+    async def _communicate_with_developer(self, message: str) -> dict[str, Any]:
         """Communicate with the developer agent."""
         try:
             collaboration_request = {
@@ -409,7 +406,7 @@ class PairProgrammingSession:
             )
             return {"success": False, "error": str(e)}
 
-    async def _communicate_with_qa(self, message: str) -> Dict[str, Any]:
+    async def _communicate_with_qa(self, message: str) -> dict[str, Any]:
         """Communicate with the QA agent."""
         try:
             collaboration_request = {
@@ -437,7 +434,7 @@ class PairProgrammingSession:
             )
             return {"success": False, "error": str(e)}
 
-    async def _collect_feedback(self, task: Task, iteration: int) -> Dict[str, Any]:
+    async def _collect_feedback(self, task: Task, iteration: int) -> dict[str, Any]:
         """Collect feedback from both agents during iterative refinement."""
         self.feedback_iterations = iteration
 
@@ -458,7 +455,7 @@ class PairProgrammingSession:
             "feedback": qa_feedback.get("response", f"Iteration {iteration} feedback"),
         }
 
-    async def _validate_quality_gates(self, task: Task) -> Dict[str, Any]:
+    async def _validate_quality_gates(self, task: Task) -> dict[str, Any]:
         """Validate quality gates for the implementation."""
         return {
             "passed": True,
@@ -471,7 +468,7 @@ class PairProgrammingSession:
 
     async def _handle_phase_failure(
         self, phase: SessionPhase, error: Exception
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle failure in a collaboration phase."""
         logger.warning(
             "Phase failure detected",
@@ -488,7 +485,7 @@ class PairProgrammingSession:
             "recovery_strategy": "adjust_approach_and_retry",
         }
 
-    async def _get_developer_tasks(self, task: Task) -> List[str]:
+    async def _get_developer_tasks(self, task: Task) -> list[str]:
         """Get developer-specific tasks for the collaboration."""
         return [
             "Implement core functionality",
@@ -498,7 +495,7 @@ class PairProgrammingSession:
             "Optimize performance",
         ]
 
-    async def _get_qa_tasks(self, task: Task) -> List[str]:
+    async def _get_qa_tasks(self, task: Task) -> list[str]:
         """Get QA-specific tasks for the collaboration."""
         return [
             "Create comprehensive test suite",
@@ -508,7 +505,7 @@ class PairProgrammingSession:
             "Conduct code quality review",
         ]
 
-    def get_session_metrics(self) -> Dict[str, Any]:
+    def get_session_metrics(self) -> dict[str, Any]:
         """Get session metrics and performance data."""
         return {
             "session_id": self.session_id,

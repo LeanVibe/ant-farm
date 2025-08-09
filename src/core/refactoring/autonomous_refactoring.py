@@ -2,12 +2,10 @@
 
 import ast
 import re
-import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -57,8 +55,8 @@ class CodeSmellInstance:
     location: str
     severity: float
     description: str
-    line_number: Optional[int] = None
-    suggestion: Optional[str] = None
+    line_number: int | None = None
+    suggestion: str | None = None
 
 
 @dataclass
@@ -70,8 +68,8 @@ class RefactoringOpportunity:
     description: str
     confidence: float
     estimated_benefit: float
-    code_smell: Optional[CodeSmell] = None
-    suggested_changes: List[str] = field(default_factory=list)
+    code_smell: CodeSmell | None = None
+    suggested_changes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -81,11 +79,11 @@ class RefactoringResult:
     success: bool
     original_code: str
     refactored_code: str = ""
-    refactoring_type: Optional[RefactoringType] = None
+    refactoring_type: RefactoringType | None = None
     confidence: float = 0.0
-    improvements: List[str] = field(default_factory=list)
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    error_message: Optional[str] = None
+    improvements: list[str] = field(default_factory=list)
+    metrics: dict[str, Any] = field(default_factory=dict)
+    error_message: str | None = None
 
 
 class AutonomousRefactoringEngine:
@@ -117,7 +115,7 @@ class AutonomousRefactoringEngine:
             auto_apply_threshold=auto_apply_threshold,
         )
 
-    async def detect_code_smells(self, code: str) -> List[CodeSmellInstance]:
+    async def detect_code_smells(self, code: str) -> list[CodeSmellInstance]:
         """Detect code smells in the provided code."""
         smells = []
 
@@ -139,7 +137,7 @@ class AutonomousRefactoringEngine:
             logger.warning("Failed to parse code for smell detection", error=str(e))
             return []
 
-    async def analyze_complexity(self, code: str) -> Dict[str, Any]:
+    async def analyze_complexity(self, code: str) -> dict[str, Any]:
         """Analyze code complexity metrics."""
         try:
             tree = ast.parse(code)
@@ -159,7 +157,7 @@ class AutonomousRefactoringEngine:
 
     async def identify_refactoring_opportunities(
         self, code: str
-    ) -> List[RefactoringOpportunity]:
+    ) -> list[RefactoringOpportunity]:
         """Identify refactoring opportunities in the code."""
         opportunities = []
 
@@ -471,7 +469,7 @@ class AutonomousRefactoringEngine:
 
     async def analyze_refactoring_impact(
         self, code: str, opportunity: RefactoringOpportunity
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze the potential impact of applying a refactoring."""
         # Calculate current complexity
         current_complexity = await self.analyze_complexity(code)
@@ -489,8 +487,8 @@ class AutonomousRefactoringEngine:
         return impact
 
     async def apply_batch_refactoring(
-        self, code: str, opportunities: List[RefactoringOpportunity]
-    ) -> List[RefactoringResult]:
+        self, code: str, opportunities: list[RefactoringOpportunity]
+    ) -> list[RefactoringResult]:
         """Apply multiple refactoring opportunities in batch."""
         results = []
         current_code = code
@@ -514,7 +512,7 @@ class AutonomousRefactoringEngine:
         """Determine if refactoring should be automatically applied."""
         return opportunity.confidence >= self.auto_apply_threshold
 
-    def get_refactoring_metrics(self) -> Dict[str, Any]:
+    def get_refactoring_metrics(self) -> dict[str, Any]:
         """Get refactoring metrics and performance data."""
         return self.metrics.copy()
 
@@ -540,7 +538,7 @@ class AutonomousRefactoringEngine:
                 error_message=f"Refactoring type {refactoring_type} not implemented",
             )
 
-    def _initialize_smell_detectors(self) -> Dict[CodeSmell, callable]:
+    def _initialize_smell_detectors(self) -> dict[CodeSmell, callable]:
         """Initialize code smell detection functions."""
         return {
             CodeSmell.LONG_METHOD: self._detect_long_methods,
@@ -550,7 +548,7 @@ class AutonomousRefactoringEngine:
             CodeSmell.MAGIC_NUMBERS: self._detect_magic_numbers,
         }
 
-    def _initialize_refactoring_strategies(self) -> Dict[RefactoringType, callable]:
+    def _initialize_refactoring_strategies(self) -> dict[RefactoringType, callable]:
         """Initialize refactoring strategy functions."""
         return {
             RefactoringType.EXTRACT_METHOD: self.extract_method,
@@ -559,7 +557,7 @@ class AutonomousRefactoringEngine:
             RefactoringType.REDUCE_PARAMETERS: self.reduce_parameter_count,
         }
 
-    def _detect_long_methods(self, code: str, tree: ast.AST) -> List[CodeSmellInstance]:
+    def _detect_long_methods(self, code: str, tree: ast.AST) -> list[CodeSmellInstance]:
         """Detect methods that are too long."""
         smells = []
 
@@ -584,7 +582,7 @@ class AutonomousRefactoringEngine:
 
     def _detect_long_parameter_lists(
         self, code: str, tree: ast.AST
-    ) -> List[CodeSmellInstance]:
+    ) -> list[CodeSmellInstance]:
         """Detect functions with too many parameters."""
         smells = []
 
@@ -607,7 +605,7 @@ class AutonomousRefactoringEngine:
 
     def _detect_complex_conditionals(
         self, code: str, tree: ast.AST
-    ) -> List[CodeSmellInstance]:
+    ) -> list[CodeSmellInstance]:
         """Detect overly complex conditional statements."""
         smells = []
 
@@ -631,7 +629,7 @@ class AutonomousRefactoringEngine:
 
     def _detect_duplicate_code(
         self, code: str, tree: ast.AST
-    ) -> List[CodeSmellInstance]:
+    ) -> list[CodeSmellInstance]:
         """Detect duplicate code patterns."""
         smells = []
 
@@ -660,7 +658,7 @@ class AutonomousRefactoringEngine:
 
     def _detect_magic_numbers(
         self, code: str, tree: ast.AST
-    ) -> List[CodeSmellInstance]:
+    ) -> list[CodeSmellInstance]:
         """Detect magic numbers in code."""
         smells = []
 
@@ -682,8 +680,8 @@ class AutonomousRefactoringEngine:
         return smells
 
     def _smell_to_opportunity(
-        self, smell: CodeSmellInstance, complexity: Dict[str, Any]
-    ) -> Optional[RefactoringOpportunity]:
+        self, smell: CodeSmellInstance, complexity: dict[str, Any]
+    ) -> RefactoringOpportunity | None:
         """Convert a code smell into a refactoring opportunity."""
         smell_to_refactoring = {
             CodeSmell.LONG_METHOD: RefactoringType.EXTRACT_METHOD,
@@ -714,7 +712,7 @@ class AutonomousRefactoringEngine:
 
     def _identify_pattern_opportunities(
         self, code: str
-    ) -> List[RefactoringOpportunity]:
+    ) -> list[RefactoringOpportunity]:
         """Identify refactoring opportunities based on code patterns."""
         opportunities = []
 
@@ -744,7 +742,7 @@ class AutonomousRefactoringEngine:
 
         return complexity
 
-    def _calculate_function_lengths(self, tree: ast.AST) -> Dict[str, int]:
+    def _calculate_function_lengths(self, tree: ast.AST) -> dict[str, int]:
         """Calculate lengths of all functions."""
         function_lengths = {}
 
@@ -756,7 +754,7 @@ class AutonomousRefactoringEngine:
 
         return function_lengths
 
-    def _calculate_parameter_counts(self, tree: ast.AST) -> Dict[str, int]:
+    def _calculate_parameter_counts(self, tree: ast.AST) -> dict[str, int]:
         """Calculate parameter counts for all functions."""
         parameter_counts = {}
 
@@ -785,7 +783,7 @@ class AutonomousRefactoringEngine:
         calculate_depth(tree)
         return max_depth
 
-    def _calculate_class_complexity(self, tree: ast.AST) -> Dict[str, Dict[str, Any]]:
+    def _calculate_class_complexity(self, tree: ast.AST) -> dict[str, dict[str, Any]]:
         """Calculate complexity metrics for classes."""
         class_complexity = {}
 

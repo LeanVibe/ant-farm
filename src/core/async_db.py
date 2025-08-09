@@ -1,9 +1,8 @@
 """Async database manager for LeanVibe Agent Hive 2.0."""
 
-import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import structlog
 from sqlalchemy import text
@@ -12,10 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 # Handle both module and direct execution imports
 try:
     from .config import settings
-    from .models import Agent as AgentModel, Base, Context, SystemMetric, Task
+    from .models import Agent as AgentModel
+    from .models import Base, Context, SystemMetric, Task
 except ImportError:
     from config import settings
-    from models import Agent as AgentModel, Base, Context, SystemMetric, Task
+    from models import Agent as AgentModel
+    from models import Base, Context, SystemMetric, Task
 
 logger = structlog.get_logger()
 
@@ -110,7 +111,7 @@ class AsyncDatabaseManager:
                 if existing_agent:
                     # Update existing agent
                     existing_agent.status = "active"
-                    existing_agent.last_heartbeat = datetime.now(timezone.utc)
+                    existing_agent.last_heartbeat = datetime.now(UTC)
                     existing_agent.tmux_session = tmux_session
                     if capabilities:
                         existing_agent.capabilities = capabilities
@@ -140,7 +141,7 @@ class AsyncDatabaseManager:
                         capabilities=capabilities or {},
                         status="active",
                         tmux_session=tmux_session,
-                        last_heartbeat=datetime.now(timezone.utc),
+                        last_heartbeat=datetime.now(UTC),
                     )
                     session.add(agent)
                     await session.flush()  # Get the ID without committing
@@ -170,12 +171,12 @@ class AsyncDatabaseManager:
         """Update agent heartbeat."""
         async with self.async_session_maker() as session:
             try:
-                from sqlalchemy import select, update
+                from sqlalchemy import update
 
                 stmt = (
                     update(AgentModel)
                     .where(AgentModel.name == agent_name)
-                    .values(last_heartbeat=datetime.now(timezone.utc))
+                    .values(last_heartbeat=datetime.now(UTC))
                 )
                 result = await session.execute(stmt)
                 await session.commit()
@@ -197,7 +198,7 @@ class AsyncDatabaseManager:
                 )
                 return False
 
-    async def get_agent_by_name(self, name: str) -> Optional[AgentModel]:
+    async def get_agent_by_name(self, name: str) -> AgentModel | None:
         """Get agent by name."""
         async with self.async_session_maker() as session:
             try:
@@ -211,7 +212,7 @@ class AsyncDatabaseManager:
                 logger.error("Failed to get agent", agent=name, error=str(e))
                 return None
 
-    async def get_agent_by_id(self, agent_id: str) -> Optional[AgentModel]:
+    async def get_agent_by_id(self, agent_id: str) -> AgentModel | None:
         """Get agent by ID."""
         async with self.async_session_maker() as session:
             try:
@@ -248,8 +249,8 @@ class AsyncDatabaseManager:
                     category=category,
                     topic=topic,
                     meta_data=metadata or {},
-                    created_at=datetime.now(timezone.utc),
-                    last_accessed=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
+                    last_accessed=datetime.now(UTC),
                 )
                 session.add(context)
                 await session.commit()
@@ -287,7 +288,7 @@ class AsyncDatabaseManager:
                     task_id=uuid.UUID(task_id) if task_id else None,
                     session_id=uuid.UUID(session_id) if session_id else None,
                     labels=labels or {},
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 session.add(metric)
                 await session.commit()
@@ -328,9 +329,9 @@ class AsyncDatabaseManager:
         """
         async with self.async_session_maker() as session:
             try:
-                from sqlalchemy import select, update, and_
+                from sqlalchemy import and_, update
 
-                threshold_time = datetime.now(timezone.utc) - timedelta(
+                threshold_time = datetime.now(UTC) - timedelta(
                     minutes=threshold_minutes
                 )
 
@@ -370,7 +371,7 @@ class AsyncDatabaseManager:
                 stats["null_heartbeat_agents"] = result.rowcount
 
                 # 3. Clean up old "starting" agents (stuck in starting state > 5 minutes)
-                starting_threshold = datetime.now(timezone.utc) - timedelta(minutes=5)
+                starting_threshold = datetime.now(UTC) - timedelta(minutes=5)
                 old_starting_stmt = (
                     update(AgentModel)
                     .where(
@@ -444,7 +445,7 @@ class AsyncDatabaseManager:
 
 
 # Global async database manager instance
-_async_db_manager: Optional[AsyncDatabaseManager] = None
+_async_db_manager: AsyncDatabaseManager | None = None
 
 
 async def get_async_database_manager(database_url: str = None) -> AsyncDatabaseManager:

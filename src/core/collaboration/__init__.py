@@ -1,28 +1,26 @@
 """Collaboration module for multi-agent workflows."""
 
-from .pair_programming import (
-    PairProgrammingSession,
-    CollaborationResult,
-    SessionPhase,
-    SessionStatus,
+from .enhanced_pair_programming import (
+    CollaborationMode,
+    CollaborationSession,
+    ContextShareType,
+    EnhancedAIPairProgramming,
+    SharedContext,
+    get_enhanced_pair_programming,
 )
-
 from .large_project_coordination import (
     LargeProjectCoordinator,
-    ProjectScale,
     ProjectPhase,
+    ProjectScale,
     ProjectWorkspace,
     TaskDependencyGraph,
     get_large_project_coordinator,
 )
-
-from .enhanced_pair_programming import (
-    EnhancedAIPairProgramming,
-    CollaborationSession,
-    ContextShareType,
-    CollaborationMode,
-    SharedContext,
-    get_enhanced_pair_programming,
+from .pair_programming import (
+    CollaborationResult,
+    PairProgrammingSession,
+    SessionPhase,
+    SessionStatus,
 )
 
 __all__ = [

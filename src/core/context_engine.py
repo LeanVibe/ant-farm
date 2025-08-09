@@ -7,9 +7,9 @@ from enum import Enum
 from typing import Any
 
 import structlog
-from sqlalchemy.orm import Session
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.future import select
+from sqlalchemy.orm import Session
 
 from .caching import CONTEXT_CACHE_CONFIG, CacheKey, get_cache_manager
 from .models import Context, get_database_manager

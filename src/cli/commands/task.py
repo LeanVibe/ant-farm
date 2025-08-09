@@ -325,11 +325,11 @@ async def _cancel_task(task_identifier: str, force: bool):
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
-                    success_message(f"Task {task_id} cancelled successfully!")
+                    success_message(f"Task {task_identifier} cancelled successfully!")
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))
             elif response.status_code == 404:
-                error_handler(Exception(f"Task '{task_id}' not found"))
+                error_handler(Exception(f"Task '{task_identifier}' not found"))
             else:
                 error_handler(Exception(f"API returned status {response.status_code}"))
 

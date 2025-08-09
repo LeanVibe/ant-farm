@@ -351,7 +351,7 @@ class CacheManager:
                 await asyncio.wait_for(self.redis_client.ping(), timeout=base_timeout)
                 logger.info("Cache manager initialized")
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     f"Redis ping timeout on attempt {attempt + 1}/{max_retries}"
                 )

@@ -1,18 +1,17 @@
 """Database migration and setup utilities."""
 
 import asyncio
-import logging
 from pathlib import Path
 
-import alembic.command
-import alembic.config
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from .async_db import AsyncDatabaseManager, DatabaseConnectionError
+import alembic.command
+import alembic.config
+
+from .async_db import AsyncDatabaseManager
 from .config import settings
-from .models import Base
 
 logger = structlog.get_logger()
 

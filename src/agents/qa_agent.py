@@ -19,10 +19,10 @@ except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
+    from agents.base_agent import BaseAgent, HealthStatus, TaskResult
     from core.config import settings
     from core.task_queue import Task
     from core.testing.ai_test_generator import AITestGenerator, TestType
-    from agents.base_agent import BaseAgent, HealthStatus, TaskResult
 
 logger = structlog.get_logger()
 
@@ -87,7 +87,7 @@ class QAAgent(BaseAgent):
         from ..core.task_queue import task_queue
 
         # Look for QA-specific task types
-        qa_task_types = [
+        _qa_task_types = [
             "test_code",
             "review_code",
             "check_quality",
@@ -820,7 +820,7 @@ Request: {message}
 
 As a QA Agent, I specialize in:
 - Creating comprehensive test suites
-- Validating security requirements  
+- Validating security requirements
 - Testing edge cases and error scenarios
 - Verifying performance requirements
 - Conducting code quality reviews

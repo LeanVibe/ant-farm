@@ -3,7 +3,7 @@
 import json
 import time
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 import structlog
 from fastapi import Request, Response
@@ -236,7 +236,7 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
             )
             return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "Request timeout",
                 path=request.url.path,

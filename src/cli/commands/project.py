@@ -4,8 +4,6 @@ CLI commands for large project coordination and management.
 
 import asyncio
 import json
-from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -26,7 +24,7 @@ def create(
         "medium", help="Project scale: small, medium, large, massive"
     ),
     lead_agent: str = typer.Option("meta-agent", help="Lead agent for the project"),
-    root_path: Optional[str] = typer.Option(
+    root_path: str | None = typer.Option(
         None, help="Root path for project workspace"
     ),
 ):
@@ -38,10 +36,10 @@ def create(
 
 
 async def _create_project(
-    name: str, description: str, scale: str, lead_agent: str, root_path: Optional[str]
+    name: str, description: str, scale: str, lead_agent: str, root_path: str | None
 ):
     """Async implementation of project creation."""
-    from ...core.collaboration import get_large_project_coordinator, ProjectScale
+    from ...core.collaboration import ProjectScale, get_large_project_coordinator
 
     try:
         # Validate scale
@@ -63,7 +61,7 @@ async def _create_project(
         root_path=root_path,
     )
 
-    success_message(f"Project workspace created successfully!")
+    success_message("Project workspace created successfully!")
     info_message(f"Project ID: {project_id}")
     info_message(f"Scale: {scale}")
     info_message(f"Lead Agent: {lead_agent}")
@@ -76,7 +74,7 @@ async def _create_project(
 def join(
     project_id: str = typer.Argument(..., help="Project ID to join"),
     agent_id: str = typer.Argument(..., help="Agent ID to add to project"),
-    roles: List[str] = typer.Option(["contributor"], help="Agent roles in the project"),
+    roles: list[str] = typer.Option(["contributor"], help="Agent roles in the project"),
 ):
     """Add an agent to a project workspace."""
     try:
@@ -85,7 +83,7 @@ def join(
         error_handler(e)
 
 
-async def _join_project(project_id: str, agent_id: str, roles: List[str]):
+async def _join_project(project_id: str, agent_id: str, roles: list[str]):
     """Async implementation of joining a project."""
     from ...core.collaboration import get_large_project_coordinator
 
@@ -109,7 +107,7 @@ def decompose(
     complexity: int = typer.Option(
         5, min=1, max=10, help="Estimated complexity (1-10)"
     ),
-    target_agents: Optional[List[str]] = typer.Option(
+    target_agents: list[str] | None = typer.Option(
         None, help="Target agents for assignment"
     ),
 ):
@@ -124,7 +122,7 @@ async def _decompose_task(
     project_id: str,
     description: str,
     complexity: int,
-    target_agents: Optional[List[str]],
+    target_agents: list[str] | None,
 ):
     """Async implementation of task decomposition."""
     from ...core.collaboration import get_large_project_coordinator
@@ -283,7 +281,7 @@ async def _show_project_progress(project_id: str):
     filled_width = int(completion / 100 * total_width)
     bar = "█" * filled_width + "░" * (total_width - filled_width)
 
-    console.print(f"\n[bold]Project Progress:[/bold]")
+    console.print("\n[bold]Project Progress:[/bold]")
     console.print(f"[cyan]{bar}[/cyan] {completion:.1f}%")
     console.print(f"Tasks: {progress['completed_tasks']}/{progress['total_tasks']}")
     console.print(f"Active: {progress['active_tasks']}")
@@ -313,8 +311,8 @@ async def _watch_project_progress(project_id: str):
 def resolve_conflict(
     project_id: str = typer.Argument(..., help="Project ID"),
     conflict_type: str = typer.Argument(..., help="Type of conflict"),
-    agents: List[str] = typer.Argument(..., help="Involved agent IDs"),
-    context_file: Optional[str] = typer.Option(
+    agents: list[str] = typer.Argument(..., help="Involved agent IDs"),
+    context_file: str | None = typer.Option(
         None, help="JSON file with conflict context"
     ),
 ):
@@ -328,7 +326,7 @@ def resolve_conflict(
 
 
 async def _resolve_project_conflict(
-    project_id: str, conflict_type: str, agents: List[str], context_file: Optional[str]
+    project_id: str, conflict_type: str, agents: list[str], context_file: str | None
 ):
     """Async implementation of conflict resolution."""
     from ...core.collaboration import get_large_project_coordinator
@@ -339,7 +337,7 @@ async def _resolve_project_conflict(
     context = {}
     if context_file:
         try:
-            with open(context_file, "r") as f:
+            with open(context_file) as f:
                 context = json.load(f)
         except Exception as e:
             warning_message(f"Could not load context file: {e}")

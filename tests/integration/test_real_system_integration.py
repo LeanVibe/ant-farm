@@ -5,15 +5,15 @@ real-world behavior and performance.
 """
 
 import asyncio
+from collections.abc import AsyncGenerator
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
-from typing import AsyncGenerator
 
 from src.core.async_db import AsyncDatabaseManager
-from src.core.task_queue import TaskQueue
-from src.core.message_broker import MessageBroker
-from src.core.task_queue import Task, TaskStatus, TaskPriority
 from src.core.config import get_settings
+from src.core.message_broker import MessageBroker
+from src.core.task_queue import Task, TaskPriority, TaskQueue, TaskStatus
 
 
 @pytest.fixture

@@ -1,17 +1,17 @@
 """Tests for large project coordination system."""
 
-import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.core.collaboration.large_project_coordination import (
     LargeProjectCoordinator,
-    ProjectScale,
     ProjectPhase,
+    ProjectScale,
     ProjectWorkspace,
-    TaskDependencyGraph,
     ResourcePool,
     ResourceType,
+    TaskDependencyGraph,
     get_large_project_coordinator,
 )
 

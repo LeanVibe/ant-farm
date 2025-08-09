@@ -21,21 +21,21 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any
 
 # Add src to path for imports
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
 try:
-    from core.adw.session_manager import ADWSession, ADWSessionConfig
     from core.adw.cognitive_load_manager import CognitiveLoadManager
+    from core.adw.session_manager import ADWSession, ADWSessionConfig
     from core.monitoring.autonomous_dashboard import AutonomousDashboard
     from core.prediction.failure_prediction import FailurePredictionSystem
-    from core.testing.extended_session_tester import ExtendedSessionTester
+    from core.safety.quality_gates import AutonomousQualityGates
     from core.safety.resource_guardian import ResourceGuardian
     from core.safety.rollback_system import AutoRollbackSystem
-    from core.safety.quality_gates import AutonomousQualityGates
+    from core.testing.extended_session_tester import ExtendedSessionTester
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you're running from the project root directory")
@@ -46,7 +46,7 @@ class ValidationResult:
     """Result of a validation check."""
 
     def __init__(
-        self, name: str, passed: bool, message: str, details: Dict[str, Any] = None
+        self, name: str, passed: bool, message: str, details: dict[str, Any] = None
     ):
         self.name = name
         self.passed = passed
@@ -60,7 +60,7 @@ class ADWValidationSuite:
 
     def __init__(self, project_path: Path):
         self.project_path = project_path
-        self.results: List[ValidationResult] = []
+        self.results: list[ValidationResult] = []
 
     def log_result(self, result: ValidationResult):
         """Log a validation result."""
@@ -75,7 +75,7 @@ class ADWValidationSuite:
         success_rate = (passed / total * 100) if total > 0 else 0
 
         print(f"\n{'=' * 60}")
-        print(f"VALIDATION SUMMARY")
+        print("VALIDATION SUMMARY")
         print(f"{'=' * 60}")
         print(f"Total Checks: {total}")
         print(f"Passed: {passed}")
@@ -83,11 +83,11 @@ class ADWValidationSuite:
         print(f"Success Rate: {success_rate:.1f}%")
 
         if success_rate >= 90:
-            print(f"🎉 SYSTEM READY FOR EXTENDED AUTONOMOUS OPERATION")
+            print("🎉 SYSTEM READY FOR EXTENDED AUTONOMOUS OPERATION")
         elif success_rate >= 75:
-            print(f"⚠️  SYSTEM MOSTLY READY - Review failed checks")
+            print("⚠️  SYSTEM MOSTLY READY - Review failed checks")
         else:
-            print(f"❌ SYSTEM NOT READY - Critical issues need resolution")
+            print("❌ SYSTEM NOT READY - Critical issues need resolution")
 
         print(f"{'=' * 60}")
 

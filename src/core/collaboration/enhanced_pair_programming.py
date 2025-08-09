@@ -14,23 +14,19 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import structlog
 
-from .pair_programming import (
-    PairProgrammingSession,
-    SessionPhase,
-    SessionStatus,
-    CollaborationResult,
-    PhaseResult,
-)
 from ..constants import Intervals
 from ..context_engine import get_context_engine
 from ..message_broker import MessageType, message_broker
+from .pair_programming import (
+    CollaborationResult,
+    PairProgrammingSession,
+    SessionPhase,
+)
 
 logger = structlog.get_logger()
 
@@ -64,12 +60,12 @@ class SharedContext:
 
     session_id: str
     context_type: ContextShareType
-    content: Dict[str, Any]
+    content: dict[str, Any]
     source_agent: str
     timestamp: float = field(default_factory=time.time)
     relevance_score: float = 1.0
-    expiry_time: Optional[float] = None
-    tags: Set[str] = field(default_factory=set)
+    expiry_time: float | None = None
+    tags: set[str] = field(default_factory=set)
 
     def is_expired(self) -> bool:
         """Check if this context has expired."""
@@ -83,16 +79,16 @@ class CollaborationSession:
     """Enhanced collaboration session with context sharing."""
 
     session_id: str
-    participants: List[str]
+    participants: list[str]
     mode: CollaborationMode
-    project_context: Dict[str, Any]
+    project_context: dict[str, Any]
 
     # Context sharing
-    shared_contexts: List[SharedContext] = field(default_factory=list)
+    shared_contexts: list[SharedContext] = field(default_factory=list)
     context_sync_interval: float = 5.0
 
     # Session state
-    current_driver: Optional[str] = None
+    current_driver: str | None = None
     active_phase: SessionPhase = SessionPhase.PLANNING
     start_time: float = field(default_factory=time.time)
     last_sync: float = field(default_factory=time.time)
@@ -103,11 +99,11 @@ class CollaborationSession:
     suggestions_applied: int = 0
 
     # Live state tracking
-    active_files: Set[str] = field(default_factory=set)
-    cursor_positions: Dict[str, Tuple[int, int]] = field(
+    active_files: set[str] = field(default_factory=set)
+    cursor_positions: dict[str, tuple[int, int]] = field(
         default_factory=dict
     )  # agent -> (line, col)
-    edit_history: List[Dict[str, Any]] = field(default_factory=list)
+    edit_history: list[dict[str, Any]] = field(default_factory=list)
 
 
 class EnhancedAIPairProgramming:
@@ -116,7 +112,7 @@ class EnhancedAIPairProgramming:
     def __init__(self, base_session: PairProgrammingSession):
         self.base_session = base_session
         self.context_engine = None
-        self.active_sessions: Dict[str, CollaborationSession] = {}
+        self.active_sessions: dict[str, CollaborationSession] = {}
 
         # Context sharing configuration
         self.context_retention_hours = 24
@@ -124,7 +120,7 @@ class EnhancedAIPairProgramming:
         self.context_relevance_threshold = 0.3
 
         # Pattern recognition
-        self.pattern_cache: Dict[str, Any] = {}
+        self.pattern_cache: dict[str, Any] = {}
         self.pattern_match_threshold = 0.7
 
         # Performance metrics
@@ -147,9 +143,9 @@ class EnhancedAIPairProgramming:
 
     async def start_enhanced_session(
         self,
-        participants: List[str],
+        participants: list[str],
         mode: CollaborationMode,
-        project_context: Dict[str, Any],
+        project_context: dict[str, Any],
         task_description: str,
     ) -> str:
         """Start an enhanced collaboration session."""
@@ -229,8 +225,8 @@ class EnhancedAIPairProgramming:
         session_id: str,
         source_agent: str,
         context_type: ContextShareType,
-        content: Dict[str, Any],
-        tags: Set[str] = None,
+        content: dict[str, Any],
+        tags: set[str] = None,
     ) -> bool:
         """Share context between agents in a session."""
         if session_id not in self.active_sessions:
@@ -291,8 +287,8 @@ class EnhancedAIPairProgramming:
         session_id: str,
         requesting_agent: str,
         query: str,
-        context_types: List[ContextShareType] = None,
-    ) -> List[SharedContext]:
+        context_types: list[ContextShareType] = None,
+    ) -> list[SharedContext]:
         """Get relevant context for an agent based on current work."""
         if session_id not in self.active_sessions:
             return []
@@ -352,7 +348,7 @@ class EnhancedAIPairProgramming:
 
     async def suggest_code_patterns(
         self, session_id: str, current_code: str, context: str = ""
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Suggest relevant code patterns based on current work."""
         if session_id not in self.active_sessions:
             return []
@@ -394,7 +390,7 @@ class EnhancedAIPairProgramming:
 
     async def _recognize_code_patterns(
         self, code: str, context: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Recognize patterns in code using cached pattern database."""
         suggestions = []
 
@@ -442,8 +438,8 @@ class EnhancedAIPairProgramming:
         session_id: str,
         agent_id: str,
         file_path: str,
-        cursor_position: Tuple[int, int],
-        edit_action: Dict[str, Any] = None,
+        cursor_position: tuple[int, int],
+        edit_action: dict[str, Any] = None,
     ):
         """Track live collaboration state."""
         if session_id not in self.active_sessions:
@@ -599,7 +595,7 @@ class EnhancedAIPairProgramming:
         except Exception as e:
             logger.warning("Could not load collaboration patterns", error=str(e))
 
-    async def get_collaboration_metrics(self, session_id: str = None) -> Dict[str, Any]:
+    async def get_collaboration_metrics(self, session_id: str = None) -> dict[str, Any]:
         """Get collaboration metrics for a session or overall."""
         if session_id and session_id in self.active_sessions:
             session = self.active_sessions[session_id]

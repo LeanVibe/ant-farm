@@ -355,7 +355,7 @@ class TestAutonomousDashboard:
         assert metrics_file.exists()
 
         # Load and verify data
-        with open(metrics_file, "r") as f:
+        with open(metrics_file) as f:
             data = json.load(f)
 
         assert "metrics_history" in data

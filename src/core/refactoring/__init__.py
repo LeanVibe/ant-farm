@@ -2,11 +2,11 @@
 
 from .autonomous_refactoring import (
     AutonomousRefactoringEngine,
+    CodeSmell,
+    RefactoringConfidence,
+    RefactoringOpportunity,
     RefactoringResult,
     RefactoringType,
-    CodeSmell,
-    RefactoringOpportunity,
-    RefactoringConfidence,
 )
 
 __all__ = [

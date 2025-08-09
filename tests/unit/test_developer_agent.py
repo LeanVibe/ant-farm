@@ -1,12 +1,11 @@
 """Unit tests for DeveloperAgent with TDD approach."""
 
-import asyncio
-import json
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from src.agents.developer_agent import DeveloperAgent
+import pytest
+
 from src.agents.base_agent import HealthStatus, TaskResult
+from src.agents.developer_agent import DeveloperAgent
 from src.core.task_queue import Task
 
 

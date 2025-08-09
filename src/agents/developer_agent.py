@@ -1,14 +1,14 @@
 """Developer Agent for LeanVibe Agent Hive 2.0."""
 
-import asyncio
 import ast
+import asyncio
 import json
 import re
 import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -21,9 +21,8 @@ except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from core.config import settings
-    from core.task_queue import Task
     from agents.base_agent import BaseAgent, HealthStatus, TaskResult
+    from core.task_queue import Task
 
 logger = structlog.get_logger()
 
@@ -313,7 +312,7 @@ File: {file_path}
 
         return await self.refactor_code(file_path, refactor_type)
 
-    async def analyze_code_complexity(self, code: str) -> Dict[str, Any]:
+    async def analyze_code_complexity(self, code: str) -> dict[str, Any]:
         """Analyze code complexity metrics."""
         try:
             tree = ast.parse(code)
@@ -350,7 +349,7 @@ File: {file_path}
                 "error": str(e),
             }
 
-    async def suggest_improvements(self, code: str) -> List[str]:
+    async def suggest_improvements(self, code: str) -> list[str]:
         """Suggest code improvements."""
         suggestions = []
 
@@ -390,8 +389,8 @@ File: {file_path}
         return suggestions
 
     async def handle_collaboration(
-        self, collaboration_request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, collaboration_request: dict[str, Any]
+    ) -> dict[str, Any]:
         """Handle collaboration requests from other agents."""
         logger.info(
             "Handling collaboration request",
@@ -449,7 +448,7 @@ Please help with this collaboration by providing my perspective as a Developer A
         except Exception:
             return False
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         """Get agent capabilities."""
         return {
             "programming_languages": self.programming_languages,
@@ -483,7 +482,7 @@ Please help with this collaboration by providing my perspective as a Developer A
         elif "database" in description_lower or "sql" in description_lower:
             self.specialization_counts["database_development"] += 1
 
-    def get_specializations(self) -> Dict[str, int]:
+    def get_specializations(self) -> dict[str, int]:
         """Get current specialization counts."""
         return dict(self.specialization_counts)
 
@@ -614,7 +613,7 @@ Please fix this bug systematically.
         finally:
             await self.cleanup()
 
-    async def _on_collaboration_completed(self, result: Dict[str, Any]) -> None:
+    async def _on_collaboration_completed(self, result: dict[str, Any]) -> None:
         """Called when a collaboration is completed."""
         logger.info("Collaboration completed", result=result, agent=self.name)
 
@@ -626,7 +625,7 @@ Please fix this bug systematically.
         if collaboration_type:
             self.specialization_counts[f"collaboration_{collaboration_type}"] += 1
 
-    async def _on_collaboration_failed(self, failure_info: Dict[str, Any]) -> None:
+    async def _on_collaboration_failed(self, failure_info: dict[str, Any]) -> None:
         """Called when a collaboration fails."""
         logger.warning(
             "Collaboration failed", failure_info=failure_info, agent=self.name

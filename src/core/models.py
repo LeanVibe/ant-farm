@@ -1,7 +1,7 @@
 """SQLAlchemy models for LeanVibe Agent Hive 2.0."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Column,
@@ -46,7 +46,7 @@ except ImportError:
 # Utility function for timezone-aware datetime
 def utc_now():
     """Get current UTC time with timezone info."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 Base = declarative_base()
@@ -583,15 +583,15 @@ def generate_session_short_id(mapper, connection, target):
 @event.listens_for(Agent, "before_update")
 def receive_before_update(mapper, connection, target):
     """Update the updated_at timestamp on agent updates."""
-    target.updated_at = datetime.now(timezone.utc)
+    target.updated_at = datetime.now(UTC)
 
 
 @event.listens_for(Context, "before_update")
 def receive_before_update_context(mapper, connection, target):
     """Update timestamps and access tracking on context updates."""
-    target.updated_at = datetime.now(timezone.utc)
+    target.updated_at = datetime.now(UTC)
     target.access_count += 1
-    target.last_accessed = datetime.now(timezone.utc)
+    target.last_accessed = datetime.now(UTC)
 
 
 # Global database manager instance

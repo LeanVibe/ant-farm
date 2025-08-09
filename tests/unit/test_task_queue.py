@@ -1,5 +1,4 @@
 import pytest
-from src.core.task_queue import TaskQueue
 
 
 @pytest.mark.asyncio

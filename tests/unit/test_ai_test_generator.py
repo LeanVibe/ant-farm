@@ -5,17 +5,16 @@ The AI Test Generator analyzes code and generates comprehensive test suites
 that go beyond what humans typically think to test.
 """
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
-from typing import List, Dict, Any
 
 from src.core.testing.ai_test_generator import (
     AITestGenerator,
-    TestGenerationResult,
-    TestType,
     CodeAnalysis,
     EdgeCase,
+    TestGenerationResult,
+    TestType,
 )
 
 

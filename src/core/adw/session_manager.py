@@ -10,21 +10,18 @@ This module manages 4-hour autonomous development sessions with phases:
 import asyncio
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
-from ..safety import AutoRollbackSystem, AutonomousQualityGates, ResourceGuardian
-from ..safety.emergency_intervention import (
-    EmergencyInterventionSystem,
-    CriticalFailureType,
-    InterventionLevel,
-)
 from ..monitoring.autonomous_dashboard import AutonomousDashboard
 from ..prediction.failure_prediction import FailurePredictionSystem
+from ..safety import AutonomousQualityGates, AutoRollbackSystem, ResourceGuardian
+from ..safety.emergency_intervention import (
+    EmergencyInterventionSystem,
+)
 from .cognitive_load_manager import CognitiveLoadManager, SessionMode
 from .session_persistence import SessionStatePersistence
 
@@ -80,7 +77,7 @@ class SessionMetrics:
     """Metrics collected during an ADW session."""
 
     start_time: float
-    end_time: Optional[float] = None
+    end_time: float | None = None
     current_phase: SessionPhase = SessionPhase.RECONNAISSANCE
 
     # Phase durations
@@ -108,8 +105,8 @@ class SessionMetrics:
     max_cpu_usage: float = 0.0
 
     # Learning metrics
-    patterns_discovered: List[str] = field(default_factory=list)
-    improvements_identified: List[str] = field(default_factory=list)
+    patterns_discovered: list[str] = field(default_factory=list)
+    improvements_identified: list[str] = field(default_factory=list)
 
     def duration(self) -> float:
         """Get total session duration."""
@@ -121,7 +118,7 @@ class SessionMetrics:
 class ADWSession:
     """Manages a complete autonomous development workflow session."""
 
-    def __init__(self, project_path: Path, config: Optional[ADWSessionConfig] = None):
+    def __init__(self, project_path: Path, config: ADWSessionConfig | None = None):
         self.project_path = project_path
         self.config = config or ADWSessionConfig()
 
@@ -178,8 +175,8 @@ class ADWSession:
         )
 
     async def start_session(
-        self, target_goals: Optional[List[str]] = None, resume: bool = False
-    ) -> Dict[str, Any]:
+        self, target_goals: list[str] | None = None, resume: bool = False
+    ) -> dict[str, Any]:
         """Start a complete ADW session."""
         if self.active:
             raise RuntimeError("Session already active")
@@ -324,7 +321,7 @@ class ADWSession:
         finally:
             self.active = False
 
-    async def _run_phase(self, phase: SessionPhase) -> Dict[str, Any]:
+    async def _run_phase(self, phase: SessionPhase) -> dict[str, Any]:
         """Run a specific session phase."""
         self.metrics.current_phase = phase
         phase_start = time.time()
@@ -359,7 +356,7 @@ class ADWSession:
 
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "Phase timed out", session_id=self.session_id, phase=phase.value
             )
@@ -381,7 +378,7 @@ class ADWSession:
 
             return {"status": "failed", "phase": phase.value, "error": str(e)}
 
-    async def _run_reconnaissance_phase(self) -> Dict[str, Any]:
+    async def _run_reconnaissance_phase(self) -> dict[str, Any]:
         """Run the reconnaissance phase - system assessment."""
         logger.info("Running reconnaissance phase", session_id=self.session_id)
 
@@ -446,7 +443,7 @@ class ADWSession:
 
         return reconnaissance_data
 
-    async def _run_micro_development_phase(self) -> Dict[str, Any]:
+    async def _run_micro_development_phase(self) -> dict[str, Any]:
         """Run the micro-development phase - 30-minute TDD cycles."""
         logger.info("Running micro-development phase", session_id=self.session_id)
 
@@ -499,7 +496,7 @@ class ADWSession:
             ),
         }
 
-    async def _run_micro_iteration(self, iteration_num: int) -> Dict[str, Any]:
+    async def _run_micro_iteration(self, iteration_num: int) -> dict[str, Any]:
         """Run a single 30-minute micro-development iteration."""
         iteration_start = time.time()
 
@@ -592,7 +589,7 @@ class ADWSession:
                 "error": str(e),
             }
 
-    async def _run_integration_validation_phase(self) -> Dict[str, Any]:
+    async def _run_integration_validation_phase(self) -> dict[str, Any]:
         """Run the integration validation phase."""
         logger.info("Running integration validation phase", session_id=self.session_id)
 
@@ -601,7 +598,6 @@ class ADWSession:
         # Run comprehensive test suite
         test_start = time.time()
         try:
-            import subprocess
 
             process = await asyncio.create_subprocess_exec(
                 "pytest",
@@ -679,7 +675,7 @@ class ADWSession:
 
         return validation_results
 
-    async def _run_meta_learning_phase(self) -> Dict[str, Any]:
+    async def _run_meta_learning_phase(self) -> dict[str, Any]:
         """Run the meta-learning phase - analyze and learn from session."""
         logger.info("Running meta-learning phase", session_id=self.session_id)
 
@@ -793,7 +789,7 @@ class ADWSession:
                 "Rollback failed", session_id=self.session_id, phase=phase.value
             )
 
-    async def _finalize_session(self) -> Dict[str, Any]:
+    async def _finalize_session(self) -> dict[str, Any]:
         """Finalize the session and return summary."""
         self.metrics.end_time = time.time()
 
@@ -879,7 +875,7 @@ class ADWSession:
 
         return summary
 
-    async def _plan_extended_session(self) -> List[SessionPhase]:
+    async def _plan_extended_session(self) -> list[SessionPhase]:
         """Plan phases for extended 16-24 hour sessions."""
         phases = []
         total_hours = self.config.max_extended_duration_hours
@@ -967,7 +963,7 @@ class ADWSession:
         # Enable extra quality gates
         self.config.quality_gates_enabled = True
 
-    async def abort_session(self, reason: str = "Manual abort") -> Dict[str, Any]:
+    async def abort_session(self, reason: str = "Manual abort") -> dict[str, Any]:
         """Abort the current session."""
         logger.warning(
             "Aborting ADW session", session_id=self.session_id, reason=reason

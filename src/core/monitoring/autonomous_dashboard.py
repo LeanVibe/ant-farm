@@ -8,9 +8,9 @@ import asyncio
 import json
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -72,8 +72,8 @@ class MetricsCollector:
 
     def __init__(self, project_path: Path):
         self.project_path = project_path
-        self.collection_history: List[Dict[str, Any]] = []
-        self.baselines: Dict[str, float] = {}
+        self.collection_history: list[dict[str, Any]] = []
+        self.baselines: dict[str, float] = {}
 
     async def collect_velocity_metrics(
         self, timeframe_hours: float = 1.0
@@ -106,7 +106,7 @@ class MetricsCollector:
             logger.error("Failed to collect velocity metrics", error=str(e))
             return VelocityMetrics()
 
-    async def collect_performance_metrics(self) -> Dict[str, float]:
+    async def collect_performance_metrics(self) -> dict[str, float]:
         """Collect system performance metrics."""
         try:
             performance = {}
@@ -135,7 +135,7 @@ class MetricsCollector:
 
     async def _collect_git_velocity_metrics(
         self, timeframe_hours: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Collect git-based velocity metrics."""
         try:
             since_time = time.time() - (timeframe_hours * 3600)
@@ -201,7 +201,7 @@ class MetricsCollector:
 
     async def _collect_test_velocity_metrics(
         self, timeframe_hours: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Collect test-related velocity metrics."""
         try:
             # Count test files and functions
@@ -231,7 +231,7 @@ class MetricsCollector:
             logger.error("Failed to collect test velocity metrics", error=str(e))
             return {"tests_per_hour": 0.0}
 
-    async def _collect_quality_metrics(self) -> Dict[str, float]:
+    async def _collect_quality_metrics(self) -> dict[str, float]:
         """Collect code quality metrics."""
         try:
             quality_score = 0.0
@@ -320,7 +320,7 @@ class MetricsCollector:
             logger.error("Failed to estimate bug introduction rate", error=str(e))
             return 0.0
 
-    async def _measure_test_performance(self) -> Dict[str, float]:
+    async def _measure_test_performance(self) -> dict[str, float]:
         """Measure test execution performance."""
         try:
             start_time = time.time()
@@ -411,7 +411,7 @@ class AutonomyScoreCalculator:
     """Calculates composite autonomy effectiveness scores."""
 
     def __init__(self):
-        self.score_history: List[AutonomyScore] = []
+        self.score_history: list[AutonomyScore] = []
         self.component_weights = {
             "reliability": 0.3,
             "quality": 0.25,
@@ -421,7 +421,7 @@ class AutonomyScoreCalculator:
         }
 
     def calculate_autonomy_score(
-        self, metrics: AutonomousMetrics, historical_data: List[AutonomousMetrics]
+        self, metrics: AutonomousMetrics, historical_data: list[AutonomousMetrics]
     ) -> AutonomyScore:
         """Calculate comprehensive autonomy score."""
         try:
@@ -524,7 +524,7 @@ class AutonomyScoreCalculator:
     def _calculate_learning_score(
         self,
         current_metrics: AutonomousMetrics,
-        historical_data: List[AutonomousMetrics],
+        historical_data: list[AutonomousMetrics],
     ) -> float:
         """Calculate learning/improvement score."""
         if len(historical_data) < 2:
@@ -568,7 +568,7 @@ class AutonomyScoreCalculator:
 class AutonomousDashboard:
     """Main autonomous monitoring dashboard."""
 
-    def __init__(self, project_path: Path, metrics_file: Optional[Path] = None):
+    def __init__(self, project_path: Path, metrics_file: Path | None = None):
         self.project_path = project_path
 
         if metrics_file is None:
@@ -578,7 +578,7 @@ class AutonomousDashboard:
         self.collector = MetricsCollector(project_path)
         self.score_calculator = AutonomyScoreCalculator()
 
-        self.metrics_history: List[AutonomousMetrics] = []
+        self.metrics_history: list[AutonomousMetrics] = []
         self.monitoring_active = False
 
         # Load historical data
@@ -661,7 +661,7 @@ class AutonomousDashboard:
             logger.error("Failed to collect metrics", error=str(e))
             return AutonomousMetrics()
 
-    def get_current_dashboard_data(self) -> Dict[str, Any]:
+    def get_current_dashboard_data(self) -> dict[str, Any]:
         """Get current dashboard data for display."""
         if not self.metrics_history:
             return {"status": "no_data"}
@@ -730,7 +730,7 @@ class AutonomousDashboard:
         """Load metrics history from file."""
         try:
             if self.metrics_file.exists():
-                with open(self.metrics_file, "r") as f:
+                with open(self.metrics_file) as f:
                     data = json.load(f)
 
                 # Convert back to AutonomousMetrics objects
@@ -778,7 +778,7 @@ class AutonomousDashboard:
                 "metrics_history": [
                     asdict(metrics) for metrics in self.metrics_history
                 ],
-                "last_saved": datetime.now(timezone.utc).isoformat(),
+                "last_saved": datetime.now(UTC).isoformat(),
             }
 
             with open(self.metrics_file, "w") as f:

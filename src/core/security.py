@@ -3,7 +3,7 @@
 import secrets
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -160,7 +160,7 @@ class SecurityManager:
             return None
 
         # Check if account is locked
-        if user.locked_until and datetime.now(timezone.utc) < user.locked_until:
+        if user.locked_until and datetime.now(UTC) < user.locked_until:
             logger.warning("Login attempt on locked account", username=username)
             return None
 
@@ -170,7 +170,7 @@ class SecurityManager:
 
             # Lock account after max attempts
             if user.failed_login_attempts >= self.config.MAX_LOGIN_ATTEMPTS:
-                user.locked_until = datetime.now(timezone.utc) + timedelta(
+                user.locked_until = datetime.now(UTC) + timedelta(
                     minutes=self.config.LOCKOUT_DURATION_MINUTES
                 )
                 logger.warning(
@@ -189,7 +189,7 @@ class SecurityManager:
         # Reset failed attempts on successful login
         user.failed_login_attempts = 0
         user.locked_until = None
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
 
         logger.info("User authenticated successfully", username=username)
         return user
@@ -197,7 +197,7 @@ class SecurityManager:
     # JWT token management
     def create_access_token(self, user: User) -> str:
         """Create JWT access token."""
-        expire = datetime.now(timezone.utc) + timedelta(
+        expire = datetime.now(UTC) + timedelta(
             minutes=self.config.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
@@ -207,7 +207,7 @@ class SecurityManager:
             "permissions": user.permissions,
             "is_admin": user.is_admin,
             "exp": expire,
-            "iat": datetime.now(timezone.utc),
+            "iat": datetime.now(UTC),
             "type": "access",
         }
 
@@ -219,14 +219,14 @@ class SecurityManager:
 
     def create_refresh_token(self, user: User) -> str:
         """Create JWT refresh token."""
-        expire = datetime.now(timezone.utc) + timedelta(
+        expire = datetime.now(UTC) + timedelta(
             days=self.config.REFRESH_TOKEN_EXPIRE_DAYS
         )
 
         payload = {
             "sub": user.id,
             "exp": expire,
-            "iat": datetime.now(timezone.utc),
+            "iat": datetime.now(UTC),
             "type": "refresh",
         }
 

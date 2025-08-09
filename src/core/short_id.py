@@ -2,7 +2,6 @@
 
 import hashlib
 import string
-from typing import Optional
 
 
 class ShortIDGenerator:
@@ -187,7 +186,7 @@ def generate_short_id(name: str, uuid_str: str, id_type: str) -> str:
         raise ValueError(f"Unknown ID type: {id_type}")
 
 
-def resolve_short_id(short_id: str, id_type: str) -> Optional[str]:
+def resolve_short_id(short_id: str, id_type: str) -> str | None:
     """Resolve a short ID to a full UUID (requires database lookup)."""
     # This will be implemented in the database layer
     # Returns None if not found, UUID string if found

@@ -28,12 +28,12 @@ async def test_agent():
         # Give it 5 seconds to initialize
         try:
             await asyncio.wait_for(agent_task, timeout=5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             print("Agent ran for 5 seconds successfully")
             agent.status = "stopping"
             try:
                 await asyncio.wait_for(agent_task, timeout=2)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 agent_task.cancel()
 
     except Exception as e:

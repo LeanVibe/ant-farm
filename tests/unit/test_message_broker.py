@@ -1,6 +1,5 @@
 """Unit tests for message broker functionality."""
 
-import asyncio
 import json
 import time
 from unittest.mock import AsyncMock, Mock, patch

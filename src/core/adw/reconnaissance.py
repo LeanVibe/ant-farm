@@ -5,11 +5,10 @@ Performs comprehensive system assessment before development begins.
 
 import asyncio
 import json
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -21,12 +20,12 @@ class ReconnaissanceReport:
     """Report generated during reconnaissance phase."""
 
     timestamp: float
-    system_health: Dict[str, Any]
-    test_coverage: Dict[str, Any]
-    performance_baseline: Dict[str, Any]
-    error_patterns: List[Dict[str, Any]]
-    repository_status: Dict[str, Any]
-    recommendations: List[str]
+    system_health: dict[str, Any]
+    test_coverage: dict[str, Any]
+    performance_baseline: dict[str, Any]
+    error_patterns: list[dict[str, Any]]
+    repository_status: dict[str, Any]
+    recommendations: list[str]
 
 
 class ReconnaissanceEngine:
@@ -101,10 +100,11 @@ class ReconnaissanceEngine:
 
         return report
 
-    async def _assess_system_health(self) -> Dict[str, Any]:
+    async def _assess_system_health(self) -> dict[str, Any]:
         """Assess overall system health."""
-        import psutil
         import shutil
+
+        import psutil
 
         health_data = {}
 
@@ -133,7 +133,7 @@ class ReconnaissanceEngine:
 
         return health_data
 
-    async def _check_development_environment(self) -> Dict[str, Any]:
+    async def _check_development_environment(self) -> dict[str, Any]:
         """Check development environment setup."""
         env_status = {}
 
@@ -189,7 +189,7 @@ class ReconnaissanceEngine:
 
         return env_status
 
-    async def _analyze_test_coverage(self) -> Dict[str, Any]:
+    async def _analyze_test_coverage(self) -> dict[str, Any]:
         """Analyze current test coverage."""
         coverage_data = {}
 
@@ -212,7 +212,7 @@ class ReconnaissanceEngine:
             # Try to read coverage report
             coverage_file = self.project_path / "coverage.json"
             if coverage_file.exists():
-                with open(coverage_file, "r") as f:
+                with open(coverage_file) as f:
                     coverage_json = json.load(f)
 
                 coverage_data["overall_percentage"] = coverage_json.get(
@@ -248,7 +248,7 @@ class ReconnaissanceEngine:
 
         return coverage_data
 
-    async def _measure_performance_baseline(self) -> Dict[str, Any]:
+    async def _measure_performance_baseline(self) -> dict[str, Any]:
         """Measure performance baseline."""
         performance_data = {}
 
@@ -288,7 +288,7 @@ class ReconnaissanceEngine:
 
         return performance_data
 
-    async def _measure_import_times(self) -> Dict[str, float]:
+    async def _measure_import_times(self) -> dict[str, float]:
         """Measure import times for key modules."""
         import_times = {}
 
@@ -324,7 +324,7 @@ class ReconnaissanceEngine:
 
         return import_times
 
-    async def _analyze_error_patterns(self) -> List[Dict[str, Any]]:
+    async def _analyze_error_patterns(self) -> list[dict[str, Any]]:
         """Analyze error patterns from logs and git history."""
         error_patterns = []
 
@@ -424,7 +424,7 @@ class ReconnaissanceEngine:
         else:
             return "other"
 
-    async def _check_repository_status(self) -> Dict[str, Any]:
+    async def _check_repository_status(self) -> dict[str, Any]:
         """Check repository status and health."""
         repo_status = {}
 
@@ -503,12 +503,12 @@ class ReconnaissanceEngine:
 
     def _generate_recommendations(
         self,
-        system_health: Dict[str, Any],
-        test_coverage: Dict[str, Any],
-        performance_baseline: Dict[str, Any],
-        error_patterns: List[Dict[str, Any]],
-        repository_status: Dict[str, Any],
-    ) -> List[str]:
+        system_health: dict[str, Any],
+        test_coverage: dict[str, Any],
+        performance_baseline: dict[str, Any],
+        error_patterns: list[dict[str, Any]],
+        repository_status: dict[str, Any],
+    ) -> list[str]:
         """Generate actionable recommendations based on assessment."""
         recommendations = []
 

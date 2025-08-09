@@ -6,7 +6,6 @@ import time
 import uuid
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,19 +24,22 @@ from src.core.orchestrator import (
 @pytest.fixture
 def mock_db_manager():
     """Mock database manager for testing."""
-    mock_manager = MagicMock()
+    mock_manager = AsyncMock()
     mock_manager.get_session = MagicMock()
-    mock_manager.create_tables = MagicMock()
+    mock_manager.create_tables = AsyncMock()
+    mock_manager.get_active_agents = AsyncMock(return_value=[])
     return mock_manager
 
 
 @pytest.fixture
-def agent_registry(mock_db_manager):
+async def agent_registry(mock_db_manager):
     """Create AgentRegistry with mocked database manager."""
-    with patch(
-        "src.core.orchestrator.get_database_manager", return_value=mock_db_manager
-    ):
-        registry = AgentRegistry("postgresql://test")
+    registry = AgentRegistry("postgresql://test")
+    registry.db_manager = mock_db_manager
+
+    # Mock the async method that gets called during initialization
+    registry.load_agents_from_database = AsyncMock()
+
     return registry
 
 
@@ -535,7 +537,7 @@ class TestAgentOrchestrator:
     @pytest.fixture
     def orchestrator(self, mock_task_queue, mock_message_broker):
         """Create AgentOrchestrator for testing."""
-        with patch("src.core.orchestrator.get_database_manager"):
+        with patch("src.core.orchestrator.get_async_database_manager"):
             orch = AgentOrchestrator(
                 db_url="postgresql://test",
                 project_root=Path("/test"),

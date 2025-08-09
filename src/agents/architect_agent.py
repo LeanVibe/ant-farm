@@ -19,8 +19,8 @@ except ImportError:
     # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from core.task_queue import Task
     from agents.base_agent import BaseAgent, HealthStatus, TaskResult
+    from core.task_queue import Task
 
 logger = structlog.get_logger()
 
@@ -529,7 +529,7 @@ class ArchitectAgent(BaseAgent):
         from ..core.task_queue import task_queue
 
         # Look for architecture-specific task types
-        architecture_task_types = [
+        _architecture_task_types = [
             "design_system",
             "review_architecture",
             "refactor_code",

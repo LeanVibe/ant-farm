@@ -1,17 +1,16 @@
 """Integration tests for Phase 3 AI-Enhanced XP Practices."""
 
 import asyncio
-import pytest
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.agents.developer_agent import DeveloperAgent
 from src.agents.qa_agent import QAAgent
 from src.core.collaboration.pair_programming import PairProgrammingSession
 from src.core.refactoring.autonomous_refactoring import AutonomousRefactoringEngine
-from src.core.testing.ai_test_generator import AITestGenerator, TestType
 from src.core.task_queue import Task
+from src.core.testing.ai_test_generator import AITestGenerator, TestType
 
 
 @pytest.fixture

@@ -5,7 +5,6 @@ and maintainability. All timing intervals, thresholds, and other constants
 should be defined here rather than scattered throughout the codebase.
 """
 
-from enum import Enum
 
 
 class Intervals:
@@ -47,6 +46,7 @@ class Intervals:
     CLI_OPERATION_TIMEOUT = 300
     USER_INPUT_TIMEOUT = 30
     COMMAND_RETRY_DELAY = 2
+    ORCHESTRATOR_STARTUP_DELAY = 3
 
 
 class Limits:

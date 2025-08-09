@@ -10,15 +10,12 @@ Tests the full autonomous development workflow with all components integrated:
 
 import asyncio
 import time
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.core.adw.cognitive_load_manager import CognitiveLoadManager, SessionMode
+from src.core.adw.cognitive_load_manager import SessionMode
 from src.core.adw.session_manager import ADWSession, ADWSessionConfig, SessionPhase
-from src.core.monitoring.autonomous_dashboard import AutonomousDashboard
-from src.core.prediction.failure_prediction import FailurePredictionSystem
 
 
 class TestADWFullSystemIntegration:

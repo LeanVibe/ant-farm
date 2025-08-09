@@ -5,11 +5,10 @@ Performs comprehensive testing and validation before proceeding.
 
 import asyncio
 import json
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -24,8 +23,8 @@ class ValidationResult:
     passed: bool
     score: float
     duration: float
-    details: Dict[str, Any]
-    error_message: Optional[str] = None
+    details: dict[str, Any]
+    error_message: str | None = None
 
 
 @dataclass
@@ -34,9 +33,9 @@ class IntegrationValidationReport:
 
     timestamp: float
     overall_passed: bool
-    validation_results: List[ValidationResult]
+    validation_results: list[ValidationResult]
     rollback_triggered: bool
-    rollback_reason: Optional[str] = None
+    rollback_reason: str | None = None
 
 
 class IntegrationValidationEngine:
@@ -49,7 +48,7 @@ class IntegrationValidationEngine:
         self.rollback_system = rollback_system
         self.quality_gates = quality_gates
         self.resource_guardian = resource_guardian
-        self.validation_history: List[IntegrationValidationReport] = []
+        self.validation_history: list[IntegrationValidationReport] = []
 
     async def run_comprehensive_validation(
         self, rollback_on_failure: bool = True
@@ -132,8 +131,8 @@ class IntegrationValidationEngine:
 
             # Check if pytest-xdist is available for parallel execution
             try:
-                import pytest_xdist
                 import psutil
+                import pytest_xdist
 
                 cpu_count = psutil.cpu_count()
                 cmd.extend(["-n", str(min(cpu_count, 4))])  # Limit to 4 processes max
@@ -572,7 +571,7 @@ class IntegrationValidationEngine:
                 error_message=str(e),
             )
 
-    def _parse_pytest_output(self, output: str) -> Dict[str, int]:
+    def _parse_pytest_output(self, output: str) -> dict[str, int]:
         """Parse pytest output to extract test statistics."""
         stats = {"total": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}
 
@@ -610,7 +609,7 @@ class IntegrationValidationEngine:
         return stats
 
     def _determine_rollback_reason(
-        self, validation_results: List[ValidationResult]
+        self, validation_results: list[ValidationResult]
     ) -> str:
         """Determine the reason for rollback based on validation failures."""
         failed_validations = [
@@ -638,7 +637,7 @@ class IntegrationValidationEngine:
         return "general_validation_failure"
 
     async def _trigger_intelligent_rollback(
-        self, reason: str, validation_results: List[ValidationResult]
+        self, reason: str, validation_results: list[ValidationResult]
     ) -> bool:
         """Trigger intelligent rollback based on failure type."""
         from ..safety.rollback_system import RollbackLevel
@@ -678,7 +677,7 @@ class IntegrationValidationEngine:
             logger.error("Rollback failed", error=str(e))
             return False
 
-    def get_validation_statistics(self) -> Dict[str, Any]:
+    def get_validation_statistics(self) -> dict[str, Any]:
         """Get validation statistics from history."""
         if not self.validation_history:
             return {"total_validations": 0}

@@ -7,9 +7,8 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -25,7 +24,7 @@ class LearningInsight:
     confidence: float  # 0.0 to 1.0
     impact: str  # "low", "medium", "high"
     actionable: bool
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 @dataclass
@@ -34,11 +33,11 @@ class MetaLearningReport:
 
     timestamp: float
     session_id: str
-    insights: List[LearningInsight]
-    performance_improvements: Dict[str, float]
-    knowledge_updates: List[str]
-    next_priorities: List[str]
-    system_adaptations: List[str]
+    insights: list[LearningInsight]
+    performance_improvements: dict[str, float]
+    knowledge_updates: list[str]
+    next_priorities: list[str]
+    system_adaptations: list[str]
 
 
 class MetaLearningEngine:
@@ -55,12 +54,12 @@ class MetaLearningEngine:
 
     async def analyze_session_and_learn(
         self,
-        session_metrics: Dict[str, Any],
-        rollback_stats: Dict[str, Any],
-        quality_stats: Dict[str, Any],
-        resource_stats: Dict[str, Any],
-        validation_history: List[Any],
-        iteration_history: List[Any],
+        session_metrics: dict[str, Any],
+        rollback_stats: dict[str, Any],
+        quality_stats: dict[str, Any],
+        resource_stats: dict[str, Any],
+        validation_history: list[Any],
+        iteration_history: list[Any],
     ) -> MetaLearningReport:
         """Perform comprehensive meta-learning analysis."""
         start_time = time.time()
@@ -124,7 +123,7 @@ class MetaLearningEngine:
 
         return report
 
-    async def _analyze_code_patterns(self) -> List[LearningInsight]:
+    async def _analyze_code_patterns(self) -> list[LearningInsight]:
         """Analyze code patterns and identify best practices."""
         insights = []
 
@@ -189,7 +188,7 @@ class MetaLearningEngine:
 
         return insights
 
-    async def _analyze_complexity_trends(self) -> Optional[LearningInsight]:
+    async def _analyze_complexity_trends(self) -> LearningInsight | None:
         """Analyze code complexity trends."""
         try:
             from ..safety.quality_gates import CodeComplexityAnalyzer
@@ -233,8 +232,8 @@ class MetaLearningEngine:
         return None
 
     async def _analyze_performance_trends(
-        self, session_metrics: Dict[str, Any], resource_stats: Dict[str, Any]
-    ) -> List[LearningInsight]:
+        self, session_metrics: dict[str, Any], resource_stats: dict[str, Any]
+    ) -> list[LearningInsight]:
         """Analyze performance trends and bottlenecks."""
         insights = []
 
@@ -311,8 +310,8 @@ class MetaLearningEngine:
         return insights
 
     async def _analyze_failure_modes(
-        self, rollback_stats: Dict[str, Any], validation_history: List[Any]
-    ) -> List[LearningInsight]:
+        self, rollback_stats: dict[str, Any], validation_history: list[Any]
+    ) -> list[LearningInsight]:
         """Analyze failure modes and patterns."""
         insights = []
 
@@ -402,8 +401,8 @@ class MetaLearningEngine:
         return insights
 
     async def _analyze_quality_trends(
-        self, quality_stats: Dict[str, Any]
-    ) -> List[LearningInsight]:
+        self, quality_stats: dict[str, Any]
+    ) -> list[LearningInsight]:
         """Analyze code quality trends."""
         insights = []
 
@@ -447,8 +446,8 @@ class MetaLearningEngine:
         return insights
 
     async def _analyze_development_velocity(
-        self, iteration_history: List[Any]
-    ) -> List[LearningInsight]:
+        self, iteration_history: list[Any]
+    ) -> list[LearningInsight]:
         """Analyze development velocity and iteration effectiveness."""
         insights = []
 
@@ -524,8 +523,8 @@ class MetaLearningEngine:
         return insights
 
     def _calculate_performance_improvements(
-        self, session_metrics: Dict[str, Any], resource_stats: Dict[str, Any]
-    ) -> Dict[str, float]:
+        self, session_metrics: dict[str, Any], resource_stats: dict[str, Any]
+    ) -> dict[str, float]:
         """Calculate quantifiable performance improvements."""
         improvements = {}
 
@@ -576,8 +575,8 @@ class MetaLearningEngine:
         return improvements
 
     async def _update_knowledge_base(
-        self, insights: List[LearningInsight], session_metrics: Dict[str, Any]
-    ) -> List[str]:
+        self, insights: list[LearningInsight], session_metrics: dict[str, Any]
+    ) -> list[str]:
         """Update the persistent knowledge base."""
         updates = []
 
@@ -585,7 +584,7 @@ class MetaLearningEngine:
             # Load existing knowledge base
             knowledge_base = {}
             if self.knowledge_base_path.exists():
-                with open(self.knowledge_base_path, "r") as f:
+                with open(self.knowledge_base_path) as f:
                     knowledge_base = json.load(f)
 
             # Update with new insights
@@ -659,8 +658,8 @@ class MetaLearningEngine:
         return updates
 
     def _generate_next_priorities(
-        self, insights: List[LearningInsight], session_metrics: Dict[str, Any]
-    ) -> List[str]:
+        self, insights: list[LearningInsight], session_metrics: dict[str, Any]
+    ) -> list[str]:
         """Generate prioritized list of next actions."""
         priorities = []
 
@@ -706,8 +705,8 @@ class MetaLearningEngine:
         return priorities
 
     def _generate_system_adaptations(
-        self, insights: List[LearningInsight]
-    ) -> List[str]:
+        self, insights: list[LearningInsight]
+    ) -> list[str]:
         """Generate system adaptations based on insights."""
         adaptations = []
 

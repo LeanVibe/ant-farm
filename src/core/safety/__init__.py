@@ -7,9 +7,9 @@ This module provides critical safety mechanisms for extended autonomous developm
 - Failure prediction and prevention
 """
 
-from .rollback_system import AutoRollbackSystem, RollbackLevel
 from .quality_gates import AutonomousQualityGates
 from .resource_guardian import ResourceGuardian
+from .rollback_system import AutoRollbackSystem, RollbackLevel
 
 __all__ = [
     "AutoRollbackSystem",

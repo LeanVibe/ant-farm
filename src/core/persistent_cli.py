@@ -3,12 +3,10 @@
 import asyncio
 import json
 import os
-import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -21,13 +19,13 @@ class CLISession:
 
     session_id: str
     tool_type: str  # opencode, claude, gemini
-    process: Optional[asyncio.subprocess.Process] = None
-    input_file: Optional[str] = None
-    output_file: Optional[str] = None
+    process: asyncio.subprocess.Process | None = None
+    input_file: str | None = None
+    output_file: str | None = None
     status: str = "inactive"  # inactive, starting, active, error
     created_at: float = 0.0
     last_activity: float = 0.0
-    conversation_history: List[Dict[str, Any]] = None
+    conversation_history: list[dict[str, Any]] = None
 
     def __post_init__(self):
         if self.conversation_history is None:
@@ -43,7 +41,7 @@ class PersistentCLIManager:
 
     def __init__(self, workspace_dir: str = None):
         self.workspace_dir = workspace_dir or tempfile.mkdtemp(prefix="hive_cli_")
-        self.sessions: Dict[str, CLISession] = {}
+        self.sessions: dict[str, CLISession] = {}
         self.session_files_dir = os.path.join(self.workspace_dir, "sessions")
         os.makedirs(self.session_files_dir, exist_ok=True)
 
@@ -254,7 +252,7 @@ Please provide a response that takes into account the previous conversation cont
 
             return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timeout_msg = "OpenCode command timed out"
             session.conversation_history.append(
                 {"role": "system", "content": timeout_msg, "timestamp": time.time()}
@@ -308,7 +306,7 @@ Please provide a response that takes into account the previous conversation cont
 
             return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timeout_msg = "Claude command timed out"
             session.conversation_history.append(
                 {"role": "system", "content": timeout_msg, "timestamp": time.time()}
@@ -360,14 +358,14 @@ Please provide a response that maintains conversation context.
 
             return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timeout_msg = "Gemini command timed out"
             session.conversation_history.append(
                 {"role": "system", "content": timeout_msg, "timestamp": time.time()}
             )
             return timeout_msg
 
-    async def get_session_status(self, session_id: str) -> Dict[str, Any]:
+    async def get_session_status(self, session_id: str) -> dict[str, Any]:
         """Get status of a CLI session."""
 
         if session_id not in self.sessions:
@@ -413,7 +411,7 @@ Please provide a response that maintains conversation context.
                 try:
                     session.process.terminate()
                     await asyncio.wait_for(session.process.wait(), timeout=5)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "Process didn't terminate gracefully, killing",
                         session_id=session_id,
@@ -463,7 +461,7 @@ Please provide a response that maintains conversation context.
             logger.info("Cleaning up idle session", session_id=session_id)
             await self.close_session(session_id)
 
-    async def list_sessions(self) -> List[Dict[str, Any]]:
+    async def list_sessions(self) -> list[dict[str, Any]]:
         """List all active sessions."""
 
         sessions = []
@@ -493,7 +491,7 @@ Please provide a response that maintains conversation context.
 
 
 # Global persistent CLI manager instance
-_persistent_cli_manager: Optional[PersistentCLIManager] = None
+_persistent_cli_manager: PersistentCLIManager | None = None
 
 
 def get_persistent_cli_manager(workspace_dir: str = None) -> PersistentCLIManager:

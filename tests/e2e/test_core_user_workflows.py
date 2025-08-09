@@ -5,13 +5,12 @@ validating all critical user-facing functionality.
 """
 
 import asyncio
-import pytest
+from collections.abc import AsyncGenerator
+
 import httpx
-import time
-from typing import AsyncGenerator
+import pytest
 
 from src.core.config import get_settings
-from src.core.task_queue import Task, TaskPriority, TaskStatus
 
 
 @pytest.fixture

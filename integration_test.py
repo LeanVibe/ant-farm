@@ -10,8 +10,9 @@ src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
 import structlog
+
 from agents.meta_agent import MetaAgent
-from core.task_queue import Task, task_queue
+from core.task_queue import Task
 
 logger = structlog.get_logger()
 
@@ -81,7 +82,7 @@ async def test_end_to_end_workflow():
             try:
                 context_results = await agent.retrieve_context("test task", limit=3)
                 print(f"✅ Context retrieval: {len(context_results)} results")
-            except:
+            except Exception:
                 print("⚠️  Context retrieval not available (database not initialized)")
 
         # Test CLI execution framework (with timeout to prevent hanging)
@@ -126,7 +127,7 @@ async def test_end_to_end_workflow():
         try:
             await agent.persistent_cli.close_session("test_integration_session")
             print("✅ CLI session closed")
-        except:
+        except Exception:
             print("⚠️  CLI session cleanup skipped")
 
         print("✅ Cleanup completed")

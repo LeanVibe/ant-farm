@@ -5,7 +5,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -282,7 +282,7 @@ class MetaAgent(BaseAgent):
                 if (
                     agent.last_heartbeat
                     and (
-                        datetime.now(timezone.utc) - agent.last_heartbeat
+                        datetime.now(UTC) - agent.last_heartbeat
                     ).total_seconds()
                     < 300
                 ):
@@ -409,7 +409,7 @@ class MetaAgent(BaseAgent):
                 agent.name
                 for agent in agents
                 if agent.last_heartbeat
-                and (datetime.now(timezone.utc) - agent.last_heartbeat).total_seconds()
+                and (datetime.now(UTC) - agent.last_heartbeat).total_seconds()
                 > 300
             ]
 

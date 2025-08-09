@@ -4,14 +4,13 @@ This module analyzes historical patterns to predict and prevent failures
 before they occur during extended autonomous development workflows.
 """
 
-import asyncio
 import json
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -42,12 +41,12 @@ class FailurePattern:
     """Represents a learned failure pattern."""
 
     category: FailureCategory
-    precursor_indicators: List[str]
+    precursor_indicators: list[str]
     failure_probability: float
     time_to_failure_hours: float
     confidence_score: float
     historical_occurrences: int
-    mitigation_strategies: List[str] = field(default_factory=list)
+    mitigation_strategies: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -56,9 +55,9 @@ class RiskAssessment:
 
     timestamp: float = field(default_factory=time.time)
     overall_risk_level: FailureRiskLevel = FailureRiskLevel.LOW
-    category_risks: Dict[FailureCategory, float] = field(default_factory=dict)
-    active_patterns: List[FailurePattern] = field(default_factory=list)
-    recommended_actions: List[str] = field(default_factory=list)
+    category_risks: dict[FailureCategory, float] = field(default_factory=dict)
+    active_patterns: list[FailurePattern] = field(default_factory=list)
+    recommended_actions: list[str] = field(default_factory=list)
     confidence_score: float = 0.0
 
 
@@ -69,24 +68,24 @@ class HistoricalFailure:
     timestamp: float
     category: FailureCategory
     severity: int  # 1-5 scale
-    precursor_metrics: Dict[str, float]
+    precursor_metrics: dict[str, float]
     resolution_time_minutes: float
     mitigation_used: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 class PatternAnalyzer:
     """Analyzes historical data to identify failure patterns."""
 
     def __init__(self):
-        self.learned_patterns: List[FailurePattern] = []
-        self.pattern_accuracy_history: Dict[str, List[float]] = {}
+        self.learned_patterns: list[FailurePattern] = []
+        self.pattern_accuracy_history: dict[str, list[float]] = {}
 
     async def analyze_failure_patterns(
         self,
-        historical_failures: List[HistoricalFailure],
-        historical_metrics: List[Dict[str, Any]],
-    ) -> List[FailurePattern]:
+        historical_failures: list[HistoricalFailure],
+        historical_metrics: list[dict[str, Any]],
+    ) -> list[FailurePattern]:
         """Analyze historical data to identify failure patterns."""
         try:
             patterns = []
@@ -125,9 +124,9 @@ class PatternAnalyzer:
     async def _analyze_category_patterns(
         self,
         category: FailureCategory,
-        failures: List[HistoricalFailure],
-        historical_metrics: List[Dict[str, Any]],
-    ) -> List[FailurePattern]:
+        failures: list[HistoricalFailure],
+        historical_metrics: list[dict[str, Any]],
+    ) -> list[FailurePattern]:
         """Analyze patterns for a specific failure category."""
         patterns = []
 
@@ -179,9 +178,9 @@ class PatternAnalyzer:
 
     async def _find_precursor_indicators(
         self,
-        failures: List[HistoricalFailure],
-        historical_metrics: List[Dict[str, Any]],
-    ) -> List[str]:
+        failures: list[HistoricalFailure],
+        historical_metrics: list[dict[str, Any]],
+    ) -> list[str]:
         """Find common indicators that precede failures."""
         indicators = []
 
@@ -215,7 +214,7 @@ class PatternAnalyzer:
 
         return common_indicators
 
-    def _detect_metric_anomalies(self, metrics: List[Dict[str, Any]]) -> List[str]:
+    def _detect_metric_anomalies(self, metrics: list[dict[str, Any]]) -> list[str]:
         """Detect anomalous metric values that might indicate upcoming failure."""
         anomalies = []
 
@@ -248,7 +247,7 @@ class PatternAnalyzer:
         return list(set(anomalies))  # Remove duplicates
 
     def _calculate_time_to_failure(
-        self, failure: HistoricalFailure, historical_metrics: List[Dict[str, Any]]
+        self, failure: HistoricalFailure, historical_metrics: list[dict[str, Any]]
     ) -> float:
         """Calculate average time from precursor indicators to failure."""
         # Find the earliest precursor indicator before this failure
@@ -273,7 +272,7 @@ class PatternAnalyzer:
         time_to_failure = (failure.timestamp - earliest_indicator_time) / 3600
         return max(0.1, time_to_failure)  # Minimum 0.1 hours
 
-    def _has_failure_indicators(self, metric: Dict[str, Any]) -> bool:
+    def _has_failure_indicators(self, metric: dict[str, Any]) -> bool:
         """Check if a metric contains failure indicators."""
         indicators = [
             metric.get("memory_percent", 0) > 75,
@@ -285,8 +284,8 @@ class PatternAnalyzer:
 
     def _calculate_failure_probability(
         self,
-        failures: List[HistoricalFailure],
-        historical_metrics: List[Dict[str, Any]],
+        failures: list[HistoricalFailure],
+        historical_metrics: list[dict[str, Any]],
     ) -> float:
         """Calculate the probability of failure given precursor conditions."""
         if not historical_metrics:
@@ -307,7 +306,7 @@ class PatternAnalyzer:
         probability = actual_failures / precursor_occurrences
         return min(0.9, max(0.1, probability))  # Clamp between 0.1 and 0.9
 
-    def _calculate_pattern_confidence(self, failures: List[HistoricalFailure]) -> float:
+    def _calculate_pattern_confidence(self, failures: list[HistoricalFailure]) -> float:
         """Calculate confidence score for the pattern."""
         # Higher confidence with more failures and recent occurrences
         failure_count_factor = min(
@@ -323,7 +322,7 @@ class PatternAnalyzer:
         confidence = (failure_count_factor + recency_factor) / 2
         return min(0.95, max(0.1, confidence))
 
-    def _generate_mitigation_strategies(self, category: FailureCategory) -> List[str]:
+    def _generate_mitigation_strategies(self, category: FailureCategory) -> list[str]:
         """Generate mitigation strategies for a failure category."""
         strategies = {
             FailureCategory.RESOURCE_EXHAUSTION: [
@@ -374,9 +373,9 @@ class RiskMonitor:
 
     async def assess_current_risk(
         self,
-        current_metrics: Dict[str, Any],
-        learned_patterns: List[FailurePattern],
-        session_context: Dict[str, Any],
+        current_metrics: dict[str, Any],
+        learned_patterns: list[FailurePattern],
+        session_context: dict[str, Any],
     ) -> RiskAssessment:
         """Assess current failure risk based on patterns and metrics."""
         try:
@@ -446,8 +445,8 @@ class RiskMonitor:
     async def _evaluate_pattern_risk(
         self,
         pattern: FailurePattern,
-        current_metrics: Dict[str, Any],
-        session_context: Dict[str, Any],
+        current_metrics: dict[str, Any],
+        session_context: dict[str, Any],
     ) -> float:
         """Evaluate risk score for a specific pattern."""
         risk_score = 0.0
@@ -493,8 +492,8 @@ class RiskMonitor:
     def _check_indicator_present(
         self,
         indicator: str,
-        current_metrics: Dict[str, Any],
-        session_context: Dict[str, Any],
+        current_metrics: dict[str, Any],
+        session_context: dict[str, Any],
     ) -> bool:
         """Check if a specific indicator is present in current conditions."""
         # Map indicators to current metrics
@@ -529,7 +528,7 @@ class RiskMonitor:
             return 0.3
 
     def _calculate_assessment_confidence(
-        self, active_patterns: List[FailurePattern], current_metrics: Dict[str, Any]
+        self, active_patterns: list[FailurePattern], current_metrics: dict[str, Any]
     ) -> float:
         """Calculate confidence in the risk assessment."""
         if not active_patterns:
@@ -552,7 +551,7 @@ class RiskMonitor:
 class FailurePredictionSystem:
     """Main failure prediction and prevention system."""
 
-    def __init__(self, project_path: Path, history_file: Optional[Path] = None):
+    def __init__(self, project_path: Path, history_file: Path | None = None):
         self.project_path = project_path
 
         if history_file is None:
@@ -562,14 +561,14 @@ class FailurePredictionSystem:
         self.pattern_analyzer = PatternAnalyzer()
         self.risk_monitor = RiskMonitor()
 
-        self.failure_history: List[HistoricalFailure] = []
-        self.prediction_accuracy_history: List[Dict[str, Any]] = []
+        self.failure_history: list[HistoricalFailure] = []
+        self.prediction_accuracy_history: list[dict[str, Any]] = []
 
         # Load historical data
         self._load_failure_history()
 
     async def initialize_prediction_system(
-        self, historical_metrics: List[Dict[str, Any]]
+        self, historical_metrics: list[dict[str, Any]]
     ) -> None:
         """Initialize the prediction system with historical data."""
         try:
@@ -588,8 +587,8 @@ class FailurePredictionSystem:
             logger.error("Failed to initialize prediction system", error=str(e))
 
     async def predict_and_prevent_failures(
-        self, current_metrics: Dict[str, Any], session_context: Dict[str, Any]
-    ) -> Tuple[RiskAssessment, List[str]]:
+        self, current_metrics: dict[str, Any], session_context: dict[str, Any]
+    ) -> tuple[RiskAssessment, list[str]]:
         """Predict potential failures and return prevention actions."""
         try:
             # Assess current risk
@@ -615,7 +614,7 @@ class FailurePredictionSystem:
         self,
         category: FailureCategory,
         severity: int,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         resolution_time_minutes: float,
         mitigation_used: str,
     ) -> None:
@@ -655,9 +654,9 @@ class FailurePredictionSystem:
     async def _determine_immediate_actions(
         self,
         risk_assessment: RiskAssessment,
-        current_metrics: Dict[str, Any],
-        session_context: Dict[str, Any],
-    ) -> List[str]:
+        current_metrics: dict[str, Any],
+        session_context: dict[str, Any],
+    ) -> list[str]:
         """Determine immediate actions based on risk assessment."""
         actions = []
 
@@ -709,8 +708,8 @@ class FailurePredictionSystem:
             return []
 
     def _prioritize_actions(
-        self, actions: List[str], risk_assessment: RiskAssessment
-    ) -> List[str]:
+        self, actions: list[str], risk_assessment: RiskAssessment
+    ) -> list[str]:
         """Prioritize actions based on urgency and effectiveness."""
         # Define action priorities (higher number = higher priority)
         action_priorities = {
@@ -735,7 +734,7 @@ class FailurePredictionSystem:
         return prioritized
 
     def _log_prediction_event(
-        self, risk_assessment: RiskAssessment, actions: List[str]
+        self, risk_assessment: RiskAssessment, actions: list[str]
     ) -> None:
         """Log prediction event for accuracy tracking."""
         prediction_event = {
@@ -759,7 +758,7 @@ class FailurePredictionSystem:
         """Load failure history from file."""
         try:
             if self.history_file.exists():
-                with open(self.history_file, "r") as f:
+                with open(self.history_file) as f:
                     data = json.load(f)
 
                 # Convert back to HistoricalFailure objects
@@ -792,7 +791,7 @@ class FailurePredictionSystem:
                 "failure_history": [
                     asdict(failure) for failure in self.failure_history
                 ],
-                "last_saved": datetime.now(timezone.utc).isoformat(),
+                "last_saved": datetime.now(UTC).isoformat(),
             }
 
             # Convert enums to strings
@@ -807,7 +806,7 @@ class FailurePredictionSystem:
         except Exception as e:
             logger.error("Failed to save failure history", error=str(e))
 
-    def get_prediction_statistics(self) -> Dict[str, Any]:
+    def get_prediction_statistics(self) -> dict[str, Any]:
         """Get prediction system statistics."""
         return {
             "total_failures_in_history": len(self.failure_history),

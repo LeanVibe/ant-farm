@@ -14,12 +14,12 @@ Following TDD principles: Write failing tests first, implement minimal code, ref
 import asyncio
 import json
 import time
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 
-from src.core.task_queue import Task, TaskPriority, TaskQueue, TaskStatus, QueueStats
+from src.core.task_queue import QueueStats, Task, TaskPriority, TaskQueue, TaskStatus
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
 """Comprehensive integration tests for API endpoints with error handling."""
 
-import json
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 

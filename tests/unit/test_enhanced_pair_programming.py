@@ -1,15 +1,15 @@
 """Tests for enhanced AI pair programming system."""
 
-import asyncio
-import pytest
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from src.core.collaboration.enhanced_pair_programming import (
-    EnhancedAIPairProgramming,
-    CollaborationSession,
     CollaborationMode,
+    CollaborationSession,
     ContextShareType,
+    EnhancedAIPairProgramming,
     SharedContext,
     get_enhanced_pair_programming,
 )

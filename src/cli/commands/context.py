@@ -35,7 +35,7 @@ async def _search_context(query: str, limit: int):
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"http://localhost:9001/api/v1/context/meta-agent/search",
+                "http://localhost:9001/api/v1/context/meta-agent/search",
                 params={"query": query, "limit": limit},
             )
 

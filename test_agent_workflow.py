@@ -10,8 +10,8 @@ from pathlib import Path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-from core.task_queue import Task, TaskPriority, task_queue
 from agents.meta_agent import MetaAgent
+from core.task_queue import Task, TaskPriority, task_queue
 
 
 async def test_task_processing_workflow():
@@ -60,7 +60,7 @@ async def test_task_processing_workflow():
         if retrieved_task and retrieved_task.id == task_id:
             print(f"   ✅ Task retrieved: {retrieved_task.title}")
         else:
-            print(f"   ❌ Task retrieval failed or wrong task")
+            print("   ❌ Task retrieval failed or wrong task")
             return False
     except Exception as e:
         print(f"   ❌ Task retrieval error: {e}")
@@ -127,14 +127,14 @@ async def test_agent_initialization():
     # Test context engine (optional)
     print("1. Testing context engine initialization...")
     try:
-        from core.context_engine import get_context_engine
         from core.config import settings
+        from core.context_engine import get_context_engine
 
         context_engine = await asyncio.wait_for(
             get_context_engine(settings.database_url), timeout=10.0
         )
         print("   ✅ Context engine initialized")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("   ⚠️  Context engine timeout (expected in some environments)")
     except Exception as e:
         print(f"   ⚠️  Context engine failed: {e}")
@@ -146,7 +146,7 @@ async def test_agent_initialization():
 
         await asyncio.wait_for(message_broker.initialize(), timeout=5.0)
         print("   ✅ Message broker initialized")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("   ⚠️  Message broker timeout")
     except Exception as e:
         print(f"   ⚠️  Message broker failed: {e}")

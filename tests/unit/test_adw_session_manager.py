@@ -2,10 +2,11 @@
 Unit tests for ADW Session Manager.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.core.adw.session_manager import ADWSession, ADWSessionConfig, SessionPhase
 

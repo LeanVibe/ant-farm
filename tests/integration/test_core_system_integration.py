@@ -10,15 +10,11 @@ Tests the complete workflow of:
 This validates the most critical user journeys.
 """
 
-import asyncio
-import json
 import time
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import redis.asyncio as redis
 
-from src.core.caching import get_cache_manager
 from src.core.message_broker import MessageBroker, MessageType
 from src.core.task_queue import Task, TaskPriority, TaskQueue, TaskStatus
 
@@ -29,13 +25,13 @@ class TestCoreSystemIntegration:
     @pytest.fixture
     async def redis_client(self):
         """Create a real Redis client for integration testing."""
-        client = redis.Redis.from_url("redis://localhost:6381")
+        client = redis.Redis.from_url("redis://localhost:6381", decode_responses=True)
         # Clear test data
         await client.flushdb()
         yield client
         # Cleanup
         await client.flushdb()
-        await client.close()
+        await client.aclose()
 
     @pytest.fixture
     async def task_queue(self, redis_client):
@@ -90,7 +86,7 @@ class TestCoreSystemIntegration:
 
         # Verify task status
         task_status = await task_queue.get_task_status(task_id)
-        assert task_status == TaskStatus.IN_PROGRESS
+        assert task_status.status == TaskStatus.IN_PROGRESS
 
         # Step 6: Simulate agent messaging about task progress
         message_sent = await message_broker.send_message(
@@ -168,7 +164,7 @@ class TestCoreSystemIntegration:
         # Verify all tasks are in progress
         for task_id in tasks:
             status = await task_queue.get_task_status(task_id)
-            assert status == TaskStatus.IN_PROGRESS
+            assert status.status == TaskStatus.IN_PROGRESS
 
         # Simulate agent communication during processing
         for agent, task_id in assigned_tasks.items():

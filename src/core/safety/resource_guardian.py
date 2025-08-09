@@ -6,13 +6,13 @@ autonomous development workflows.
 
 import asyncio
 import os
-import psutil
 import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
+import psutil
 import structlog
 
 logger = structlog.get_logger()
@@ -42,8 +42,8 @@ class ResourceStatus:
     process_count: int
     test_runtime_ratio: float
     timestamp: float
-    warnings: List[str]
-    critical_alerts: List[str]
+    warnings: list[str]
+    critical_alerts: list[str]
 
 
 class MemoryOptimizer:
@@ -51,9 +51,9 @@ class MemoryOptimizer:
 
     def __init__(self):
         self.memory_baseline = psutil.virtual_memory().percent
-        self.optimization_history: List[Dict[str, Any]] = []
+        self.optimization_history: list[dict[str, Any]] = []
 
-    async def optimize_memory_usage(self) -> Dict[str, Any]:
+    async def optimize_memory_usage(self) -> dict[str, Any]:
         """Optimize system memory usage."""
         start_memory = psutil.virtual_memory().percent
         optimizations_applied = []
@@ -137,11 +137,11 @@ class CPUThrottler:
 
     def __init__(self):
         self.throttle_active = False
-        self.throttle_history: List[Dict[str, Any]] = []
+        self.throttle_history: list[dict[str, Any]] = []
 
     async def throttle_operations(
         self, target_cpu_percent: float = 70.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Throttle CPU-intensive operations."""
         if self.throttle_active:
             logger.info("CPU throttling already active")
@@ -186,7 +186,7 @@ class CPUThrottler:
         finally:
             self.throttle_active = False
 
-    async def release_throttle(self) -> Dict[str, Any]:
+    async def release_throttle(self) -> dict[str, Any]:
         """Release CPU throttling."""
         try:
             current_process = psutil.Process()
@@ -217,9 +217,9 @@ class DiskSpaceManager:
 
     def __init__(self, project_path: Path):
         self.project_path = project_path
-        self.cleanup_history: List[Dict[str, Any]] = []
+        self.cleanup_history: list[dict[str, Any]] = []
 
-    async def cleanup_temporary_files(self) -> Dict[str, Any]:
+    async def cleanup_temporary_files(self) -> dict[str, Any]:
         """Clean up temporary files and directories."""
         start_time = time.time()
         start_disk_usage = shutil.disk_usage(self.project_path)
@@ -334,7 +334,7 @@ class TestSuiteOptimizer:
     def __init__(self, project_path: Path):
         self.project_path = project_path
         self.baseline_runtime = None
-        self.runtime_history: List[Dict[str, Any]] = []
+        self.runtime_history: list[dict[str, Any]] = []
 
     async def measure_test_runtime(self) -> float:
         """Measure current test suite runtime."""
@@ -369,7 +369,7 @@ class TestSuiteOptimizer:
             logger.error("Failed to measure test runtime", error=str(e))
             return 0.0
 
-    async def optimize_test_suite(self) -> Dict[str, Any]:
+    async def optimize_test_suite(self) -> dict[str, Any]:
         """Optimize test suite performance."""
         try:
             optimizations_applied = []
@@ -423,7 +423,7 @@ class ResourceGuardian:
     """Main resource monitoring and management system."""
 
     def __init__(
-        self, project_path: Path, thresholds: Optional[ResourceThresholds] = None
+        self, project_path: Path, thresholds: ResourceThresholds | None = None
     ):
         self.project_path = project_path
         self.thresholds = thresholds or ResourceThresholds()
@@ -434,7 +434,7 @@ class ResourceGuardian:
         self.test_optimizer = TestSuiteOptimizer(project_path)
 
         self.monitoring_active = False
-        self.status_history: List[ResourceStatus] = []
+        self.status_history: list[ResourceStatus] = []
 
     async def get_current_status(self) -> ResourceStatus:
         """Get current resource usage status."""
@@ -497,7 +497,7 @@ class ResourceGuardian:
 
         return status
 
-    async def handle_resource_issues(self, status: ResourceStatus) -> Dict[str, Any]:
+    async def handle_resource_issues(self, status: ResourceStatus) -> dict[str, Any]:
         """Handle resource issues based on current status."""
         actions_taken = []
 
@@ -576,7 +576,7 @@ class ResourceGuardian:
         self.monitoring_active = False
         logger.info("Resource monitoring stopped")
 
-    def get_resource_statistics(self) -> Dict[str, Any]:
+    def get_resource_statistics(self) -> dict[str, Any]:
         """Get resource usage statistics."""
         if not self.status_history:
             return {"total_checks": 0}

@@ -1,6 +1,5 @@
 """Tests for Cognitive Load Manager."""
 
-import asyncio
 import time
 from pathlib import Path
 

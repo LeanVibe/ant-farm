@@ -6,11 +6,10 @@ entering the system during autonomous development workflows.
 
 import ast
 import asyncio
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import structlog
 
@@ -25,9 +24,9 @@ class QualityGateResult:
     passed: bool
     score: float
     threshold: float
-    details: Dict[str, Any]
+    details: dict[str, Any]
     execution_time: float
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -48,12 +47,12 @@ class CodeComplexityAnalyzer:
     """Analyzes code complexity metrics."""
 
     def __init__(self):
-        self.complexity_cache: Dict[str, int] = {}
+        self.complexity_cache: dict[str, int] = {}
 
-    def analyze_file(self, file_path: Path) -> Dict[str, Any]:
+    def analyze_file(self, file_path: Path) -> dict[str, Any]:
         """Analyze complexity metrics for a single file."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             tree = ast.parse(content, filename=str(file_path))
@@ -91,7 +90,7 @@ class CodeComplexityAnalyzer:
             )
             return {"error": str(e)}
 
-    def analyze_project(self, project_path: Path) -> Dict[str, Any]:
+    def analyze_project(self, project_path: Path) -> dict[str, Any]:
         """Analyze complexity metrics for entire project."""
         python_files = list(project_path.rglob("*.py"))
 
@@ -236,10 +235,10 @@ class SecurityScanner:
             r"pickle\.loads\s*\(",
         ]
 
-    async def scan_file(self, file_path: Path) -> Dict[str, Any]:
+    async def scan_file(self, file_path: Path) -> dict[str, Any]:
         """Scan a single file for security issues."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             issues = []
@@ -267,7 +266,7 @@ class SecurityScanner:
             )
             return {"error": str(e)}
 
-    async def scan_project(self, project_path: Path) -> Dict[str, Any]:
+    async def scan_project(self, project_path: Path) -> dict[str, Any]:
         """Scan entire project for security issues."""
         python_files = list(project_path.rglob("*.py"))
 
@@ -302,10 +301,10 @@ class SecurityScanner:
 class PerformanceAnalyzer:
     """Analyzes performance impact of code changes."""
 
-    async def analyze_import_complexity(self, file_path: Path) -> Dict[str, Any]:
+    async def analyze_import_complexity(self, file_path: Path) -> dict[str, Any]:
         """Analyze import complexity and potential performance issues."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             tree = ast.parse(content, filename=str(file_path))
@@ -352,7 +351,7 @@ class PerformanceAnalyzer:
 class AutonomousQualityGates:
     """Main quality gate system for autonomous development."""
 
-    def __init__(self, project_path: Path, config: Optional[QualityGateConfig] = None):
+    def __init__(self, project_path: Path, config: QualityGateConfig | None = None):
         self.project_path = project_path
         self.config = config or QualityGateConfig()
 
@@ -360,11 +359,11 @@ class AutonomousQualityGates:
         self.security_scanner = SecurityScanner()
         self.performance_analyzer = PerformanceAnalyzer()
 
-        self.gate_history: List[Dict[str, Any]] = []
+        self.gate_history: list[dict[str, Any]] = []
 
     async def run_all_gates(
-        self, files: Optional[List[Path]] = None
-    ) -> List[QualityGateResult]:
+        self, files: list[Path] | None = None
+    ) -> list[QualityGateResult]:
         """Run all quality gates on specified files or entire project."""
         if files is None:
             files = list(self.project_path.rglob("*.py"))
@@ -401,7 +400,7 @@ class AutonomousQualityGates:
 
         return results
 
-    async def _run_complexity_gate(self, files: List[Path]) -> QualityGateResult:
+    async def _run_complexity_gate(self, files: list[Path]) -> QualityGateResult:
         """Run complexity analysis gate."""
         start_time = time.time()
 
@@ -431,7 +430,7 @@ class AutonomousQualityGates:
                 error=str(e),
             )
 
-    async def _run_security_gate(self, files: List[Path]) -> QualityGateResult:
+    async def _run_security_gate(self, files: list[Path]) -> QualityGateResult:
         """Run security scanning gate."""
         start_time = time.time()
 
@@ -461,7 +460,7 @@ class AutonomousQualityGates:
                 error=str(e),
             )
 
-    async def _run_performance_gate(self, files: List[Path]) -> QualityGateResult:
+    async def _run_performance_gate(self, files: list[Path]) -> QualityGateResult:
         """Run performance analysis gate."""
         start_time = time.time()
 
@@ -534,7 +533,7 @@ class AutonomousQualityGates:
             if coverage_file.exists():
                 import json
 
-                with open(coverage_file, "r") as f:
+                with open(coverage_file) as f:
                     coverage_data = json.load(f)
                     coverage_percentage = (
                         coverage_data.get("totals", {}).get("percent_covered", 0) / 100
@@ -565,7 +564,7 @@ class AutonomousQualityGates:
                 error=str(e),
             )
 
-    async def _run_documentation_gate(self, files: List[Path]) -> QualityGateResult:
+    async def _run_documentation_gate(self, files: list[Path]) -> QualityGateResult:
         """Run documentation completeness gate."""
         start_time = time.time()
 
@@ -574,7 +573,7 @@ class AutonomousQualityGates:
             documented_functions = 0
 
             for file_path in files:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     content = f.read()
 
                 tree = ast.parse(content, filename=str(file_path))
@@ -620,7 +619,7 @@ class AutonomousQualityGates:
                 error=str(e),
             )
 
-    def _record_gate_run(self, results: List[QualityGateResult]) -> None:
+    def _record_gate_run(self, results: list[QualityGateResult]) -> None:
         """Record quality gate run for analysis."""
         record = {
             "timestamp": time.time(),
@@ -650,7 +649,7 @@ class AutonomousQualityGates:
             **{k: v for k, v in record.items() if k != "results"},
         )
 
-    def get_gate_statistics(self) -> Dict[str, Any]:
+    def get_gate_statistics(self) -> dict[str, Any]:
         """Get quality gate statistics."""
         if not self.gate_history:
             return {"total_runs": 0}

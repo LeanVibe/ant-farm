@@ -3,13 +3,13 @@
 import time
 import traceback
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import structlog
 from fastapi import HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 logger = structlog.get_logger()
 
@@ -18,9 +18,9 @@ class ErrorDetail(BaseModel):
     """Detailed error information."""
 
     message: str
-    field: Optional[str] = None
-    code: Optional[str] = None
-    context: Optional[Dict[str, Any]] = None
+    field: str | None = None
+    code: str | None = None
+    context: dict[str, Any] | None = None
 
 
 class APIErrorResponse(BaseModel):
@@ -28,11 +28,11 @@ class APIErrorResponse(BaseModel):
 
     success: bool = False
     error: str
-    details: Optional[List[ErrorDetail]] = None
+    details: list[ErrorDetail] | None = None
     timestamp: float
     request_id: str
-    path: Optional[str] = None
-    method: Optional[str] = None
+    path: str | None = None
+    method: str | None = None
 
 
 class APIError(HTTPException):
@@ -42,9 +42,9 @@ class APIError(HTTPException):
         self,
         status_code: int,
         message: str,
-        details: Optional[List[ErrorDetail]] = None,
-        code: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        details: list[ErrorDetail] | None = None,
+        code: str | None = None,
+        headers: dict[str, str] | None = None,
     ):
         self.message = message
         self.details = details or []
@@ -59,7 +59,7 @@ class APIError(HTTPException):
 class ValidationAPIError(APIError):
     """Validation error with field-specific details."""
 
-    def __init__(self, errors: List[Dict[str, Any]]):
+    def __init__(self, errors: list[dict[str, Any]]):
         details = []
         for error in errors:
             field_path = " -> ".join(str(loc) for loc in error.get("loc", []))
@@ -130,8 +130,8 @@ def create_error_response(
     request: Request,
     status_code: int,
     message: str,
-    details: Optional[List[ErrorDetail]] = None,
-    error_code: Optional[str] = None,
+    details: list[ErrorDetail] | None = None,
+    error_code: str | None = None,
 ) -> JSONResponse:
     """Create standardized error response."""
 
@@ -249,7 +249,7 @@ class RateLimitTracker:
     """Simple in-memory rate limiting tracker."""
 
     def __init__(self):
-        self.requests: Dict[str, List[float]] = {}
+        self.requests: dict[str, list[float]] = {}
 
     def is_rate_limited(
         self, client_id: str, limit: int, window_seconds: int = 60
