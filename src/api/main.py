@@ -2351,6 +2351,202 @@ async def request_human_intervention(reason: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+# Large Project Coordination endpoints
+@app.post("/api/v1/projects", response_model=APIResponse)
+async def create_project_workspace(
+    project_data: dict = Body(...), current_user: dict = Depends(get_current_user)
+):
+    """Create a new large project workspace."""
+    try:
+        from ..core.collaboration import get_large_project_coordinator, ProjectScale
+
+        coordinator = await get_large_project_coordinator()
+
+        # Validate input data
+        required_fields = ["name", "description", "scale", "lead_agent"]
+        for field in required_fields:
+            if field not in project_data:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required field: {field}"
+                )
+
+        # Convert scale string to enum
+        try:
+            scale = ProjectScale(project_data["scale"])
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid project scale: {project_data['scale']}",
+            )
+
+        project_id = await coordinator.create_project_workspace(
+            name=project_data["name"],
+            description=project_data["description"],
+            scale=scale,
+            lead_agent=project_data["lead_agent"],
+            root_path=project_data.get("root_path"),
+        )
+
+        return APIResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "message": "Project workspace created successfully",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to create project workspace", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/projects/{project_id}/join", response_model=APIResponse)
+async def join_project(
+    project_id: str,
+    join_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Add an agent to a project workspace."""
+    try:
+        from ..core.collaboration import get_large_project_coordinator
+
+        coordinator = await get_large_project_coordinator()
+
+        agent_id = join_data.get("agent_id")
+        roles = join_data.get("roles", ["contributor"])
+
+        if not agent_id:
+            raise HTTPException(status_code=400, detail="Missing agent_id")
+
+        success = await coordinator.join_project(project_id, agent_id, roles)
+
+        if not success:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        return APIResponse(
+            success=True,
+            data={"message": f"Agent {agent_id} joined project successfully"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to join project", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/projects/{project_id}/tasks/decompose", response_model=APIResponse)
+async def decompose_large_task(
+    project_id: str,
+    task_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Decompose a large task into coordinated sub-tasks."""
+    try:
+        from ..core.collaboration import get_large_project_coordinator
+
+        coordinator = await get_large_project_coordinator()
+
+        required_fields = ["description", "estimated_complexity"]
+        for field in required_fields:
+            if field not in task_data:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required field: {field}"
+                )
+
+        decomposition_result = await coordinator.decompose_large_task(
+            project_id=project_id,
+            task_description=task_data["description"],
+            estimated_complexity=task_data["estimated_complexity"],
+            target_agents=task_data.get("target_agents"),
+        )
+
+        return APIResponse(success=True, data=decomposition_result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to decompose task", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/projects/{project_id}/status", response_model=APIResponse)
+async def get_project_status(
+    project_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get comprehensive status of a large project."""
+    try:
+        from ..core.collaboration import get_large_project_coordinator
+
+        coordinator = await get_large_project_coordinator()
+        status = await coordinator.get_project_status(project_id)
+
+        return APIResponse(success=True, data=status)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to get project status", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/projects/{project_id}/progress", response_model=APIResponse)
+async def monitor_project_progress(
+    project_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Monitor and report on project progress."""
+    try:
+        from ..core.collaboration import get_large_project_coordinator
+
+        coordinator = await get_large_project_coordinator()
+        progress = await coordinator.monitor_project_progress(project_id)
+
+        return APIResponse(success=True, data=progress)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to monitor project progress", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/projects/{project_id}/conflicts/resolve", response_model=APIResponse)
+async def resolve_project_conflict(
+    project_id: str,
+    conflict_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Handle conflicts in large project coordination."""
+    try:
+        from ..core.collaboration import get_large_project_coordinator
+
+        coordinator = await get_large_project_coordinator()
+
+        required_fields = ["conflict_type", "involved_agents"]
+        for field in required_fields:
+            if field not in conflict_data:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required field: {field}"
+                )
+
+        resolution_result = await coordinator.handle_conflict_resolution(
+            project_id=project_id,
+            conflict_type=conflict_data["conflict_type"],
+            involved_agents=conflict_data["involved_agents"],
+            context=conflict_data.get("context", {}),
+        )
+
+        return APIResponse(success=True, data=resolution_result)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to resolve project conflict", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # System diagnostics endpoints
 @app.get("/api/v1/diagnostics", response_model=APIResponse)
 async def get_system_diagnostics():

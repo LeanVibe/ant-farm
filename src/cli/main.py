@@ -7,7 +7,7 @@ import asyncio
 import typer
 from rich.console import Console
 
-from .commands import agent, context, system, task
+from .commands import agent, context, project, system, task
 from .utils import error_handler
 
 # Try to import coordination - may not be available
@@ -32,6 +32,7 @@ app.add_typer(system.app, name="system", help="System management commands")
 app.add_typer(agent.app, name="agent", help="Agent management commands")
 app.add_typer(task.app, name="task", help="Task management commands")
 app.add_typer(context.app, name="context", help="Context engine commands")
+app.add_typer(project.app, name="project", help="Large project coordination commands")
 
 # Add coordination if available
 if COORDINATION_AVAILABLE:
