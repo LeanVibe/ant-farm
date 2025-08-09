@@ -56,14 +56,14 @@ class Settings(BaseSettings):
 
     # Database Configuration
     database_url: str = Field(
-        default="postgresql+asyncpg://hive_user:hive_pass@localhost:5433/leanvibe_hive",
+        default="postgresql+asyncpg://bogdan@localhost:5432/leanvibe_hive",
         env="DATABASE_URL",
     )
     database_pool_size: int = Field(default=10, env="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(default=20, env="DATABASE_MAX_OVERFLOW")
 
     # Redis Configuration
-    redis_url: str = Field(default="redis://localhost:6381", env="REDIS_URL")
+    redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
     redis_password: str | None = Field(default=None, env="REDIS_PASSWORD")
     redis_db: int = Field(default=0, env="REDIS_DB")
 

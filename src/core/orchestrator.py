@@ -13,24 +13,17 @@ from typing import Dict
 import structlog
 
 from .constants import Intervals
+from .enums import AgentStatus
 from .message_broker import message_broker
-from .models import Agent, get_database_manager
+from .models import Agent
+from .async_db import get_async_database_manager
 from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
 
 logger = structlog.get_logger()
 
 
-class AgentStatus(Enum):
-    """Agent status enumeration."""
-
-    STARTING = "starting"
-    ACTIVE = "active"
-    IDLE = "idle"
-    BUSY = "busy"
-    ERROR = "error"
-    STOPPING = "stopping"
-    STOPPED = "stopped"
+from .enums import AgentStatus
 
 
 @dataclass
@@ -71,96 +64,54 @@ class AgentRegistry:
     """Manages agent registration and tracking using SQLAlchemy."""
 
     def __init__(self, database_url: str):
-        self.db_manager = get_database_manager(database_url)
+        self.database_url = database_url
+        self.db_manager = None  # Will be initialized async
         self.agents: dict[str, AgentInfo] = {}
         self._lock = asyncio.Lock()
-        # Initialize database
-        self.db_manager.create_tables()
 
     async def initialize(self) -> None:
         """Initialize the registry and load existing agents from database."""
+        self.db_manager = await get_async_database_manager(self.database_url)
         await self.load_agents_from_database()
 
     async def load_agents_from_database(self) -> None:
         """Load all agents from database into memory registry."""
         async with self._lock:
             try:
-                import asyncio
-                from functools import partial
-
-                def sync_load():
-                    session = self.db_manager.get_session()
-                    try:
-                        db_agents = session.query(Agent).all()
-                        return [
-                            (
-                                agent.name,
-                                agent.type,
-                                agent.role,
-                                agent.status,
-                                agent.capabilities or {},
-                                agent.tmux_session,
-                                agent.last_heartbeat,
-                                agent.created_at,
-                                agent.tasks_completed or 0,
-                                agent.tasks_failed or 0,
-                                agent.short_id,
-                            )
-                            for agent in db_agents
-                        ]
-                    finally:
-                        session.close()
-
-                # Run database query in thread to avoid blocking
-                loop = asyncio.get_event_loop()
-                db_results = await loop.run_in_executor(None, sync_load)
+                # Get all active agents from database
+                db_agents = await self.db_manager.get_active_agents()
 
                 # Convert database results to AgentInfo objects
                 loaded_count = 0
-                for (
-                    name,
-                    agent_type,
-                    role,
-                    status,
-                    capabilities,
-                    tmux_session,
-                    last_heartbeat,
-                    created_at,
-                    tasks_completed,
-                    tasks_failed,
-                    short_id,
-                ) in db_results:
+                for agent in db_agents:
                     # Convert string status to AgentStatus enum
                     try:
-                        agent_status = AgentStatus(status)
+                        agent_status = AgentStatus(agent.status)
                     except ValueError:
                         agent_status = AgentStatus.STOPPED  # Default for invalid status
 
                     agent_info = AgentInfo(
-                        id=str(uuid.uuid4()),  # Generate new ID for in-memory
-                        name=name,
-                        type=agent_type,
-                        role=role,
+                        id=str(agent.id),
+                        name=agent.name,
+                        type=agent.type,
+                        role=agent.role,
                         status=agent_status,
-                        capabilities=list(capabilities.keys())
-                        if isinstance(capabilities, dict)
-                        else [],
-                        tmux_session=tmux_session,
-                        last_heartbeat=last_heartbeat.timestamp()
-                        if last_heartbeat
+                        capabilities=agent.capabilities or {},
+                        tmux_session=agent.tmux_session,
+                        last_heartbeat=agent.last_heartbeat.timestamp()
+                        if agent.last_heartbeat
                         else time.time(),
-                        created_at=created_at.timestamp()
-                        if created_at
+                        created_at=agent.created_at.timestamp()
+                        if agent.created_at
                         else time.time(),
-                        tasks_completed=tasks_completed,
-                        tasks_failed=tasks_failed,
-                        short_id=short_id,
+                        tasks_completed=agent.tasks_completed or 0,
+                        tasks_failed=agent.tasks_failed or 0,
                     )
 
-                    self.agents[name] = agent_info
+                    self.agents[agent.name] = agent_info
                     loaded_count += 1
 
-                logger.info(f"Loaded {loaded_count} agents from database into registry")
+                logger.info(f"Loaded {loaded_count} agents from database")
 
             except Exception as e:
                 logger.error("Failed to load agents from database", error=str(e))
@@ -189,38 +140,19 @@ class AgentRegistry:
 
     async def _store_agent_in_db(self, agent_info: AgentInfo) -> None:
         """Store agent in database asynchronously."""
-        # For now, use a simple approach - run sync DB operations in thread
-        import asyncio
-        from functools import partial
-
-        def sync_store():
-            session = self.db_manager.get_session()
-            try:
-                # Check if agent already exists
-                existing = session.query(Agent).filter_by(name=agent_info.name).first()
-                if existing:
-                    return
-
-                # Create new agent record
-                agent = Agent(
-                    id=agent_info.id,
-                    name=agent_info.name,
-                    type=agent_info.type,
-                    role=agent_info.role,
-                    status=agent_info.status.value,
-                    capabilities=agent_info.capabilities,
-                    last_heartbeat=datetime.now(datetime.UTC),
-                    created_at=datetime.now(datetime.UTC),
-                    updated_at=datetime.now(datetime.UTC),
-                )
-                session.add(agent)
-                session.commit()
-            finally:
-                session.close()
-
-        # Run in executor to avoid blocking async loop
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, sync_store)
+        try:
+            await self.db_manager.register_agent(
+                name=agent_info.name,
+                agent_type=agent_info.type,
+                role=agent_info.role,
+                capabilities=agent_info.capabilities,
+                tmux_session=agent_info.tmux_session,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to store agent in database", agent=agent_info.name, error=str(e)
+            )
+            raise
 
     async def update_agent_status(
         self,

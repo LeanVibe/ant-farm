@@ -580,3 +580,24 @@ class MessageBroker:
 
 # Global message broker instance
 message_broker = MessageBroker()
+
+
+def get_message_broker() -> MessageBroker:
+    """Get a fresh message broker instance with current config."""
+    global message_broker
+    from .config import get_settings
+
+    current_redis_url = get_settings().redis_url
+
+    # Check if broker needs to be recreated with new config
+    if hasattr(message_broker, "redis_client"):
+        broker_url = message_broker.redis_client.connection_pool.connection_kwargs
+        broker_port = broker_url.get("port", 6379)
+        current_port = (
+            int(current_redis_url.split(":")[-1]) if ":" in current_redis_url else 6379
+        )
+
+        if broker_port != current_port:
+            message_broker = MessageBroker()
+
+    return message_broker

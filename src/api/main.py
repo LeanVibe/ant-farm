@@ -8,7 +8,7 @@ import time
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,36 +31,36 @@ try:
         require_admin,
     )
     from ..core.config import settings
-    from ..core.message_broker import MessageType, message_broker
+    from ..core.message_broker import MessageType, get_message_broker
     from ..core.orchestrator import get_orchestrator
     from ..core.security import User, create_default_admin, security_manager
     from ..core.task_queue import Task, TaskPriority, task_queue
 except ImportError:  # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from core.analytics import (
-        PerformanceMiddleware,
-        get_performance_collector,
-        start_performance_monitoring,
-        stop_performance_monitoring,
+    from src.core.analytics import (
+        analytics_manager,
+        track_api_call,
+        track_agent_event,
+        track_websocket_event,
     )
-    from core.auth import (
-        AuthenticationError,
-        Permissions,
-        SecurityMiddleware,
+    from src.core.auth import (
+        AuthScope,
+        Permission,
+        auth_required,
         get_current_user,
-        get_cli_user,
-        rate_limit,
-        require_admin,
+        get_user_permissions,
+        validate_permissions,
     )
-    from core.config import settings
-    from core.message_broker import MessageType, message_broker
-    from core.orchestrator import get_orchestrator
-    from core.security import User, create_default_admin, security_manager
-    from core.task_queue import Task, TaskPriority, task_queue
+    from src.core.config import settings
+    from src.core.message_broker import MessageType, get_message_broker
+    from src.core.orchestrator import get_orchestrator
+    from src.core.security import User, create_default_admin, security_manager
+    from src.core.task_queue import Task, TaskPriority, task_queue
 
 from fastapi import (
     BackgroundTasks,
+    Body,
     Depends,
     FastAPI,
     HTTPException,
@@ -328,13 +328,7 @@ app.add_middleware(
 )
 
 
-# Pydantic models for API
-class AgentStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    STARTING = "starting"
-    STOPPING = "stopping"
-    ERROR = "error"
+from ..core.enums import AgentStatus
 
 
 class AgentInfo(BaseModel):
@@ -445,14 +439,12 @@ async def startup_event():
 
     try:
         # Initialize message broker
-        await message_broker.initialize()
+        await get_message_broker().initialize()
 
         # Initialize orchestrator
         from pathlib import Path
 
-        orch = await get_orchestrator(
-            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive", Path(".")
-        )
+        orch = await get_orchestrator(settings.database_url, Path("."))
         await orch.start()
 
         # Start background event broadcaster
@@ -468,7 +460,7 @@ async def startup_event():
         logger.info("API server started successfully")
 
     except Exception as e:
-        logger.error("Failed to start API server", error=str(e))
+        logger.error(f"Failed to start API server: {str(e)}")
         raise
 
 
@@ -478,11 +470,9 @@ async def shutdown_event():
     logger.info("Shutting down LeanVibe Agent Hive API server")
 
     try:
-        orch = await get_orchestrator(
-            "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive", Path(".")
-        )
+        orch = await get_orchestrator(settings.database_url, Path("."))
         await orch.stop()
-        await message_broker.shutdown()
+        await get_message_broker().shutdown()
 
         # Stop performance monitoring
         await stop_performance_monitoring()
@@ -898,7 +888,7 @@ async def detailed_health_check():
         orchestrator = await get_orchestrator(settings.database_url, Path("."))
 
         # Test Redis connection
-        await message_broker.redis_client.ping()
+        await get_message_broker().redis_client.ping()
 
         return APIResponse(
             success=True,
@@ -1046,7 +1036,7 @@ async def get_agent(agent_name: str, current_user: User = Depends(get_cli_user))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get agent", agent_name=agent_name, error=str(e))
+        logger.error(f"Failed to get agent {agent_name}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1132,7 +1122,7 @@ async def stop_agent(agent_name: str, current_user: User = Depends(get_current_u
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to stop agent", agent_name=agent_name, error=str(e))
+        logger.error(f"Failed to stop agent {agent_name}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1141,7 +1131,7 @@ async def check_agent_health(agent_name: str):
     """Check agent health."""
     try:
         # Send health check message to agent
-        response = await message_broker.send_message(
+        response = await get_message_broker().send_message(
             from_agent="api-server",
             to_agent=agent_name,
             topic="health_check",
@@ -1350,7 +1340,7 @@ async def get_task(task_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get task", task_id=task_id, error=str(e))
+        logger.error(f"Failed to get task {task_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1370,7 +1360,7 @@ async def cancel_task(task_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to cancel task", task_id=task_id, error=str(e))
+        logger.error(f"Failed to cancel task {task_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -1379,7 +1369,7 @@ async def cancel_task(task_id: str):
 async def send_message(message: MessageSend):
     """Send a message to an agent."""
     try:
-        message_id = await message_broker.send_message(
+        message_id = await get_message_broker().send_message(
             from_agent="api-server",
             to_agent=message.to_agent,
             topic=message.topic,
@@ -1405,7 +1395,7 @@ async def send_message(message: MessageSend):
 async def broadcast_message(topic: str, content: dict[str, Any]):
     """Broadcast a message to all agents."""
     try:
-        message_id = await message_broker.broadcast_message(
+        message_id = await get_message_broker().broadcast_message(
             from_agent="api-server", topic=topic, payload=content
         )
 
@@ -1454,7 +1444,7 @@ async def shutdown_system(current_user: User = Depends(get_current_user)):
     """Gracefully shutdown the entire system."""
     try:
         # Send shutdown message to all agents
-        await message_broker.broadcast_message(
+        await get_message_broker().broadcast_message(
             from_agent="api-server",
             topic="shutdown",
             payload={"reason": "API shutdown request", "timestamp": time.time()},
@@ -1745,8 +1735,8 @@ async def trigger_optimization():
 # Context helper function
 async def resolve_agent_uuid(agent_identifier: str) -> str:
     """Resolve agent identifier to UUID for context operations."""
-    from core.async_db import get_async_database_manager
-    from core.models import Agent as AgentModel
+    from src.core.async_db import get_async_database_manager
+    from src.core.models import Agent as AgentModel
     from sqlalchemy import select
     import uuid
 
@@ -1782,7 +1772,7 @@ async def resolve_agent_uuid(agent_identifier: str) -> str:
 async def get_agent_context(agent_id: str, limit: int = 10):
     """Get context/memory for a specific agent."""
     try:
-        from core.context_engine import get_context_engine
+        from src.core.context_engine import get_context_engine
 
         # Resolve agent identifier to proper UUID
         agent_uuid = await resolve_agent_uuid(agent_id)
@@ -1813,7 +1803,7 @@ async def get_agent_context(agent_id: str, limit: int = 10):
 async def search_context(agent_id: str, query: str, limit: int = 10):
     """Perform semantic search on agent context."""
     try:
-        from core.context_engine import get_context_engine
+        from src.core.context_engine import get_context_engine
 
         # Resolve agent identifier to proper UUID
         agent_uuid = await resolve_agent_uuid(agent_id)
@@ -1877,7 +1867,7 @@ async def add_context(
 ):
     """Add a document to the context engine."""
     try:
-        from core.context_engine import get_context_engine
+        from src.core.context_engine import get_context_engine
 
         # Resolve agent identifier to proper UUID
         agent_uuid = await resolve_agent_uuid(agent_id)
@@ -1926,7 +1916,7 @@ async def add_context(
 async def consolidate_agent_memory(agent_id: str):
     """Trigger memory consolidation for an agent."""
     try:
-        from core.context_engine import get_context_engine
+        from src.core.context_engine import get_context_engine
 
         context_engine = await get_context_engine(settings.database_url)
         consolidation_stats = await context_engine.consolidate_memory(agent_id)

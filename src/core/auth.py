@@ -122,6 +122,7 @@ async def get_cli_user(
             id="cli-anonymous",
             username="cli-user",
             email="cli@localhost",
+            hashed_password="cli-anonymous-no-password",
             is_active=True,
             permissions=[
                 "agent_read",
