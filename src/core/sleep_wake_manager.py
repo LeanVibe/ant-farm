@@ -15,6 +15,7 @@ from .advanced_context_engine import (
     get_advanced_context_engine,
 )
 from .config import settings
+from .constants import Intervals, Timeouts
 from .message_broker import message_broker
 from .models import Agent, SystemMetric, get_database_manager
 from .task_queue import task_queue
@@ -278,11 +279,13 @@ class SleepWakeManager:
                     await self._monitor_sleep_cycle()
 
                 # Check every minute
-                await asyncio.sleep(60)
+                await asyncio.sleep(Intervals.SYSTEM_HEALTH_CHECK)
 
             except Exception as e:
                 logger.error("Sleep-wake cycle error", error=str(e))
-                await asyncio.sleep(300)  # Wait 5 minutes on error
+                await asyncio.sleep(
+                    Intervals.DB_CONNECTION_RETRY * 60
+                )  # Wait 5 minutes on error
 
     async def _should_enter_sleep(self) -> bool:
         """Determine if the system should enter sleep mode."""

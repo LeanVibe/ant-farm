@@ -1,176 +1,209 @@
-"""
-Configuration constants for the LeanVibe Agent Hive system.
+"""Configuration constants for LeanVibe Agent Hive 2.0.
 
-This module centralizes all timing, interval, and threshold constants
-to improve maintainability and testing.
+This module centralizes all hardcoded values to improve configurability
+and maintainability. All timing intervals, thresholds, and other constants
+should be defined here rather than scattered throughout the codebase.
 """
 
-from typing import Final
+from enum import Enum
 
 
 class Intervals:
-    """Timing intervals for various system components."""
+    """Time intervals in seconds."""
 
-    # Agent monitoring and heartbeat intervals
-    AGENT_HEARTBEAT: Final[int] = 30
-    AGENT_BRIEF_DELAY: Final[int] = 1
-    AGENT_STARTUP_DELAY: Final[int] = 1
-    AGENT_SHUTDOWN_GRACE: Final[int] = 1
+    # Agent lifecycle intervals
+    AGENT_HEARTBEAT = 30
+    AGENT_STATUS_CHECK = 5
+    AGENT_HEALTH_CHECK = 60
+    AGENT_REGISTRATION_RETRY = 10
 
     # Task coordination intervals
-    TASK_COORDINATION_CYCLE: Final[int] = 5
-    TASK_COORDINATOR_ERROR_DELAY: Final[int] = 30
-
-    # Agent-specific intervals
-    DEVELOPER_AGENT_CYCLE: Final[int] = 1
-    DEVELOPER_AGENT_ERROR_DELAY: Final[int] = 5
-    ARCHITECT_AGENT_PLANNING_DELAY: Final[int] = 10
-    ARCHITECT_AGENT_CYCLE: Final[int] = 15
-    QA_AGENT_ERROR_DELAY: Final[int] = 5
-    QA_AGENT_CYCLE: Final[int] = 10
-    META_AGENT_CYCLE: Final[int] = 10
-    META_AGENT_ERROR_DELAY: Final[int] = 30
-    DEVOPS_AGENT_MONITORING_CYCLE: Final[int] = 30
-    DEVOPS_AGENT_CYCLE: Final[int] = 20
-    DEVOPS_AGENT_COMMAND_DELAY: Final[int] = 1
-    DEVOPS_AGENT_SCALING_DELAY: Final[int] = 2
-
-    # System monitoring intervals
-    SYSTEM_HEALTH_CHECK: Final[int] = 60
-    SYSTEM_STARTUP_DELAY: Final[int] = 3
-    SYSTEM_RESTART_DELAY: Final[int] = 2
+    TASK_COORDINATION_CYCLE = 5
+    TASK_QUEUE_POLL = 1
+    TASK_CLEANUP = 300
+    TASK_TIMEOUT_CHECK = 30
 
     # Emergency and safety intervals
-    EMERGENCY_CHECK_INTERVAL: Final[int] = 10
-    EMERGENCY_ERROR_BACKOFF: Final[int] = 30
+    EMERGENCY_CHECK = 10
+    SAFETY_VIOLATION_CHECK = 30
+    INTERVENTION_COOLDOWN = 60
 
-    # Analytics and monitoring intervals
-    ANALYTICS_DEFAULT_INTERVAL: Final[int] = 60
-    AUTONOMOUS_DASHBOARD_DEFAULT: Final[int] = 5
+    # System health and monitoring
+    SYSTEM_HEALTH_CHECK = 60
+    METRICS_COLLECTION = 30
+    LOG_ROTATION_CHECK = 3600
 
-    # Agent runner intervals
-    RUNNER_TASK_CHECK: Final[int] = 5
-    RUNNER_ERROR_DELAY: Final[int] = 30
-    RUNNER_SYSTEM_HEALTH_CHECK: Final[int] = 10
-    RUNNER_IMPROVEMENT_CHECK: Final[int] = 30
-    RUNNER_PROACTIVE_CYCLE: Final[int] = 15
-    RUNNER_MONITORING_CYCLE: Final[int] = 30
-    RUNNER_MAINTENANCE_CYCLE: Final[int] = 20
-    RUNNER_CLEANUP_CYCLE: Final[int] = 30
-    RUNNER_BRIEF_DELAY: Final[int] = 1
+    # Database and connection intervals
+    DB_CONNECTION_RETRY = 5
+    DB_POOL_CLEANUP = 300
+    CONNECTION_TIMEOUT = 30
 
-    # Sleep/wake manager intervals
-    SLEEP_WAKE_MONITOR_CYCLE: Final[int] = 60
-    SLEEP_WAKE_ERROR_DELAY: Final[int] = 300
-    SLEEP_WAKE_DURATION: Final[int] = 300
-    SLEEP_WAKE_CHECK_DURING_SLEEP: Final[int] = 30
+    # Message broker intervals
+    MESSAGE_PROCESSING_CYCLE = 1
+    MESSAGE_CLEANUP = 300
+    SUBSCRIPTION_HEALTH_CHECK = 60
 
-    # Orchestrator intervals
-    ORCHESTRATOR_STARTUP_DELAY: Final[int] = 3
-    ORCHESTRATOR_AGENT_DELAY: Final[int] = 2
-    ORCHESTRATOR_HEARTBEAT_CHECK: Final[int] = 1
-    ORCHESTRATOR_MONITOR_CYCLE: Final[int] = 1
-    ORCHESTRATOR_ERROR_DELAY: Final[int] = 5
-    ORCHESTRATOR_HEALTH_CHECK: Final[int] = 300
-    ORCHESTRATOR_CLEANUP_CYCLE: Final[int] = 60
-
-    # Persistence and caching intervals
-    PERSISTENT_CLI_HEARTBEAT: Final[int] = 30
-    PERSISTENT_CLI_ERROR_DELAY: Final[int] = 5
-    CACHE_RETRY_BACKOFF_BASE: Final[float] = 1.0
-
-    # Resource monitoring intervals
-    RESOURCE_GUARDIAN_CHECK: Final[float] = 0.1
-    RESOURCE_GUARDIAN_MONITOR_CYCLE: Final[int] = 60
-
-    # ADW system intervals
-    ADW_SESSION_TEST_DELAY: Final[int] = 1
-    ADW_SESSION_CODE_DELAY: Final[int] = 1
-    ADW_MICRO_DEVELOPMENT_DELAYS: Final[float] = 0.1
-
-    # Testing intervals
-    EXTENDED_SESSION_MONITOR: Final[int] = 5
-    EXTENDED_SESSION_HEALTH_CHECK: Final[int] = 30
+    # CLI and user interaction
+    CLI_OPERATION_TIMEOUT = 300
+    USER_INPUT_TIMEOUT = 30
+    COMMAND_RETRY_DELAY = 2
 
 
-class Thresholds:
-    """Threshold values for system monitoring and decision making."""
+class Limits:
+    """Various system limits and thresholds."""
 
-    # Performance thresholds
-    MAX_MEMORY_PER_AGENT: Final[int] = 500_000_000  # 500MB in bytes
-    MAX_CPU_PERCENTAGE: Final[float] = 80.0
-    MAX_RESPONSE_TIME_MS: Final[int] = 100
+    # Agent limits
+    MAX_CONCURRENT_AGENTS = 50
+    MAX_AGENT_RETRIES = 3
+    MAX_AGENT_MEMORY_MB = 500
 
-    # Queue and coordination thresholds
-    MAX_QUEUE_DEPTH: Final[int] = 1000
-    MAX_CONCURRENT_AGENTS: Final[int] = 50
+    # Task limits
+    MAX_TASK_RETRIES = 3
+    MAX_TASK_DURATION = 1800  # 30 minutes
+    MAX_QUEUE_SIZE = 1000
 
-    # Health check thresholds
-    MIN_HEALTH_SCORE: Final[float] = 0.7
-    MAX_ERROR_RATE: Final[float] = 0.1
+    # Message limits
+    MAX_MESSAGE_SIZE = 1048576  # 1MB
+    MAX_MESSAGE_HISTORY = 1000
+    MESSAGE_RETENTION_HOURS = 168  # 1 week
 
-    # Cognitive load thresholds
-    COGNITIVE_LOAD_WARNING: Final[float] = 0.7
-    COGNITIVE_LOAD_CRITICAL: Final[float] = 0.9
+    # Database limits
+    DB_POOL_SIZE = 10
+    DB_MAX_OVERFLOW = 20
+    MAX_QUERY_EXECUTION_TIME = 30
+
+    # File system limits
+    MAX_LOG_FILE_SIZE_MB = 100
+    MAX_TEMP_FILES = 1000
+    MAX_WORKSPACE_SIZE_GB = 10
 
 
 class Timeouts:
-    """Timeout values for various operations."""
+    """Timeout values in seconds."""
 
-    # API timeouts
-    API_REQUEST_TIMEOUT: Final[int] = 30
-    WEBSOCKET_TIMEOUT: Final[int] = 60
+    # Network timeouts
+    HTTP_REQUEST_TIMEOUT = 30
+    WEBSOCKET_PING_TIMEOUT = 10
+    REDIS_OPERATION_TIMEOUT = 5
 
-    # Database timeouts
-    DATABASE_QUERY_TIMEOUT: Final[int] = 30
-    DATABASE_CONNECTION_TIMEOUT: Final[int] = 10
+    # Process timeouts
+    SUBPROCESS_TIMEOUT = 300
+    SHELL_COMMAND_TIMEOUT = 120
+    CLI_TOOL_TIMEOUT = 300
 
-    # Agent operation timeouts
-    AGENT_SPAWN_TIMEOUT: Final[int] = 60
-    AGENT_STOP_TIMEOUT: Final[int] = 30
-    CLI_TOOL_TIMEOUT: Final[int] = 300
+    # Lock timeouts
+    DISTRIBUTED_LOCK_TIMEOUT = 30
+    FILE_LOCK_TIMEOUT = 10
 
-    # Task execution timeouts
-    TASK_EXECUTION_TIMEOUT: Final[int] = 3600  # 1 hour
-    EMERGENCY_RESPONSE_TIMEOUT: Final[int] = 10
-
-
-class RetryLimits:
-    """Retry limits for various operations."""
-
-    # Network retries
-    API_RETRY_ATTEMPTS: Final[int] = 3
-    DATABASE_RETRY_ATTEMPTS: Final[int] = 3
-
-    # Agent operation retries
-    AGENT_SPAWN_RETRIES: Final[int] = 3
-    CLI_TOOL_RETRIES: Final[int] = 2
-
-    # Cache operation retries
-    CACHE_RETRY_ATTEMPTS: Final[int] = 3
+    # Shutdown timeouts
+    GRACEFUL_SHUTDOWN_TIMEOUT = 30
+    FORCE_SHUTDOWN_TIMEOUT = 10
 
 
-class Paths:
-    """Path constants for the system."""
+class Priorities:
+    """Priority levels for various operations."""
 
-    # Log paths
-    LOG_DIR: Final[str] = "logs"
-    AGENT_LOG_DIR: Final[str] = "logs/agents"
-    SYSTEM_LOG_DIR: Final[str] = "logs/system"
+    # Task priorities (1-9, where 9 is highest)
+    CRITICAL_TASK = 9
+    HIGH_TASK = 7
+    NORMAL_TASK = 5
+    LOW_TASK = 3
+    BACKGROUND_TASK = 1
 
-    # Data paths
-    DATA_DIR: Final[str] = "data"
-    BACKUP_DIR: Final[str] = "data/backups"
-    CONTEXT_DATA_DIR: Final[str] = "data/context"
+    # Agent priorities
+    META_AGENT_PRIORITY = 9
+    ARCHITECT_AGENT_PRIORITY = 8
+    DEVELOPER_AGENT_PRIORITY = 7
+    QA_AGENT_PRIORITY = 6
+    DEVOPS_AGENT_PRIORITY = 5
 
 
-# Legacy constants for backwards compatibility
-# TODO: These should be gradually phased out in favor of the class-based approach above
+class Thresholds:
+    """Various threshold values."""
 
-# Agent intervals (deprecated - use Intervals class)
+    # Performance thresholds
+    CPU_USAGE_WARNING = 80.0  # percentage
+    MEMORY_USAGE_WARNING = 85.0  # percentage
+    DISK_USAGE_WARNING = 90.0  # percentage
+
+    # Quality thresholds
+    CODE_COVERAGE_MINIMUM = 90.0  # percentage
+    PERFORMANCE_REGRESSION_THRESHOLD = 0.1  # 10% slower
+
+    # Safety thresholds
+    ERROR_RATE_THRESHOLD = 0.05  # 5% error rate
+    RESPONSE_TIME_THRESHOLD = 1.0  # 1 second
+
+    # Resource thresholds
+    MAX_OPEN_FILES = 1000
+    MAX_CONCURRENT_CONNECTIONS = 100
+
+
+class RetryConfig:
+    """Configuration for retry logic."""
+
+    # Exponential backoff
+    BASE_DELAY = 1
+    MAX_DELAY = 60
+    BACKOFF_MULTIPLIER = 2
+    JITTER = True
+
+    # Retry counts by operation type
+    DATABASE_RETRIES = 3
+    NETWORK_RETRIES = 3
+    FILE_OPERATION_RETRIES = 3
+    CLI_TOOL_RETRIES = 2
+
+
+class LogLevels:
+    """Logging configuration."""
+
+    # Log levels by component
+    DEFAULT_LEVEL = "INFO"
+    DATABASE_LEVEL = "WARNING"
+    REDIS_LEVEL = "WARNING"
+    HTTP_LEVEL = "INFO"
+
+    # Sensitive operations
+    SECURITY_LEVEL = "WARNING"
+    AUTH_LEVEL = "INFO"
+
+
+class CacheConfig:
+    """Cache configuration constants."""
+
+    # TTL values in seconds
+    AGENT_STATUS_TTL = 60
+    TASK_RESULT_TTL = 3600
+    CONTEXT_SEARCH_TTL = 300
+    USER_SESSION_TTL = 1800
+
+    # Cache sizes
+    MAX_CACHE_ENTRIES = 10000
+    CACHE_CLEANUP_THRESHOLD = 0.8  # Clean when 80% full
+
+
+class FeatureFlags:
+    """Feature flag constants."""
+
+    # Self-improvement features
+    SELF_MODIFICATION_ENABLED = True
+    AUTONOMOUS_REFACTORING = True
+    EMERGENCY_INTERVENTION = True
+
+    # Advanced features
+    PREDICTIVE_SCALING = False
+    ADVANCED_ANALYTICS = True
+    DISTRIBUTED_EXECUTION = False
+
+    # Development features
+    DEBUG_MODE = False
+    VERBOSE_LOGGING = False
+    PROFILING_ENABLED = False
+
+
+# Backward compatibility - these can be imported directly
 AGENT_HEARTBEAT_INTERVAL = Intervals.AGENT_HEARTBEAT
 TASK_COORDINATION_CYCLE = Intervals.TASK_COORDINATION_CYCLE
-
-# System intervals (deprecated - use Intervals class)
+EMERGENCY_CHECK_INTERVAL = Intervals.EMERGENCY_CHECK
 SYSTEM_HEALTH_CHECK_INTERVAL = Intervals.SYSTEM_HEALTH_CHECK
-EMERGENCY_CHECK_INTERVAL = Intervals.EMERGENCY_CHECK_INTERVAL

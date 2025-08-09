@@ -482,8 +482,10 @@ Please provide a response that maintains conversation context.
                     await self.cleanup_idle_sessions()
                     await asyncio.sleep(self.heartbeat_interval)
                 except Exception as e:
+                    from .constants import Intervals
+
                     logger.error("Error in session monitor", error=str(e))
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(Intervals.DB_CONNECTION_RETRY)
 
         # Start monitoring task
         asyncio.create_task(monitor())
