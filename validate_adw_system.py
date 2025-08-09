@@ -194,7 +194,8 @@ class ADWValidationSuite:
 
             # Test extended session planning
             extended_config = ADWSessionConfig(
-                extended_session_mode=True, max_extended_duration_hours=0.1
+                extended_session_mode=True,
+                max_extended_duration_hours=4.1,  # Ensure at least 1 cycle
             )
             extended_session = ADWSession(self.project_path, extended_config)
             phases = await extended_session._plan_extended_session()
@@ -327,13 +328,12 @@ class ADWValidationSuite:
 
         try:
             # Test Cognitive Load Manager
-            cognitive_manager = CognitiveLoadManager()
+            cognitive_manager = CognitiveLoadManager(self.project_path)
             self.log_result(
                 ValidationResult(
                     "Cognitive Load Manager",
                     True,
                     "Cognitive load manager initialized",
-                    {"fatigue_threshold": cognitive_manager.fatigue_threshold},
                 )
             )
 

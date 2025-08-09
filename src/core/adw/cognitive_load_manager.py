@@ -25,6 +25,11 @@ class SessionMode(Enum):
     CONSERVATIVE = "conservative"  # 8-16 hours
     ULTRA_CONSERVATIVE = "ultra_conservative"  # 16+ hours
 
+    # Activity-specific modes
+    FOCUS = "focus"  # Deep work periods with minimal distractions
+    REST = "rest"  # Break periods for cognitive recovery
+    EXPLORATION = "exploration"  # Learning and discovery phases
+
 
 @dataclass
 class CognitiveLoadMetrics:
@@ -190,6 +195,9 @@ class TaskComplexityAdapter:
                 SessionMode.MAINTENANCE: 0.7,
                 SessionMode.CONSERVATIVE: 0.5,
                 SessionMode.ULTRA_CONSERVATIVE: 0.3,
+                SessionMode.FOCUS: 1.2,  # Enhanced performance during focus
+                SessionMode.REST: 0.1,  # Minimal activity during rest
+                SessionMode.EXPLORATION: 0.8,  # Moderate complexity for learning
             }
 
             max_complexity = complexity_limits[current_mode]
@@ -578,6 +586,27 @@ class CognitiveLoadManager:
                 "prefer_safe_operations": True,
                 "require_checkpoint_before_changes": True,
                 "read_only_analysis_mode": True,
+            },
+            SessionMode.FOCUS: {
+                "max_concurrent_tasks": 1,
+                "test_coverage_threshold": 0.85,
+                "rollback_on_single_failure": False,
+                "deep_work_mode": True,
+                "minimize_interruptions": True,
+            },
+            SessionMode.REST: {
+                "max_concurrent_tasks": 0,
+                "test_coverage_threshold": 0.9,
+                "rollback_on_single_failure": True,
+                "read_only_mode": True,
+                "passive_monitoring_only": True,
+            },
+            SessionMode.EXPLORATION: {
+                "max_concurrent_tasks": 2,
+                "test_coverage_threshold": 0.7,
+                "rollback_on_single_failure": False,
+                "experimental_mode": True,
+                "allow_exploratory_changes": True,
             },
         }
 

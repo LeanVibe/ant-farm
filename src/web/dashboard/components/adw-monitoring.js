@@ -218,6 +218,131 @@ export class AdwMonitoringComponent extends LitElement {
             color: #000;
             border-color: #4ade80;
         }
+
+        .emergency-status {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .emergency-status.critical {
+            border-left-color: #ef4444;
+        }
+
+        .intervention-level {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        .intervention-level.warning {
+            color: #f59e0b;
+        }
+
+        .intervention-level.critical {
+            color: #ef4444;
+        }
+
+        .intervention-level.good {
+            color: #4ade80;
+        }
+
+        .intervention-request {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .alert-icon {
+            font-size: 1.2rem;
+        }
+
+        .resolve-button {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: auto;
+        }
+
+        .resolve-button:hover {
+            background: #dc2626;
+        }
+
+        .recent-events {
+            margin-top: 1rem;
+        }
+
+        .recent-events h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .emergency-event {
+            background: rgba(55, 65, 81, 0.5);
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid #ef4444;
+        }
+
+        .emergency-event.resolved {
+            border-left-color: #4ade80;
+            opacity: 0.7;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .event-type {
+            font-weight: bold;
+            color: #f59e0b;
+        }
+
+        .event-time {
+            color: #9ca3af;
+        }
+
+        .event-description {
+            font-size: 0.85rem;
+            color: #d1d5db;
+            margin-bottom: 0.5rem;
+        }
+
+        .emergency-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .control-button.emergency {
+            background: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .control-button.emergency:hover {
+            background: #dc2626;
+            border-color: #dc2626;
+        }
+
+        .status.active {
+            color: #4ade80;
+        }
+
+        .status.inactive {
+            color: #9ca3af;
+        }
     `;
 
     static properties = {
@@ -225,6 +350,7 @@ export class AdwMonitoringComponent extends LitElement {
         cognitiveState: { type: Object },
         failurePredictions: { type: Object },
         systemMetrics: { type: Object },
+        emergencyStatus: { type: Object },
         currentPhase: { type: String },
         alerts: { type: Array },
         isMonitoring: { type: Boolean },
@@ -237,6 +363,7 @@ export class AdwMonitoringComponent extends LitElement {
         this.cognitiveState = {};
         this.failurePredictions = {};
         this.systemMetrics = {};
+        this.emergencyStatus = {};
         this.currentPhase = 'reconnaissance';
         this.alerts = [];
         this.isMonitoring = false;
@@ -280,15 +407,17 @@ export class AdwMonitoringComponent extends LitElement {
 
     async fetchLatestData() {
         try {
-            const [metrics, cognitive, predictions] = await Promise.all([
+            const [metrics, cognitive, predictions, emergency] = await Promise.all([
                 this.apiService.get('/api/v1/adw/metrics/current'),
                 this.apiService.get('/api/v1/adw/cognitive/state'),
-                this.apiService.get('/api/v1/adw/predictions/current')
+                this.apiService.get('/api/v1/adw/predictions/current'),
+                this.apiService.get('/api/v1/adw/emergency/status')
             ]);
             
             this.systemMetrics = metrics.data || {};
             this.cognitiveState = cognitive.data || {};
             this.failurePredictions = predictions.data || {};
+            this.emergencyStatus = emergency.data || {};
             
             this.requestUpdate();
         } catch (error) {
@@ -605,10 +734,174 @@ export class AdwMonitoringComponent extends LitElement {
         this.requestUpdate();
     }
 
+    renderEmergencyStatus() {
+        const emergency = this.emergencyStatus;
+        const interventionColor = this.getInterventionLevelColor(emergency.current_intervention_level);
+        const statusIcon = emergency.active ? '🛡️' : '⭕';
+        
+        return html`
+            <div class="monitor-card emergency-status">
+                <h3>${statusIcon} Emergency Intervention Status</h3>
+                <div class="metric-item">
+                    <span>System Status:</span>
+                    <span class="status ${emergency.active ? 'active' : 'inactive'}">
+                        ${emergency.active ? 'Monitoring Active' : 'Monitoring Inactive'}
+                    </span>
+                </div>
+                <div class="metric-item">
+                    <span>Intervention Level:</span>
+                    <span class="intervention-level ${interventionColor}">
+                        ${emergency.current_intervention_level || 'normal'}
+                    </span>
+                </div>
+                <div class="metric-item">
+                    <span>Total Events:</span>
+                    <span>${emergency.total_events || 0}</span>
+                </div>
+                <div class="metric-item">
+                    <span>Unresolved Events:</span>
+                    <span class="${emergency.unresolved_events > 0 ? 'warning' : 'good'}">
+                        ${emergency.unresolved_events || 0}
+                    </span>
+                </div>
+                ${emergency.human_intervention_requested ? html`
+                    <div class="intervention-request">
+                        <span class="alert-icon">⚠️</span>
+                        <span>Human Intervention Requested</span>
+                        <button class="resolve-button" @click="${this.resolveInterventionRequest}">
+                            Acknowledge
+                        </button>
+                    </div>
+                ` : ''}
+                ${emergency.recent_events && emergency.recent_events.length > 0 ? html`
+                    <div class="recent-events">
+                        <h4>Recent Events:</h4>
+                        ${emergency.recent_events.slice(0, 3).map(event => html`
+                            <div class="emergency-event ${event.resolved ? 'resolved' : 'active'}">
+                                <div class="event-header">
+                                    <span class="event-type">${event.failure_type}</span>
+                                    <span class="event-time">
+                                        ${this.formatTimestamp(event.timestamp)}
+                                    </span>
+                                </div>
+                                <div class="event-description">${event.description}</div>
+                                ${!event.resolved ? html`
+                                    <button class="resolve-button" 
+                                            @click="${() => this.resolveEmergencyEvent(event)}">
+                                        Resolve
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `)}
+                    </div>
+                ` : ''}
+                <div class="emergency-controls">
+                    <button class="control-button emergency" 
+                            @click="${this.requestHumanIntervention}">
+                        Request Intervention
+                    </button>
+                    <button class="control-button" 
+                            @click="${this.refreshEmergencyStatus}">
+                        Refresh Status
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    getInterventionLevelColor(level) {
+        switch (level) {
+            case 'warning': return 'warning';
+            case 'pause': return 'warning';
+            case 'rollback': return 'critical';
+            case 'terminate': return 'critical';
+            case 'escalate': return 'critical';
+            default: return 'good';
+        }
+    }
+
+    formatTimestamp(timestamp) {
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleTimeString();
+    }
+
+    async resolveInterventionRequest() {
+        try {
+            await this.apiService.post('/api/v1/adw/emergency/resolve-intervention');
+            this.addAlert({
+                type: 'success',
+                message: 'Human intervention request resolved',
+                timestamp: Date.now()
+            });
+            await this.refreshEmergencyStatus();
+        } catch (error) {
+            this.addAlert({
+                type: 'error',
+                message: 'Failed to resolve intervention request',
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    async resolveEmergencyEvent(event) {
+        try {
+            const eventIndex = this.emergencyStatus.recent_events.indexOf(event);
+            await this.apiService.post(`/api/v1/adw/emergency/resolve/${eventIndex}`, {
+                resolution_notes: 'Resolved via dashboard'
+            });
+            this.addAlert({
+                type: 'success',
+                message: `Emergency event resolved: ${event.failure_type}`,
+                timestamp: Date.now()
+            });
+            await this.refreshEmergencyStatus();
+        } catch (error) {
+            this.addAlert({
+                type: 'error',
+                message: 'Failed to resolve emergency event',
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    async requestHumanIntervention() {
+        try {
+            const reason = prompt('Please enter the reason for requesting human intervention:');
+            if (reason) {
+                await this.apiService.post('/api/v1/adw/emergency/request-intervention', {
+                    reason: reason
+                });
+                this.addAlert({
+                    type: 'warning',
+                    message: 'Human intervention requested',
+                    timestamp: Date.now()
+                });
+                await this.refreshEmergencyStatus();
+            }
+        } catch (error) {
+            this.addAlert({
+                type: 'error',
+                message: 'Failed to request human intervention',
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    async refreshEmergencyStatus() {
+        try {
+            const response = await this.apiService.get('/api/v1/adw/emergency/status');
+            this.emergencyStatus = response.data || {};
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Failed to refresh emergency status:', error);
+        }
+    }
+
     render() {
         return html`
             ${this.renderSessionControls()}
             ${this.renderOverviewCards()}
+            ${this.renderEmergencyStatus()}
             ${this.renderSessionTimeline()}
             ${this.renderMetricsCharts()}
             ${this.renderAlertsPanel()}

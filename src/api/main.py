@@ -2268,6 +2268,89 @@ async def get_adw_session_history():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/api/v1/adw/emergency/status", response_model=APIResponse)
+async def get_emergency_status():
+    """Get current emergency intervention status."""
+    try:
+        # Mock emergency status data
+        # In a real implementation, this would connect to the active ADW session
+        emergency_status = {
+            "timestamp": time.time(),
+            "active": True,
+            "current_intervention_level": "warning",
+            "total_events": 2,
+            "unresolved_events": 0,
+            "human_intervention_requested": False,
+            "last_check_time": time.time() - 10,
+            "recent_events": [
+                {
+                    "timestamp": time.time() - 300,
+                    "failure_type": "resource_exhaustion",
+                    "intervention_level": "pause",
+                    "description": "Memory usage exceeded 90%",
+                    "resolved": True,
+                },
+                {
+                    "timestamp": time.time() - 600,
+                    "failure_type": "repeated_failures",
+                    "intervention_level": "warning",
+                    "description": "3 consecutive test failures detected",
+                    "resolved": True,
+                },
+            ],
+            "system_health": {
+                "memory_usage": 72.5,
+                "cpu_usage": 45.2,
+                "disk_usage": 68.9,
+                "active_monitors": 5,
+            },
+        }
+
+        return APIResponse(success=True, data=emergency_status)
+    except Exception as e:
+        logger.error("Failed to get emergency status", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/adw/emergency/resolve/{event_index}", response_model=APIResponse)
+async def resolve_emergency_event(event_index: int, resolution_notes: str = ""):
+    """Resolve a specific emergency event."""
+    try:
+        # Mock emergency event resolution
+        # In a real implementation, this would connect to the active ADW session
+        result = {
+            "event_index": event_index,
+            "resolved": True,
+            "resolution_timestamp": time.time(),
+            "resolution_notes": resolution_notes,
+        }
+
+        return APIResponse(success=True, data=result)
+    except Exception as e:
+        logger.error("Failed to resolve emergency event", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/adw/emergency/request-intervention", response_model=APIResponse)
+async def request_human_intervention(reason: str):
+    """Request human intervention for the current ADW session."""
+    try:
+        # Mock human intervention request
+        # In a real implementation, this would connect to the active ADW session
+        result = {
+            "intervention_requested": True,
+            "timestamp": time.time(),
+            "reason": reason,
+            "session_id": f"adw-session-{int(time.time())}",
+            "escalation_level": "human_required",
+        }
+
+        return APIResponse(success=True, data=result)
+    except Exception as e:
+        logger.error("Failed to request human intervention", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # System diagnostics endpoints
 @app.get("/api/v1/diagnostics", response_model=APIResponse)
 async def get_system_diagnostics():

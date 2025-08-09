@@ -1,23 +1,40 @@
 {
-  "timestamp": 1754728190.879044,
+  "timestamp": 1754729281.00051,
   "project_path": "/Users/bogdan/work/leanvibe-dev/ant-farm",
-  "total_checks": 19,
-  "passed_checks": 16,
-  "success_rate": 84.21052631578947,
+  "total_checks": 22,
+  "passed_checks": 22,
+  "success_rate": 100.0,
   "results": [
     {
       "name": "ADW Component Integration",
-      "passed": false,
-      "message": "Integration error: type object 'SessionMode' has no attribute 'FOCUS'",
-      "details": {},
-      "timestamp": 1754728189.873445
+      "passed": true,
+      "message": "All ADW components properly integrated",
+      "details": {
+        "cognitive": true,
+        "prediction": true,
+        "dashboard": true
+      },
+      "timestamp": 1754729279.994626
     },
     {
-      "name": "Session Management",
-      "passed": false,
-      "message": "Session management error: type object 'SessionMode' has no attribute 'FOCUS'",
-      "details": {},
-      "timestamp": 1754728189.873507
+      "name": "Session Creation",
+      "passed": true,
+      "message": "ADW session created successfully",
+      "details": {
+        "session_id": "adw-1754729279",
+        "config": "valid"
+      },
+      "timestamp": 1754729279.994741
+    },
+    {
+      "name": "Extended Session Planning",
+      "passed": true,
+      "message": "Extended session planned with 4 phases",
+      "details": {
+        "phases": 4,
+        "extended_mode": true
+      },
+      "timestamp": 1754729279.994829
     },
     {
       "name": "Extended Session Tester",
@@ -26,70 +43,84 @@
       "details": {
         "output_dir": "/Users/bogdan/work/leanvibe-dev/ant-farm/extended_session_tests"
       },
-      "timestamp": 1754728189.873642
+      "timestamp": 1754729279.994869
     },
     {
       "name": "Endurance Test Support",
       "passed": true,
       "message": "endurance test method available",
       "details": {},
-      "timestamp": 1754728189.8736472
+      "timestamp": 1754729279.994873
     },
     {
       "name": "Stress Test Support",
       "passed": true,
       "message": "stress test method available",
       "details": {},
-      "timestamp": 1754728189.8736498
+      "timestamp": 1754729279.994876
     },
     {
       "name": "Recovery Test Support",
       "passed": true,
       "message": "recovery test method available",
       "details": {},
-      "timestamp": 1754728189.873653
+      "timestamp": 1754729279.994878
     },
     {
       "name": "Efficiency Test Support",
       "passed": true,
       "message": "efficiency test method available",
       "details": {},
-      "timestamp": 1754728189.873656
+      "timestamp": 1754729279.99488
     },
     {
       "name": "Cognitive Test Support",
       "passed": true,
       "message": "cognitive test method available",
       "details": {},
-      "timestamp": 1754728189.8736582
+      "timestamp": 1754729279.994882
     },
     {
       "name": "Resource Guardian",
       "passed": true,
       "message": "Resource guardian initialized",
       "details": {},
-      "timestamp": 1754728189.873673
+      "timestamp": 1754729279.994893
     },
     {
       "name": "Quality Gates",
       "passed": true,
       "message": "Quality gates system initialized",
       "details": {},
-      "timestamp": 1754728189.873676
+      "timestamp": 1754729279.994897
     },
     {
       "name": "Rollback System",
       "passed": true,
       "message": "Rollback system initialized",
       "details": {},
-      "timestamp": 1754728189.873688
+      "timestamp": 1754729279.9949079
     },
     {
-      "name": "Monitoring Systems",
-      "passed": false,
-      "message": "Monitoring system validation error: CognitiveLoadManager.__init__() missing 1 required positional argument: 'project_path'",
+      "name": "Cognitive Load Manager",
+      "passed": true,
+      "message": "Cognitive load manager initialized",
       "details": {},
-      "timestamp": 1754728189.873695
+      "timestamp": 1754729279.994915
+    },
+    {
+      "name": "Autonomous Dashboard",
+      "passed": true,
+      "message": "Autonomous dashboard initialized",
+      "details": {},
+      "timestamp": 1754729279.994924
+    },
+    {
+      "name": "Failure Prediction",
+      "passed": true,
+      "message": "Failure prediction system initialized",
+      "details": {},
+      "timestamp": 1754729279.994933
     },
     {
       "name": "Resource Monitoring",
@@ -100,49 +131,49 @@
         "cpu_check": true,
         "disk_check": true
       },
-      "timestamp": 1754728190.877942
+      "timestamp": 1754729280.9996228
     },
     {
       "name": "Web Component: adw-monitoring.js",
       "passed": true,
       "message": "adw-monitoring.js exists",
       "details": {},
-      "timestamp": 1754728190.878025
+      "timestamp": 1754729280.999723
     },
     {
       "name": "Web Component: hive-dashboard.js",
       "passed": true,
       "message": "hive-dashboard.js exists",
       "details": {},
-      "timestamp": 1754728190.878043
+      "timestamp": 1754729280.9997408
     },
     {
       "name": "Web Component: index.html",
       "passed": true,
       "message": "index.html exists",
       "details": {},
-      "timestamp": 1754728190.8780549
+      "timestamp": 1754729280.999752
     },
     {
       "name": "ADW API Endpoints",
       "passed": true,
       "message": "4/4 ADW endpoints found",
       "details": {},
-      "timestamp": 1754728190.8782568
+      "timestamp": 1754729280.999945
     },
     {
       "name": "Test File: test_adw_full_system.py",
       "passed": true,
       "message": "9 tests found in test_adw_full_system.py",
       "details": {},
-      "timestamp": 1754728190.878752
+      "timestamp": 1754729281.000233
     },
     {
       "name": "Test File: test_extended_session_tester.py",
       "passed": true,
       "message": "12 tests found in test_extended_session_tester.py",
       "details": {},
-      "timestamp": 1754728190.879019
+      "timestamp": 1754729281.0004811
     }
   ]
 }

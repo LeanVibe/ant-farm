@@ -18,6 +18,11 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from ..safety import AutoRollbackSystem, AutonomousQualityGates, ResourceGuardian
+from ..safety.emergency_intervention import (
+    EmergencyInterventionSystem,
+    CriticalFailureType,
+    InterventionLevel,
+)
 from ..monitoring.autonomous_dashboard import AutonomousDashboard
 from ..prediction.failure_prediction import FailurePredictionSystem
 from .cognitive_load_manager import CognitiveLoadManager, SessionMode
@@ -35,6 +40,7 @@ class SessionPhase(Enum):
     META_LEARNING = "meta_learning"
     COMPLETED = "completed"
     FAILED = "failed"
+    EMERGENCY_ROLLBACK = "emergency_rollback"
 
 
 @dataclass
@@ -128,6 +134,7 @@ class ADWSession:
         self.cognitive_load_manager = None
         self.failure_predictor = None
         self.dashboard = None
+        self.emergency_system = None
 
         if self.config.cognitive_load_management_enabled:
             self.cognitive_load_manager = CognitiveLoadManager(project_path)
@@ -144,6 +151,11 @@ class ADWSession:
         self.active = False
         self.consecutive_failures = 0
         self.current_session_mode = SessionMode.FOCUS
+
+        # Always initialize emergency intervention system for safety
+        self.emergency_system = EmergencyInterventionSystem(
+            project_path, self.session_id
+        )
 
         # Session persistence
         self.persistence = SessionStatePersistence(project_path, self.session_id)
@@ -205,6 +217,10 @@ class ADWSession:
             # Initialize failure prediction
             if self.failure_predictor:
                 await self.failure_predictor.start_monitoring()
+
+            # Start emergency intervention monitoring
+            await self.emergency_system.start_monitoring()
+            self._register_emergency_callbacks()
 
             # Start resource monitoring if enabled
             if self.config.resource_monitoring_enabled:
@@ -794,6 +810,10 @@ class ADWSession:
         if self.failure_predictor:
             await self.failure_predictor.stop_monitoring()
 
+        # Stop emergency intervention monitoring
+        if self.emergency_system:
+            await self.emergency_system.stop_monitoring()
+
         # Stop dashboard monitoring
         if self.dashboard:
             await self.dashboard.stop_monitoring()
@@ -956,4 +976,110 @@ class ADWSession:
         self.active = False
         self.metrics.current_phase = SessionPhase.FAILED
 
+        # Stop emergency monitoring
+        if self.emergency_system:
+            await self.emergency_system.stop_monitoring()
+
         return await self._finalize_session()
+
+    def _register_emergency_callbacks(self):
+        """Register callbacks for emergency intervention actions."""
+        if not self.emergency_system:
+            return
+
+        self.emergency_system.register_callbacks(
+            session_termination_callback=self._emergency_termination,
+            rollback_callback=self._emergency_rollback,
+            pause_callback=self._emergency_pause,
+            alert_callback=self._emergency_alert,
+        )
+
+        logger.info(
+            "Emergency intervention callbacks registered", session_id=self.session_id
+        )
+
+    async def _emergency_termination(self, emergency_event):
+        """Handle emergency session termination."""
+        logger.critical(
+            "Emergency session termination triggered",
+            session_id=self.session_id,
+            failure_type=emergency_event.failure_type.value,
+            description=emergency_event.description,
+        )
+
+        # Attempt to save current state before termination
+        try:
+            await self.persistence.save_session(self)
+        except Exception as e:
+            logger.error("Failed to save session state during emergency", error=str(e))
+
+        # Terminate session
+        await self.abort_session(
+            f"Emergency termination: {emergency_event.description}"
+        )
+
+    async def _emergency_rollback(self, emergency_event):
+        """Handle emergency rollback."""
+        logger.error(
+            "Emergency rollback triggered",
+            session_id=self.session_id,
+            failure_type=emergency_event.failure_type.value,
+            description=emergency_event.description,
+        )
+
+        try:
+            # Execute rollback
+            rollback_result = await self.rollback_system.execute_rollback()
+            if rollback_result["success"]:
+                logger.info("Emergency rollback completed successfully")
+                # Report failure to increment consecutive failures
+                await self._handle_phase_failure(
+                    SessionPhase.EMERGENCY_ROLLBACK,
+                    f"Emergency: {emergency_event.description}",
+                )
+            else:
+                logger.error("Emergency rollback failed", result=rollback_result)
+                # If rollback fails, escalate to termination
+                await self._emergency_termination(emergency_event)
+
+        except Exception as e:
+            logger.error("Emergency rollback execution failed", error=str(e))
+            await self._emergency_termination(emergency_event)
+
+    async def _emergency_pause(self, emergency_event):
+        """Handle emergency pause."""
+        logger.warning(
+            "Emergency pause triggered",
+            session_id=self.session_id,
+            failure_type=emergency_event.failure_type.value,
+            description=emergency_event.description,
+        )
+
+        # Save current state
+        await self.persistence.save_session(self)
+
+        # Request human intervention
+        self.emergency_system.request_human_intervention(
+            f"Session paused due to: {emergency_event.description}"
+        )
+
+        # Transition to conservative mode
+        if self.cognitive_load_manager:
+            await self._transition_session_mode(SessionMode.ULTRA_CONSERVATIVE)
+
+    async def _emergency_alert(self, emergency_event):
+        """Handle emergency alert."""
+        logger.warning(
+            "Emergency alert issued",
+            session_id=self.session_id,
+            failure_type=emergency_event.failure_type.value,
+            description=emergency_event.description,
+        )
+
+        # Update dashboard if available
+        if self.dashboard:
+            await self.dashboard.record_alert(
+                alert_type="emergency",
+                message=emergency_event.description,
+                severity="high",
+            )
