@@ -92,8 +92,10 @@ class MemoryOptimizer:
             for temp_file in temp_files:
                 try:
                     temp_file.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to remove temp file", file=str(temp_file), error=str(e)
+                    )
             if temp_files:
                 optimizations_applied.append(f"clear_temp_files_{len(temp_files)}")
 
@@ -250,8 +252,12 @@ class DiskSpaceManager:
                             file_path.unlink()
                             files_removed += 1
                             space_freed += file_size
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to remove file during cleanup",
+                            file=str(file_path),
+                            error=str(e),
+                        )
 
             # Remove empty directories
             for dir_path in self.project_path.rglob("*"):
@@ -259,8 +265,12 @@ class DiskSpaceManager:
                     try:
                         dir_path.rmdir()
                         directories_removed += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to remove empty directory",
+                            directory=str(dir_path),
+                            error=str(e),
+                        )
 
             # Clean up specific directories
             cleanup_dirs = [
@@ -288,8 +298,12 @@ class DiskSpaceManager:
                             )
                             shutil.rmtree(dir_path)
                             directories_removed += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to remove directory during cleanup",
+                            directory=str(dir_path),
+                            error=str(e),
+                        )
 
             end_disk_usage = shutil.disk_usage(self.project_path)
 
