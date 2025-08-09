@@ -706,6 +706,9 @@ class TaskQueue:
             await self._update_task(task)
             await self._update_stats("completed")
 
+            # Remove from priority queue
+            await self.redis_client.zrem(f"{self.queue_prefix}:priority", task_id)
+
             # Process dependent tasks
             await self._process_dependent_tasks(task_id)
 

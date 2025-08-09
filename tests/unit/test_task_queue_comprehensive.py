@@ -324,9 +324,83 @@ class TestTaskQueueAssignmentAndStatus:
         mock_redis.zrem.assert_called()  # Task removed from active queue
 
     @pytest.mark.asyncio
+    async def test_assign_task_to_agent(self, task_queue, sample_task, mock_redis):
+        """Test assigning a task to a specific agent."""
+        agent_id = "test-agent-001"
+
+        # Arrange - Mock that task exists in Redis
+        task_data = sample_task.model_dump()
+        mock_redis.hgetall.return_value = {
+            k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+            for k, v in task_data.items()
+        }
+
+        # Act - Assign task
+        success = await task_queue.assign_task(sample_task.id, agent_id)
+
+        # Assert - Assignment successful
+        assert success is True
+
+        # Verify Redis operations for assignment
+        mock_redis.hset.assert_called()  # Task status updated
+
+    @pytest.mark.asyncio
+    async def test_start_task_processing(self, task_queue, sample_task, mock_redis):
+        """Test marking a task as in progress."""
+        # Arrange - Mock that task exists in Redis
+        task_data = sample_task.model_dump()
+        mock_redis.hgetall.return_value = {
+            k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+            for k, v in task_data.items()
+        }
+
+        # Act - Start task processing
+        success = await task_queue.start_task(sample_task.id)
+
+        # Assert - Task started successfully
+        assert success is True
+
+        # Verify status update operations
+        mock_redis.hset.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_complete_task_successfully(
+        self, task_queue, sample_task, mock_redis
+    ):
+        """Test completing a task with results."""
+        result_data = {
+            "output": "Task completed successfully",
+            "metrics": {"duration": 45},
+        }
+
+        # Arrange - Mock that task exists in Redis
+        task_data = sample_task.model_dump()
+        mock_redis.hgetall.return_value = {
+            k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+            for k, v in task_data.items()
+        }
+
+        # Act - Complete task
+        success = await task_queue.complete_task(sample_task.id, result_data)
+
+        # Assert - Task completed
+        assert success is True
+
+        # Verify completion operations
+        mock_redis.hset.assert_called()  # Task updated with result
+        mock_redis.zrem.assert_called()  # Task removed from active queue
+
+    @pytest.mark.asyncio
     async def test_fail_task_with_retry(self, task_queue, sample_task, mock_redis):
         """Test failing a task and scheduling retry."""
         error_message = "Network timeout occurred"
+
+        # Arrange - Mock that task exists in Redis
+        task_data = sample_task.model_dump()
+        mock_redis.hgetall.return_value = {
+            k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+            for k, v in task_data.items()
+        }
 
         # Act - Fail task with retry
         success = await task_queue.fail_task(sample_task.id, error_message, retry=True)
