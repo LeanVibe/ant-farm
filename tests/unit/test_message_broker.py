@@ -45,7 +45,7 @@ def mock_redis():
 def message_broker(mock_redis):
     """Create a MessageBroker with mocked Redis."""
     with patch("redis.asyncio.from_url", return_value=mock_redis):
-        broker = MessageBroker("redis://localhost:6381/1")
+        broker = MessageBroker("redis://localhost:6379/1")
         return broker
 
 

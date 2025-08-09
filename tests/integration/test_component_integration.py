@@ -32,7 +32,7 @@ async def message_broker():
 
         mock_redis.return_value = mock_redis_client
 
-        broker = MessageBroker("redis://localhost:6381/1")
+        broker = MessageBroker("redis://localhost:6379/1")
         await broker.initialize()
         return broker
 
@@ -56,7 +56,7 @@ async def task_queue():
 
         mock_redis.return_value = mock_redis_client
 
-        queue = TaskQueue("redis://localhost:6381/1")
+        queue = TaskQueue("redis://localhost:6379/1")
         await queue.initialize()
         return queue
 

@@ -175,9 +175,10 @@ class TaskQueue:
 
         # Check if dependencies are satisfied
         if await self._dependencies_satisfied(task):
-            # Add to appropriate priority queue
-            queue_key = f"{self.queue_prefix}:p{task.priority}"
-            await self.redis_client.lpush(queue_key, task.id)
+            # Add to priority queue using sorted set (lower score = higher priority)
+            await self.redis_client.zadd(
+                f"{self.queue_prefix}:priority", {task.id: task.priority.value}
+            )
             logger.info(
                 "Task submitted to queue", task_id=task.id, priority=task.priority
             )
@@ -445,7 +446,33 @@ class TaskQueue:
 
         return count
 
-    async def get_task(self, agent_id: str = None) -> Task | None:
+    async def get_task(self, task_id_or_agent: str = None) -> Task | None:
+        """Get task by ID if provided, otherwise get next available task."""
+        # If parameter looks like a task ID (UUID format), get specific task
+        if task_id_or_agent and (
+            "-" in task_id_or_agent and len(task_id_or_agent) > 20
+        ):
+            return await self._get_task_by_id(task_id_or_agent)
+        else:
+            # Get next available task for agent
+            return await self._get_next_available_task(task_id_or_agent)
+
+    async def _get_task_by_id(self, task_id: str) -> Task | None:
+        """Get a specific task by ID."""
+        try:
+            task_key = f"{self.task_prefix}:{task_id}"
+            task_data = await self.redis_client.hgetall(task_key)
+
+            if not task_data:
+                return None
+
+            return await self._dict_to_task(task_data)
+
+        except Exception as e:
+            logger.error("Failed to get task by ID", task_id=task_id, error=str(e))
+            return None
+
+    async def _get_next_available_task(self, agent_id: str = None) -> Task | None:
         """Get next available task from priority queues using BRPOP."""
         try:
             # Check queues in priority order (lower number = higher priority)
@@ -760,8 +787,10 @@ class TaskQueue:
             logger.error("Failed to update task status", task_id=task_id, error=str(e))
             return False
 
-    async def fail_task(self, task_id: str, error_message: str = None) -> bool:
-        """Mark a task as failed with optional error message."""
+    async def fail_task(
+        self, task_id: str, error_message: str = None, retry: bool = True
+    ) -> bool:
+        """Mark a task as failed with optional error message and retry control."""
         try:
             task_key = f"{self.task_prefix}:{task_id}"
             task_data = await self.redis_client.hgetall(task_key)
@@ -779,7 +808,7 @@ class TaskQueue:
             await self._update_stats("failed")
 
             # Check if task should be retried
-            if task.retry_count < task.max_retries:
+            if retry and task.retry_count < task.max_retries:
                 logger.info(
                     "Task failed, will retry",
                     task_id=task_id,
@@ -841,6 +870,82 @@ class TaskQueue:
         except Exception as e:
             logger.error("Failed to cleanup expired tasks", error=str(e))
             return 0
+
+    async def get_next_task(self, agent_id: str = None) -> Task | None:
+        """Get the next highest priority task from the queue."""
+        try:
+            # Use sorted set to get highest priority task (lowest score)
+            task_ids = await self.redis_client.zrange(
+                f"{self.queue_prefix}:priority", 0, 0
+            )
+
+            if not task_ids:
+                return None
+
+            task_id = task_ids[0]
+            task = await self.get_task(task_id)
+
+            if task and task.status == TaskStatus.PENDING:
+                # Remove from priority queue
+                await self.redis_client.zrem(f"{self.queue_prefix}:priority", task_id)
+                return task
+
+            return None
+
+        except Exception as e:
+            logger.error("Failed to get next task", error=str(e))
+            return None
+
+    async def assign_task(self, task_id: str, agent_id: str) -> bool:
+        """Assign a task to a specific agent."""
+        try:
+            task = await self.get_task(task_id)
+            if not task:
+                logger.warning("Task not found for assignment", task_id=task_id)
+                return False
+
+            # Update task with agent assignment
+            task.agent_id = agent_id
+            task.status = TaskStatus.ASSIGNED
+            await self._update_task(task)
+
+            logger.info("Task assigned to agent", task_id=task_id, agent_id=agent_id)
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Failed to assign task",
+                task_id=task_id,
+                agent_id=agent_id,
+                error=str(e),
+            )
+            return False
+
+    async def get_task_status(self, task_id: str) -> Task | None:
+        """Get current task status (alias for get_task)."""
+        return await self.get_task(task_id)
+
+    async def get_timed_out_tasks(self) -> list[Task]:
+        """Get list of tasks that have timed out."""
+        try:
+            timed_out = []
+            current_time = time.time()
+
+            # Get all in-progress tasks
+            in_progress_tasks = await self.list_tasks(status=TaskStatus.IN_PROGRESS)
+
+            for task in in_progress_tasks:
+                if (
+                    task.started_at
+                    and current_time - task.started_at > task.timeout_seconds
+                ):
+                    timed_out.append(task)
+
+            return timed_out
+
+        except Exception as e:
+            logger.error("Failed to get timed out tasks", error=str(e))
+            return []
 
 
 # Global task queue instance
