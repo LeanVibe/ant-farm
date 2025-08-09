@@ -17,6 +17,7 @@ from .message_broker import message_broker
 from .models import Agent
 from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
+from .tmux_manager import get_tmux_manager, TmuxOperationResult
 
 logger = structlog.get_logger()
 
@@ -249,89 +250,150 @@ class AgentRegistry:
 
 
 class AgentSpawner:
-    """Handles spawning new agent instances."""
+    """Handles spawning new agent instances using resilient tmux management."""
 
     def __init__(self, project_root: Path):
         self.project_root = project_root
+        self.tmux_manager = get_tmux_manager()
 
     async def spawn_agent(
         self, agent_type: str, agent_name: str, capabilities: list[str] = None
     ) -> str | None:
-        """Spawn a new agent in a tmux session."""
+        """Spawn a new agent in a tmux session with retry logic and validation."""
         if capabilities is None:
             capabilities = []
 
         session_name = f"hive-{agent_name}"
 
         try:
-            # Create tmux session using uv to manage dependencies
-            import os
-
-            # Get current environment variables
-            current_env = os.environ.copy()
-
-            # Use uv run to ensure proper dependency management
-            cmd = [
-                "tmux",
-                "new-session",
-                "-d",
-                "-s",
-                session_name,
-                f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}",
-            ]
-
-            result = subprocess.run(
-                cmd, check=True, capture_output=True, text=True, env=current_env
+            logger.info(
+                "Spawning agent with resilient tmux manager",
+                agent_type=agent_type,
+                agent_name=agent_name,
+                session_name=session_name,
             )
 
-            # Wait longer for the session to initialize (uv needs time to set up environment)
-            await asyncio.sleep(Intervals.ORCHESTRATOR_STARTUP_DELAY)
+            # Get current environment variables
+            import os
 
-            # Verify session exists
-            check_cmd = ["tmux", "has-session", "-t", session_name]
-            check_result = subprocess.run(check_cmd, capture_output=True)
+            current_env = os.environ.copy()
 
-            if check_result.returncode != 0:
+            # Build command to run in tmux session
+            command = f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}"
+
+            # Create session using resilient tmux manager
+            result: TmuxOperationResult = await self.tmux_manager.create_session(
+                session_name=session_name,
+                command=command,
+                working_directory=self.project_root,
+                environment=current_env,
+            )
+
+            if result.success:
+                # Wait for agent to initialize (uv needs time to set up environment)
+                await asyncio.sleep(Intervals.ORCHESTRATOR_STARTUP_DELAY)
+
+                # Validate session is still active and agent is responsive
+                session_status = await self.tmux_manager.get_session_status(
+                    session_name
+                )
+                if session_status.name == "ACTIVE":
+                    logger.info(
+                        "Agent spawned successfully with resilient tmux",
+                        agent_name=agent_name,
+                        session_name=session_name,
+                        execution_time=result.execution_time,
+                        retry_count=result.retry_count,
+                    )
+                    return session_name
+                else:
+                    logger.error(
+                        "Agent session became inactive after spawn",
+                        agent_name=agent_name,
+                        session_name=session_name,
+                        session_status=session_status.name,
+                    )
+                    return None
+            else:
                 logger.error(
-                    "Session not found after creation",
+                    "Failed to spawn agent with resilient tmux",
                     agent_name=agent_name,
-                    session=session_name,
+                    session_name=session_name,
+                    error=result.error_message,
+                    retry_count=result.retry_count,
                 )
                 return None
 
-            logger.info("Agent spawned", agent_name=agent_name, session=session_name)
-            return session_name
-
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             logger.error(
-                "Failed to spawn agent",
+                "Unexpected error during agent spawn",
                 agent_name=agent_name,
+                session_name=session_name,
                 error=str(e),
-                stderr=e.stderr,
-                stdout=e.stdout,
             )
             return None
 
     async def terminate_agent(self, agent_name: str, session_name: str) -> bool:
-        """Terminate an agent and its tmux session."""
+        """Terminate an agent and its tmux session using resilient tmux management."""
         try:
-            # Send graceful shutdown signal
-            subprocess.run(
-                ["tmux", "send-keys", "-t", session_name, "C-c", "Enter"], check=True
+            logger.info(
+                "Terminating agent with resilient tmux manager",
+                agent_name=agent_name,
+                session_name=session_name,
             )
 
-            # Wait a bit for graceful shutdown
-            await asyncio.sleep(Intervals.ORCHESTRATOR_AGENT_DELAY)
+            # Use resilient tmux manager for termination
+            result: TmuxOperationResult = await self.tmux_manager.terminate_session(
+                session_name=session_name,
+                force=False,  # Try graceful first
+            )
 
-            # Force kill session if still running
-            subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
+            if result.success:
+                logger.info(
+                    "Agent terminated successfully with resilient tmux",
+                    agent_name=agent_name,
+                    session_name=session_name,
+                    execution_time=result.execution_time,
+                    retry_count=result.retry_count,
+                )
+                return True
+            else:
+                logger.error(
+                    "Failed to terminate agent with resilient tmux",
+                    agent_name=agent_name,
+                    session_name=session_name,
+                    error=result.error_message,
+                )
 
-            logger.info("Agent terminated", agent_name=agent_name)
-            return True
+                # Try force termination as fallback
+                logger.info("Attempting force termination", agent_name=agent_name)
+                force_result = await self.tmux_manager.terminate_session(
+                    session_name=session_name,
+                    force=True,
+                )
 
-        except subprocess.CalledProcessError as e:
+                if force_result.success:
+                    logger.info(
+                        "Agent force-terminated successfully",
+                        agent_name=agent_name,
+                        session_name=session_name,
+                    )
+                    return True
+                else:
+                    logger.error(
+                        "Force termination also failed",
+                        agent_name=agent_name,
+                        session_name=session_name,
+                        error=force_result.error_message,
+                    )
+                    return False
+
+        except Exception as e:
             logger.error(
-                "Failed to terminate agent", agent_name=agent_name, error=str(e)
+                "Unexpected error during agent termination",
+                agent_name=agent_name,
+                session_name=session_name,
+                error=str(e),
             )
             return False
 
@@ -749,38 +811,39 @@ class AgentOrchestrator:
                 await asyncio.sleep(60)
 
     async def _cleanup_orphaned_sessions(self) -> None:
-        """Clean up tmux sessions that don't have corresponding agents."""
+        """Clean up tmux sessions that don't have corresponding agents using resilient tmux manager."""
         try:
-            # Get all tmux sessions
-            result = subprocess.run(
-                ["tmux", "list-sessions", "-F", "#{session_name}"],
-                capture_output=True,
-                text=True,
-            )
+            logger.debug("Starting orphaned session cleanup")
 
-            if result.returncode != 0:
-                return
-
-            active_sessions = set(result.stdout.strip().split("\n"))
+            # Get all tracked agent sessions
             agent_sessions = {
                 agent.tmux_session
                 for agent in self.registry.agents.values()
                 if agent.tmux_session
             }
 
-            # Find orphaned sessions (sessions that start with 'hive-' but don't have agents)
-            orphaned = {
-                s
-                for s in active_sessions
-                if s.startswith("hive-") and s not in agent_sessions
-            }
+            # Use resilient tmux manager to cleanup orphaned sessions
+            orphaned_sessions = (
+                await self.spawner.tmux_manager.cleanup_orphaned_sessions(
+                    prefix="hive-"
+                )
+            )
 
-            for session in orphaned:
-                try:
-                    subprocess.run(["tmux", "kill-session", "-t", session], check=True)
-                    logger.info("Cleaned up orphaned session", session=session)
-                except subprocess.CalledProcessError:
-                    pass
+            # Filter out sessions that belong to active agents
+            truly_orphaned = [
+                session
+                for session in orphaned_sessions
+                if session not in agent_sessions
+            ]
+
+            if truly_orphaned:
+                logger.info(
+                    "Cleaned up orphaned tmux sessions",
+                    orphaned_count=len(truly_orphaned),
+                    orphaned_sessions=truly_orphaned,
+                )
+            else:
+                logger.debug("No orphaned sessions found")
 
         except Exception as e:
             logger.error("Failed to cleanup orphaned sessions", error=str(e))
