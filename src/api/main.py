@@ -26,6 +26,7 @@ try:
         Permissions,
         SecurityMiddleware,
         get_current_user,
+        get_cli_user,
         rate_limit,
         require_admin,
     )
@@ -48,6 +49,7 @@ except ImportError:  # Direct execution - add src to path
         Permissions,
         SecurityMiddleware,
         get_current_user,
+        get_cli_user,
         rate_limit,
         require_admin,
     )
@@ -957,10 +959,7 @@ async def get_system_status():
 
 # Agent management endpoints
 @app.get("/api/v1/agents", response_model=APIResponse)
-# @Permissions.agent_read()  # Temporarily disabled for CLI testing
-async def list_agents(
-    # current_user: User = Depends(get_current_user)  # Temporarily disabled
-):
+async def list_agents(current_user: User = Depends(get_cli_user)):
     """List all agents."""
     try:
         from pathlib import Path
@@ -1020,10 +1019,7 @@ async def list_agents(
 
 @app.get("/api/v1/agents/{agent_name}", response_model=APIResponse)
 # @Permissions.agent_read()  # Temporarily disabled for CLI testing
-async def get_agent(
-    agent_name: str,
-    # current_user: User = Depends(get_current_user)  # Temporarily disabled
-):
+async def get_agent(agent_name: str, current_user: User = Depends(get_cli_user)):
     """Get specific agent information."""
     try:
         from pathlib import Path
@@ -1060,7 +1056,7 @@ async def spawn_agent(
     agent_type: str,
     agent_name: str | None = None,
     background_tasks: BackgroundTasks = None,
-    # current_user: User = Depends(get_current_user),  # Temporarily disabled
+    current_user: User = Depends(get_cli_user),
 ):
     """Spawn a new agent."""
     try:
@@ -1176,7 +1172,7 @@ async def test_endpoint():
 async def list_tasks(
     status: str | None = None,
     assigned_to: str | None = None,
-    # current_user: User = Depends(get_current_user),  # Temporarily disabled
+    current_user: User = Depends(get_cli_user),
 ):
     """List tasks with optional filtering."""
     try:
@@ -1210,7 +1206,7 @@ async def list_tasks(
 @app.post("/api/v1/tasks", response_model=APIResponse)
 # @Permissions.task_create()  # Temporarily disabled for CLI testing
 async def create_task(
-    task_create: TaskCreate,  # current_user: User = Depends(get_current_user)  # Temporarily disabled
+    task_create: TaskCreate, current_user: User = Depends(get_cli_user)
 ):
     """Create a new task and submit it to the task queue for MetaAgent processing."""
     try:
@@ -1268,8 +1264,7 @@ async def create_task(
 @app.post("/api/v1/tasks/self-improvement", response_model=APIResponse)
 # @Permissions.task_create()  # Temporarily disabled for CLI testing
 async def create_self_improvement_task(
-    title: str,
-    description: str,  # current_user: User = Depends(get_current_user)  # Temporarily disabled
+    title: str, description: str, current_user: User = Depends(get_cli_user)
 ):
     """Create a self-improvement task for the MetaAgent as specified in PLAN.md.
 

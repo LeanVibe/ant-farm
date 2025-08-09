@@ -101,6 +101,38 @@ async def get_optional_user(
         return None
 
 
+async def get_cli_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+) -> User:
+    """Get current user for CLI operations - creates anonymous user if no auth provided."""
+    try:
+        return await get_current_user(request, credentials)
+    except HTTPException:
+        # Create anonymous CLI user for development/testing
+        from .security import User
+
+        logger.info(
+            "Creating anonymous CLI user for unauthenticated request",
+            client_ip=get_client_ip(request),
+            endpoint=str(request.url),
+        )
+
+        return User(
+            id="cli-anonymous",
+            username="cli-user",
+            email="cli@localhost",
+            is_active=True,
+            permissions=[
+                "agent_read",
+                "agent_spawn",
+                "task_read",
+                "task_create",
+                "system_read",
+            ],
+        )
+
+
 def require_permissions(*permissions: str):
     """Decorator to require specific permissions for an endpoint."""
 
