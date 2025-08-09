@@ -2123,6 +2123,151 @@ async def complete_workflow(workflow_id: str, merge_to_main: bool = False):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+# ADW Monitoring endpoints
+@app.get("/api/v1/adw/metrics/current", response_model=APIResponse)
+async def get_current_adw_metrics():
+    """Get current ADW monitoring metrics."""
+    try:
+        # This would integrate with the actual monitoring dashboard
+        metrics = {
+            "autonomy_score": 85.5,
+            "memory_percent": 45.2,
+            "cpu_percent": 32.1,
+            "uptime": time.time() - startup_time,
+            "session_hours": 2.5,
+            "velocity_commits": 3.2,
+            "active_session": True,
+            "timestamp": time.time(),
+        }
+
+        return APIResponse(success=True, data=metrics)
+    except Exception as e:
+        logger.error("Failed to get ADW metrics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/adw/cognitive/state", response_model=APIResponse)
+async def get_cognitive_state():
+    """Get current cognitive load state."""
+    try:
+        # This would integrate with the cognitive load manager
+        cognitive_state = {
+            "fatigue_level": 0.35,
+            "focus_efficiency": 0.82,
+            "mode": "focus",
+            "session_duration": 2.5,
+            "mode_transitions": 1,
+            "last_transition": time.time() - 1800,  # 30 minutes ago
+            "recommended_action": "continue",
+            "timestamp": time.time(),
+        }
+
+        return APIResponse(success=True, data=cognitive_state)
+    except Exception as e:
+        logger.error("Failed to get cognitive state", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/adw/predictions/current", response_model=APIResponse)
+async def get_failure_predictions():
+    """Get current failure predictions."""
+    try:
+        # This would integrate with the failure prediction system
+        predictions = {
+            "risk_score": 0.15,
+            "confidence": 0.87,
+            "next_check": "5 minutes",
+            "risk_factors": ["complexity_increase", "time_pressure"],
+            "mitigation_suggestions": [
+                "Consider reducing iteration scope",
+                "Take a 5-minute break to maintain focus",
+            ],
+            "timestamp": time.time(),
+        }
+
+        return APIResponse(success=True, data=predictions)
+    except Exception as e:
+        logger.error("Failed to get failure predictions", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/adw/monitoring/start", response_model=APIResponse)
+async def start_adw_monitoring():
+    """Start ADW monitoring session."""
+    try:
+        # This would start the actual monitoring
+        session_id = f"adw-monitor-{int(time.time())}"
+
+        # In real implementation, this would:
+        # - Initialize AutonomousDashboard
+        # - Start cognitive load monitoring
+        # - Begin failure prediction
+
+        return APIResponse(
+            success=True,
+            data={
+                "session_id": session_id,
+                "monitoring_started": True,
+                "start_time": time.time(),
+            },
+        )
+    except Exception as e:
+        logger.error("Failed to start ADW monitoring", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/adw/monitoring/stop", response_model=APIResponse)
+async def stop_adw_monitoring():
+    """Stop ADW monitoring session."""
+    try:
+        # This would stop the actual monitoring
+
+        return APIResponse(
+            success=True,
+            data={
+                "monitoring_stopped": True,
+                "stop_time": time.time(),
+            },
+        )
+    except Exception as e:
+        logger.error("Failed to stop ADW monitoring", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/adw/sessions/history", response_model=APIResponse)
+async def get_adw_session_history():
+    """Get ADW session history."""
+    try:
+        # This would retrieve actual session history
+        history = [
+            {
+                "session_id": "adw-session-1",
+                "start_time": time.time() - 7200,  # 2 hours ago
+                "duration": 3600,  # 1 hour
+                "status": "completed",
+                "commits": 8,
+                "tests_passed": 15,
+                "cognitive_score": 0.85,
+                "autonomy_score": 82.5,
+            },
+            {
+                "session_id": "adw-session-2",
+                "start_time": time.time() - 14400,  # 4 hours ago
+                "duration": 7200,  # 2 hours
+                "status": "completed",
+                "commits": 12,
+                "tests_passed": 22,
+                "cognitive_score": 0.78,
+                "autonomy_score": 88.2,
+            },
+        ]
+
+        return APIResponse(success=True, data=history)
+    except Exception as e:
+        logger.error("Failed to get ADW session history", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # System diagnostics endpoints
 @app.get("/api/v1/diagnostics", response_model=APIResponse)
 async def get_system_diagnostics():

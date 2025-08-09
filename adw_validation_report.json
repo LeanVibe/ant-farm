@@ -1,0 +1,148 @@
+{
+  "timestamp": 1754728190.879044,
+  "project_path": "/Users/bogdan/work/leanvibe-dev/ant-farm",
+  "total_checks": 19,
+  "passed_checks": 16,
+  "success_rate": 84.21052631578947,
+  "results": [
+    {
+      "name": "ADW Component Integration",
+      "passed": false,
+      "message": "Integration error: type object 'SessionMode' has no attribute 'FOCUS'",
+      "details": {},
+      "timestamp": 1754728189.873445
+    },
+    {
+      "name": "Session Management",
+      "passed": false,
+      "message": "Session management error: type object 'SessionMode' has no attribute 'FOCUS'",
+      "details": {},
+      "timestamp": 1754728189.873507
+    },
+    {
+      "name": "Extended Session Tester",
+      "passed": true,
+      "message": "Extended session tester initialized",
+      "details": {
+        "output_dir": "/Users/bogdan/work/leanvibe-dev/ant-farm/extended_session_tests"
+      },
+      "timestamp": 1754728189.873642
+    },
+    {
+      "name": "Endurance Test Support",
+      "passed": true,
+      "message": "endurance test method available",
+      "details": {},
+      "timestamp": 1754728189.8736472
+    },
+    {
+      "name": "Stress Test Support",
+      "passed": true,
+      "message": "stress test method available",
+      "details": {},
+      "timestamp": 1754728189.8736498
+    },
+    {
+      "name": "Recovery Test Support",
+      "passed": true,
+      "message": "recovery test method available",
+      "details": {},
+      "timestamp": 1754728189.873653
+    },
+    {
+      "name": "Efficiency Test Support",
+      "passed": true,
+      "message": "efficiency test method available",
+      "details": {},
+      "timestamp": 1754728189.873656
+    },
+    {
+      "name": "Cognitive Test Support",
+      "passed": true,
+      "message": "cognitive test method available",
+      "details": {},
+      "timestamp": 1754728189.8736582
+    },
+    {
+      "name": "Resource Guardian",
+      "passed": true,
+      "message": "Resource guardian initialized",
+      "details": {},
+      "timestamp": 1754728189.873673
+    },
+    {
+      "name": "Quality Gates",
+      "passed": true,
+      "message": "Quality gates system initialized",
+      "details": {},
+      "timestamp": 1754728189.873676
+    },
+    {
+      "name": "Rollback System",
+      "passed": true,
+      "message": "Rollback system initialized",
+      "details": {},
+      "timestamp": 1754728189.873688
+    },
+    {
+      "name": "Monitoring Systems",
+      "passed": false,
+      "message": "Monitoring system validation error: CognitiveLoadManager.__init__() missing 1 required positional argument: 'project_path'",
+      "details": {},
+      "timestamp": 1754728189.873695
+    },
+    {
+      "name": "Resource Monitoring",
+      "passed": true,
+      "message": "Resource monitoring functional",
+      "details": {
+        "memory_check": true,
+        "cpu_check": true,
+        "disk_check": true
+      },
+      "timestamp": 1754728190.877942
+    },
+    {
+      "name": "Web Component: adw-monitoring.js",
+      "passed": true,
+      "message": "adw-monitoring.js exists",
+      "details": {},
+      "timestamp": 1754728190.878025
+    },
+    {
+      "name": "Web Component: hive-dashboard.js",
+      "passed": true,
+      "message": "hive-dashboard.js exists",
+      "details": {},
+      "timestamp": 1754728190.878043
+    },
+    {
+      "name": "Web Component: index.html",
+      "passed": true,
+      "message": "index.html exists",
+      "details": {},
+      "timestamp": 1754728190.8780549
+    },
+    {
+      "name": "ADW API Endpoints",
+      "passed": true,
+      "message": "4/4 ADW endpoints found",
+      "details": {},
+      "timestamp": 1754728190.8782568
+    },
+    {
+      "name": "Test File: test_adw_full_system.py",
+      "passed": true,
+      "message": "9 tests found in test_adw_full_system.py",
+      "details": {},
+      "timestamp": 1754728190.878752
+    },
+    {
+      "name": "Test File: test_extended_session_tester.py",
+      "passed": true,
+      "message": "12 tests found in test_extended_session_tester.py",
+      "details": {},
+      "timestamp": 1754728190.879019
+    }
+  ]
+}

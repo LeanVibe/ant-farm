@@ -241,6 +241,7 @@ export class HiveDashboard extends LitElement {
     renderNavigation() {
         const navItems = [
             { id: 'overview', icon: '📊', label: 'Overview' },
+            { id: 'adw', icon: '🚀', label: 'ADW Monitor' },
             { id: 'agents', icon: '🤖', label: 'Agents' },
             { id: 'tasks', icon: '📋', label: 'Tasks' },
             { id: 'messages', icon: '💬', label: 'Messages' },
@@ -264,6 +265,8 @@ export class HiveDashboard extends LitElement {
         switch (this.activeView) {
             case 'overview':
                 return this.renderOverview();
+            case 'adw':
+                return html`<adw-monitoring></adw-monitoring>`;
             case 'agents':
                 return html`<agent-status></agent-status>`;
             case 'tasks':

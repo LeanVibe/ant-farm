@@ -130,9 +130,7 @@ class ADWSession:
         self.dashboard = None
 
         if self.config.cognitive_load_management_enabled:
-            self.cognitive_load_manager = CognitiveLoadManager(
-                fatigue_threshold=self.config.cognitive_fatigue_threshold
-            )
+            self.cognitive_load_manager = CognitiveLoadManager(project_path)
 
         if self.config.failure_prediction_enabled:
             self.failure_predictor = FailurePredictionSystem(project_path)
@@ -199,8 +197,7 @@ class ADWSession:
             # Initialize cognitive load tracking
             if self.cognitive_load_manager:
                 await self.cognitive_load_manager.start_session()
-                self.current_session_mode = SessionMode.FOCUS
-
+                self.current_session_mode = SessionMode.NORMAL
             # Start autonomous dashboard if enabled
             if self.dashboard:
                 await self.dashboard.start_monitoring(self.session_id)
@@ -240,7 +237,7 @@ class ADWSession:
                         > self.config.cognitive_fatigue_threshold
                     ):
                         logger.warning(
-                            "High cognitive fatigue detected, entering rest mode",
+                            "High cognitive fatigue detected, entering conservative mode",
                             fatigue_level=cognitive_state.fatigue_level,
                         )
                         optimal_mode = (
@@ -904,24 +901,24 @@ class ADWSession:
         )
 
         # Apply mode-specific adjustments
-        if new_mode == SessionMode.REST:
+        if new_mode == SessionMode.CONSERVATIVE:
             # Reduce session intensity
             self.config.micro_iteration_minutes = 45  # Longer iterations
-            logger.info("Entering rest mode - reduced session intensity")
-        elif new_mode == SessionMode.EXPLORATION:
-            # Increase exploration time
+            logger.info("Entering conservative mode - reduced session intensity")
+        elif new_mode == SessionMode.MAINTENANCE:
+            # Increase maintenance time
             self.config.reconnaissance_minutes = 25
-            logger.info("Entering exploration mode - extended reconnaissance")
-        elif new_mode == SessionMode.INTEGRATION:
-            # Focus on integration
+            logger.info("Entering maintenance mode - extended reconnaissance")
+        elif new_mode == SessionMode.ULTRA_CONSERVATIVE:
+            # Focus on stability
             self.config.integration_validation_minutes = 45
-            logger.info("Entering integration mode - extended validation")
-        else:  # FOCUS mode
+            logger.info("Entering ultra-conservative mode - extended validation")
+        else:  # NORMAL mode
             # Reset to standard timings
             self.config.micro_iteration_minutes = 30
             self.config.reconnaissance_minutes = 15
             self.config.integration_validation_minutes = 30
-            logger.info("Entering focus mode - standard timings")
+            logger.info("Entering normal mode - standard timings")
 
     async def _handle_high_failure_risk(self, phase: SessionPhase, risk: float) -> None:
         """Handle high failure risk prediction."""
@@ -939,7 +936,7 @@ class ADWSession:
 
         # Switch to more conservative mode
         if self.cognitive_load_manager:
-            await self._transition_session_mode(SessionMode.REST)
+            await self._transition_session_mode(SessionMode.CONSERVATIVE)
 
         # Reduce iteration complexity
         if phase == SessionPhase.MICRO_DEVELOPMENT:
