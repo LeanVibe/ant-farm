@@ -24,9 +24,7 @@ def create(
         "medium", help="Project scale: small, medium, large, massive"
     ),
     lead_agent: str = typer.Option("meta-agent", help="Lead agent for the project"),
-    root_path: str | None = typer.Option(
-        None, help="Root path for project workspace"
-    ),
+    root_path: str | None = typer.Option(None, help="Root path for project workspace"),
 ):
     """Create a new large project workspace."""
     try:

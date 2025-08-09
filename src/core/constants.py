@@ -6,7 +6,6 @@ should be defined here rather than scattered throughout the codebase.
 """
 
 
-
 class Intervals:
     """Time intervals in seconds."""
 

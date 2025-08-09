@@ -21,8 +21,6 @@ from .task_queue import Task, task_queue
 logger = structlog.get_logger()
 
 
-
-
 @dataclass
 class AgentInfo:
     """Agent information structure."""

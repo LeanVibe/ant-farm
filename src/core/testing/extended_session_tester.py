@@ -587,7 +587,8 @@ class ExtendedSessionTester:
                         result * duration
                         for result, duration in zip(
                             self.metrics.commits_per_hour,
-                            [1] * len(self.metrics.commits_per_hour), strict=False,
+                            [1] * len(self.metrics.commits_per_hour),
+                            strict=False,
                         )
                     ]
                 )

@@ -281,10 +281,7 @@ class MetaAgent(BaseAgent):
                 # Check if agent is responsive (simplified)
                 if (
                     agent.last_heartbeat
-                    and (
-                        datetime.now(UTC) - agent.last_heartbeat
-                    ).total_seconds()
-                    < 300
+                    and (datetime.now(UTC) - agent.last_heartbeat).total_seconds() < 300
                 ):
                     healthy_agents += 1
 
@@ -409,8 +406,7 @@ class MetaAgent(BaseAgent):
                 agent.name
                 for agent in agents
                 if agent.last_heartbeat
-                and (datetime.now(UTC) - agent.last_heartbeat).total_seconds()
-                > 300
+                and (datetime.now(UTC) - agent.last_heartbeat).total_seconds() > 300
             ]
 
             if unresponsive_agents:

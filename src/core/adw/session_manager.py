@@ -598,7 +598,6 @@ class ADWSession:
         # Run comprehensive test suite
         test_start = time.time()
         try:
-
             process = await asyncio.create_subprocess_exec(
                 "pytest",
                 "tests/",

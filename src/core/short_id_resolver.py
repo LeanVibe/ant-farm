@@ -89,9 +89,7 @@ class ShortIDResolver:
             session_uuid = result.scalar_one_or_none()
             return session_uuid
 
-    async def get_agent_by_identifier(
-        self, identifier: str
-    ) -> dict[str, Any] | None:
+    async def get_agent_by_identifier(self, identifier: str) -> dict[str, Any] | None:
         """Get agent by any identifier and return as dict."""
         agent_id = await self.resolve_agent_id(identifier)
         if not agent_id:
