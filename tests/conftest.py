@@ -12,7 +12,8 @@ from sqlalchemy.orm import sessionmaker
 
 # Test configuration - use environment variables with fallbacks
 TEST_DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://bogdan@localhost:5432/leanvibe_hive"
+    "DATABASE_URL",
+    "postgresql+asyncpg://test_user:test_pass@localhost:5432/leanvibe_hive_test",
 )
 TEST_REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 

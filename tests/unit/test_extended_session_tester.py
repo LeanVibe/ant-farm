@@ -337,7 +337,7 @@ class TestExtendedSessionTester:
 
             # Start a test that would run forever
             async def long_running_session(*args, **kwargs):
-                await asyncio.sleep(10)  # Long delay
+                await asyncio.sleep(0.1)  # Short delay for testing
                 return {"status": "completed"}
 
             mock_session_instance.start_session = long_running_session
