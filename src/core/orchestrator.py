@@ -12,6 +12,7 @@ from typing import Dict
 
 import structlog
 
+from .constants import Intervals
 from .message_broker import message_broker
 from .models import Agent, get_database_manager
 from .short_id import ShortIDGenerator
@@ -358,7 +359,7 @@ class AgentSpawner:
             )
 
             # Wait longer for the session to initialize (uv needs time to set up environment)
-            await asyncio.sleep(3)
+            await asyncio.sleep(Intervals.ORCHESTRATOR_STARTUP_DELAY)
 
             # Verify session exists
             check_cmd = ["tmux", "has-session", "-t", session_name]
@@ -394,7 +395,7 @@ class AgentSpawner:
             )
 
             # Wait a bit for graceful shutdown
-            await asyncio.sleep(2)
+            await asyncio.sleep(Intervals.ORCHESTRATOR_AGENT_DELAY)
 
             # Force kill session if still running
             subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)

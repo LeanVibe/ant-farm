@@ -9,6 +9,7 @@ from typing import Any
 import structlog
 
 from .config import settings
+from .constants import Intervals
 from .models import Agent as AgentModel
 from .models import get_database_manager
 from .task_queue import Task, TaskPriority, TaskStatus, task_queue
@@ -121,11 +122,13 @@ class TaskCoordinator:
                 # Monitor task progress
                 await self._monitor_task_progress()
 
-                await asyncio.sleep(5)  # 5-second coordination cycle
+                await asyncio.sleep(
+                    Intervals.TASK_COORDINATION_CYCLE
+                )  # Coordination cycle
 
             except Exception as e:
                 logger.error("Coordination loop error", error=str(e))
-                await asyncio.sleep(30)
+                await asyncio.sleep(Intervals.TASK_COORDINATOR_ERROR_DELAY)
 
     async def _initialize_agent_capabilities(self) -> None:
         """Initialize agent capabilities from historical data."""

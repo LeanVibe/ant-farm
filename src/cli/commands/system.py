@@ -5,12 +5,23 @@ System management commands for the Hive CLI
 import asyncio
 import subprocess
 import sys
+import time
 
 import httpx
 import redis.asyncio as redis
 import typer
 from rich.console import Console
 from sqlalchemy.ext.asyncio import create_async_engine
+
+# Import constants
+try:
+    from ...core.constants import Intervals
+except ImportError:
+    # Fallback for when running outside package
+    class Intervals:
+        SYSTEM_RESTART_DELAY = 2
+        SYSTEM_STARTUP_DELAY = 3
+
 
 from ..utils import (
     create_system_status_table,
@@ -228,9 +239,7 @@ def restart():
         asyncio.run(_stop_services())
 
         # Wait a moment
-        import time
-
-        time.sleep(2)
+        time.sleep(Intervals.SYSTEM_RESTART_DELAY)
 
         # Start again
         asyncio.run(_start())

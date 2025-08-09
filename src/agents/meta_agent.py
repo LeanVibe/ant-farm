@@ -15,6 +15,7 @@ import structlog
 # Handle both module and direct execution imports
 try:
     from ..core.config import settings
+    from ..core.constants import Intervals
     from ..core.context_engine import get_context_engine
     from ..core.message_broker import MessageType, message_broker
     from ..core.models import Agent as AgentModel
@@ -205,13 +206,15 @@ class MetaAgent(BaseAgent):
                 await self._coordinate_agents()
 
                 # Brief pause before next iteration
-                await asyncio.sleep(10)
+                await asyncio.sleep(Intervals.META_AGENT_CYCLE)
 
             except Exception as e:
                 logger.error(
                     "Meta-agent error in main loop", agent=self.name, error=str(e)
                 )
-                await asyncio.sleep(30)  # Longer pause on error
+                await asyncio.sleep(
+                    Intervals.META_AGENT_ERROR_DELAY
+                )  # Longer pause on error
 
     async def _perform_system_analysis(self) -> SystemAnalysis:
         """Perform comprehensive system analysis."""

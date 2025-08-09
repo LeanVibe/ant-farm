@@ -17,6 +17,7 @@ import structlog
 try:
     from ..core.async_db import get_async_database_manager
     from ..core.config import CLIToolType, settings
+    from ..core.constants import Intervals, Timeouts
     from ..core.context_engine import ContextSearchResult, get_context_engine
     from ..core.message_broker import (
         Message,
@@ -568,7 +569,7 @@ class BaseAgent(ABC):
         current_time = time.time()
         if current_time - self._last_cli_call < self._rate_limit_window:
             if self._cli_call_count >= self._max_calls_per_window:
-                await asyncio.sleep(1)  # Brief delay
+                await asyncio.sleep(Intervals.AGENT_BRIEF_DELAY)  # Brief delay
                 self._cli_call_count = 0
         else:
             self._cli_call_count = 0
@@ -1222,7 +1223,7 @@ class BaseAgent(ABC):
             # In a real implementation, we would wait for dependency completion
 
         # Simulate task processing
-        await asyncio.sleep(1)
+        await asyncio.sleep(Intervals.AGENT_STARTUP_DELAY)
 
         return {
             "success": True,
@@ -1357,6 +1358,8 @@ class BaseAgent(ABC):
         self.status = "stopping"
 
         # Graceful shutdown
-        await asyncio.sleep(1)  # Allow current operations to complete
+        await asyncio.sleep(
+            Intervals.AGENT_SHUTDOWN_GRACE
+        )  # Allow current operations to complete
 
         return {"shutdown": True, "timestamp": time.time()}
