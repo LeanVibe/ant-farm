@@ -5,7 +5,7 @@ import subprocess
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -187,8 +187,8 @@ class AgentRegistry:
                 agent = session.query(Agent).filter_by(name=agent_name).first()
                 if agent:
                     agent.status = status.value
-                    agent.last_heartbeat = datetime.now(datetime.UTC)
-                    agent.updated_at = datetime.now(datetime.UTC)
+                    agent.last_heartbeat = datetime.now(UTC)
+                    agent.updated_at = datetime.now(UTC)
                     session.commit()
             finally:
                 session.close()
