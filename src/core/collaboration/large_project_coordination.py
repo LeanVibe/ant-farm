@@ -17,10 +17,10 @@ from typing import Any, Dict, List, Optional, Set
 
 import structlog
 
-from .agent_coordination import CollaborationCoordinator, CollaborationType, TaskPhase
-from .constants import Intervals, Thresholds
-from .message_broker import MessageType, message_broker
-from .models import get_database_manager
+from ..agent_coordination import CollaborationCoordinator, CollaborationType, TaskPhase
+from ..constants import Intervals, Thresholds
+from ..message_broker import MessageType, message_broker
+from ..models import get_database_manager
 
 logger = structlog.get_logger()
 
