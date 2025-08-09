@@ -28,11 +28,18 @@
 
 ## 🔧 Service Ports Configuration
 
-**Current service port configuration:**
-- **API**: 9001 (non-standard for security)
-- **PostgreSQL**: 5432 (standard port)
-- **Redis**: 6379 (standard port)
+**Current service port configuration (non-standard to avoid conflicts):**
+- **API**: 9001 (FastAPI server)
+- **PostgreSQL**: 5433 (Docker mapped from 5432)
+- **Redis**: 6381 (Docker mapped from 6379)
 - **pgAdmin**: 9050 (development only)
+- **Redis Commander**: 9081 (development only)
+
+**Docker Infrastructure:**
+- All services run in Docker with health checks
+- Non-standard ports prevent conflicts with local services
+- Persistent volumes for data retention
+- Health check endpoints for monitoring
 
 ## CLI Agentic Coding Tools
 
@@ -51,6 +58,10 @@
 - Lint/format: ruff check .; ruff format .
 - Typecheck: mypy . (if configured) or pyright
 - DB/infra: docker compose up -d postgres redis; alembic upgrade head
+- Full stack: docker compose up -d (starts all infrastructure services)
+- Check services: docker compose ps
+- View logs: docker compose logs -f [service_name]
+- Stop all: docker compose down
 
 ## Code style
 

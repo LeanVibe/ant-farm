@@ -13,7 +13,7 @@ from rich.table import Table
 console = Console()
 
 # Updated API URL for new port
-API_BASE_URL = "http://localhost:9001"
+API_BASE_URL = "http://localhost:9002"
 
 
 def error_handler(error: Exception) -> None:

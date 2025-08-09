@@ -388,6 +388,10 @@ class TaskQueue:
 
         return count
 
+    async def get_completed_tasks(self) -> int:
+        """Alias for get_completed_tasks_count for backward compatibility."""
+        return await self.get_completed_tasks_count()
+
     async def get_completed_tasks_count(self) -> int:
         """Get count of completed tasks with caching."""
 
@@ -416,6 +420,10 @@ class TaskQueue:
             await cache.set(cache_key, count, dependencies=["task_queue_stats"])
 
         return count
+
+    async def get_failed_tasks(self) -> int:
+        """Alias for get_failed_tasks_count for backward compatibility."""
+        return await self.get_failed_tasks_count()
 
     async def get_failed_tasks_count(self) -> int:
         """Get count of failed tasks with caching."""
