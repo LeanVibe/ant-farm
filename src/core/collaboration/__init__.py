@@ -16,6 +16,15 @@ from .large_project_coordination import (
     get_large_project_coordinator,
 )
 
+from .enhanced_pair_programming import (
+    EnhancedAIPairProgramming,
+    CollaborationSession,
+    ContextShareType,
+    CollaborationMode,
+    SharedContext,
+    get_enhanced_pair_programming,
+)
+
 __all__ = [
     "PairProgrammingSession",
     "CollaborationResult",
@@ -27,4 +36,10 @@ __all__ = [
     "ProjectWorkspace",
     "TaskDependencyGraph",
     "get_large_project_coordinator",
+    "EnhancedAIPairProgramming",
+    "CollaborationSession",
+    "ContextShareType",
+    "CollaborationMode",
+    "SharedContext",
+    "get_enhanced_pair_programming",
 ]

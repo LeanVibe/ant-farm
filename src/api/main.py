@@ -2547,6 +2547,339 @@ async def resolve_project_conflict(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+# Enhanced AI Pair Programming endpoints
+@app.post("/api/v1/collaboration/enhanced-session", response_model=APIResponse)
+async def start_enhanced_collaboration(
+    session_data: dict = Body(...), current_user: dict = Depends(get_current_user)
+):
+    """Start an enhanced AI pair programming session."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+            CollaborationMode,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+
+        # Validate input
+        required_fields = ["participants", "mode", "task_description"]
+        for field in required_fields:
+            if field not in session_data:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required field: {field}"
+                )
+
+        # Convert mode string to enum
+        try:
+            mode = CollaborationMode(session_data["mode"])
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid collaboration mode: {session_data['mode']}",
+            )
+
+        session_id = await enhanced_system.start_enhanced_session(
+            participants=session_data["participants"],
+            mode=mode,
+            project_context=session_data.get("project_context", {}),
+            task_description=session_data["task_description"],
+        )
+
+        return APIResponse(
+            success=True,
+            data={
+                "session_id": session_id,
+                "message": "Enhanced collaboration session started",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to start enhanced collaboration", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post(
+    "/api/v1/collaboration/{session_id}/share-context", response_model=APIResponse
+)
+async def share_collaboration_context(
+    session_id: str,
+    context_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Share context between agents in a collaboration session."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+            ContextShareType,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+
+        # Validate input
+        required_fields = ["source_agent", "context_type", "content"]
+        for field in required_fields:
+            if field not in context_data:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required field: {field}"
+                )
+
+        # Convert context type
+        try:
+            context_type = ContextShareType(context_data["context_type"])
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid context type: {context_data['context_type']}",
+            )
+
+        success = await enhanced_system.share_context(
+            session_id=session_id,
+            source_agent=context_data["source_agent"],
+            context_type=context_type,
+            content=context_data["content"],
+            tags=set(context_data.get("tags", [])),
+        )
+
+        if not success:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        return APIResponse(
+            success=True, data={"message": "Context shared successfully"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to share context", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/collaboration/{session_id}/context", response_model=APIResponse)
+async def get_relevant_context(
+    session_id: str,
+    requesting_agent: str,
+    query: str,
+    context_types: List[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get relevant context for an agent."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+            ContextShareType,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+
+        # Convert context types if provided
+        parsed_context_types = None
+        if context_types:
+            try:
+                parsed_context_types = [ContextShareType(ct) for ct in context_types]
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid context type: {e}"
+                )
+
+        contexts = await enhanced_system.get_relevant_context(
+            session_id=session_id,
+            requesting_agent=requesting_agent,
+            query=query,
+            context_types=parsed_context_types,
+        )
+
+        # Convert contexts to serializable format
+        context_data = []
+        for context in contexts:
+            context_data.append(
+                {
+                    "context_type": context.context_type.value,
+                    "content": context.content,
+                    "source_agent": context.source_agent,
+                    "relevance_score": context.relevance_score,
+                    "timestamp": context.timestamp,
+                    "tags": list(context.tags),
+                }
+            )
+
+        return APIResponse(success=True, data={"contexts": context_data})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get relevant context", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post(
+    "/api/v1/collaboration/{session_id}/suggest-patterns", response_model=APIResponse
+)
+async def suggest_code_patterns(
+    session_id: str,
+    code_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get code pattern suggestions for current work."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+
+        # Validate input
+        if "current_code" not in code_data:
+            raise HTTPException(
+                status_code=400, detail="Missing required field: current_code"
+            )
+
+        suggestions = await enhanced_system.suggest_code_patterns(
+            session_id=session_id,
+            current_code=code_data["current_code"],
+            context=code_data.get("context", ""),
+        )
+
+        return APIResponse(success=True, data={"suggestions": suggestions})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get code suggestions", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post(
+    "/api/v1/collaboration/{session_id}/switch-driver", response_model=APIResponse
+)
+async def switch_collaboration_driver(
+    session_id: str,
+    driver_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Switch the active driver in a collaboration session."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+
+        if "new_driver" not in driver_data:
+            raise HTTPException(
+                status_code=400, detail="Missing required field: new_driver"
+            )
+
+        success = await enhanced_system.switch_driver(
+            session_id=session_id, new_driver=driver_data["new_driver"]
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=404, detail="Session not found or invalid driver"
+            )
+
+        return APIResponse(
+            success=True,
+            data={"message": f"Driver switched to {driver_data['new_driver']}"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to switch driver", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/collaboration/{session_id}/track-live", response_model=APIResponse)
+async def track_live_collaboration(
+    session_id: str,
+    tracking_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Track live collaboration state."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+
+        # Validate input
+        required_fields = ["agent_id", "file_path", "cursor_position"]
+        for field in required_fields:
+            if field not in tracking_data:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required field: {field}"
+                )
+
+        await enhanced_system.track_live_collaboration(
+            session_id=session_id,
+            agent_id=tracking_data["agent_id"],
+            file_path=tracking_data["file_path"],
+            cursor_position=tuple(tracking_data["cursor_position"]),
+            edit_action=tracking_data.get("edit_action"),
+        )
+
+        return APIResponse(
+            success=True, data={"message": "Live collaboration state tracked"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to track live collaboration", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/collaboration/{session_id}/metrics", response_model=APIResponse)
+async def get_collaboration_metrics(
+    session_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get collaboration metrics for a session."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+        metrics = await enhanced_system.get_collaboration_metrics(session_id)
+
+        return APIResponse(success=True, data=metrics)
+
+    except Exception as e:
+        logger.error("Failed to get collaboration metrics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/collaboration/{session_id}/end", response_model=APIResponse)
+async def end_collaboration_session(
+    session_id: str, current_user: dict = Depends(get_current_user)
+):
+    """End an enhanced collaboration session."""
+    try:
+        from ..core.collaboration.enhanced_pair_programming import (
+            get_enhanced_pair_programming,
+        )
+
+        enhanced_system = await get_enhanced_pair_programming()
+        result = await enhanced_system.end_session(session_id)
+
+        return APIResponse(
+            success=result.success,
+            data={
+                "collaboration_summary": result.collaboration_summary,
+                "metrics": result.metrics,
+                "error_message": result.error_message,
+            },
+        )
+
+    except Exception as e:
+        logger.error("Failed to end collaboration session", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # System diagnostics endpoints
 @app.get("/api/v1/diagnostics", response_model=APIResponse)
 async def get_system_diagnostics():
