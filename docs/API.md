@@ -241,6 +241,29 @@ Trigger system analysis by meta-agent (requires `system:write`).
 #### POST /api/v1/system/shutdown
 Gracefully shutdown system (requires admin privileges).
 
+#### GET /api/v1/emergency/status
+Get emergency intervention system status (requires `system:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "level": "NORMAL",
+    "is_paused": false,
+    "session_id": "session_123",
+    "last_intervention": null,
+    "active_monitoring": true
+  }
+}
+```
+
+#### POST /api/v1/emergency/pause
+Pause autonomous development session (requires `system:write`).
+
+#### POST /api/v1/emergency/resume
+Resume paused autonomous development session (requires `system:write`).
+
 ### Agent Management
 
 #### GET /api/v1/agents

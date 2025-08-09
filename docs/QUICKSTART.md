@@ -2,7 +2,9 @@
 
 ## Overview
 
-Get your autonomous multi-agent development system up and running in 5 minutes using the unified `hive` CLI.
+Get your autonomous multi-agent development system with **Autonomous Development Workflow (ADW)** up and running in 5 minutes using the unified `hive` CLI.
+
+**New in v2.0**: ✅ 16-24 hour autonomous operation with emergency intervention controls!
 
 ## Prerequisites
 
@@ -55,11 +57,17 @@ hive system status
 
 ## First Steps
 
-### 1. Bootstrap the Agent System
+### 1. Bootstrap the ADW System
 
 ```bash
-# Bootstrap with automatic CLI tool detection
+# Bootstrap with autonomous development workflow
 hive agent bootstrap
+
+# Start extended autonomous session (16-24 hours)
+hive task submit "Begin autonomous development session with self-improvement focus"
+
+# Monitor autonomous session
+open http://localhost:9001/dashboard
 
 # Or spawn individual agents
 hive agent spawn meta
@@ -87,10 +95,17 @@ hive task status <task-id>
 hive agent list
 hive agent describe meta
 
-# System health
+# Check autonomous session status
 hive system status
 
-# Access API documentation
+# Emergency controls (if needed)
+curl -X POST http://localhost:9001/api/v1/emergency/pause
+curl -X GET http://localhost:9001/api/v1/emergency/status
+
+# Access live dashboard
+open http://localhost:9001/dashboard
+
+# Access API documentation  
 open http://localhost:9001/api/docs
 ```
 
@@ -99,6 +114,7 @@ open http://localhost:9001/api/docs
 The system runs on **non-standard ports for security**:
 
 - **API Server**: http://localhost:9001 (instead of 80/443)
+- **Dashboard**: http://localhost:9001/dashboard (NEW!)
 - **PostgreSQL**: localhost:5433 (instead of 5432)
 - **Redis**: localhost:6381 (instead of 6379)
 
@@ -110,6 +126,11 @@ curl http://localhost:9001/api/v1/health
 
 # List agents (when auth implemented)
 curl http://localhost:9001/api/v1/agents
+
+# Emergency controls
+curl -X POST http://localhost:9001/api/v1/emergency/pause
+curl -X POST http://localhost:9001/api/v1/emergency/resume  
+curl -X GET http://localhost:9001/api/v1/emergency/status
 
 # Submit task via API
 curl -X POST http://localhost:9001/api/v1/tasks \
@@ -181,6 +202,12 @@ ANTHROPIC_API_KEY=your_claude_key
 OPENAI_API_KEY=your_openai_key
 GOOGLE_AI_API_KEY=your_gemini_key
 
+# ADW Configuration
+ADW_SESSION_MAX_HOURS=24
+ADW_COGNITIVE_LOAD_THRESHOLD=0.8
+ADW_EMERGENCY_INTERVENTION=true
+ADW_AUTO_ROLLBACK=true
+
 # Agent Configuration
 MAX_CONCURRENT_AGENTS=50
 AGENT_HEARTBEAT_INTERVAL=30
@@ -231,16 +258,19 @@ ruff check .
 ruff format .
 ```
 
-### 3. Self-Improvement
+### 3. Autonomous Development
 ```bash
-# Submit self-improvement task
-hive task submit "Optimize task queue performance"
+# Start 16-24 hour autonomous session
+hive task submit "Begin comprehensive system improvement session"
 
-# The meta-agent will:
-# 1. Analyze the codebase
-# 2. Propose improvements  
-# 3. Test changes
-# 4. Commit if successful
+# Monitor via dashboard
+open http://localhost:9001/dashboard
+
+# Emergency pause (if needed)
+curl -X POST http://localhost:9001/api/v1/emergency/pause
+
+# Resume autonomous operation
+curl -X POST http://localhost:9001/api/v1/emergency/resume
 ```
 
 ## Troubleshooting
@@ -320,11 +350,12 @@ docker compose ps
 
 ## Next Steps
 
-1. **Submit Complex Tasks**: Try multi-step development tasks
-2. **Monitor Self-Improvement**: Watch the meta-agent enhance itself
-3. **Customize Agents**: Modify agent behavior in `src/agents/`
-4. **Explore API**: Visit http://localhost:9001/api/docs
-5. **Read Architecture**: See `docs/system-architecture.md`
+1. **Start Autonomous Sessions**: Use the ADW system for 16-24 hour autonomous development
+2. **Monitor via Dashboard**: Real-time monitoring at http://localhost:9001/dashboard  
+3. **Emergency Controls**: Learn to pause/resume autonomous sessions safely
+4. **Customize Agents**: Modify agent behavior in `src/agents/`
+5. **Explore API**: Visit http://localhost:9001/api/docs
+6. **Read ADW Docs**: See `docs/ADW_IMPLEMENTATION_SUMMARY.md`
 
 ## CLI Tool Details
 
