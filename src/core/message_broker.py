@@ -180,47 +180,71 @@ class MessageBroker:
         priority: int = 5,
         expires_in: int | None = None,
         correlation_id: str | None = None,
-    ) -> str:
+    ) -> bool:
         """Send a message to an agent or broadcast."""
+        try:
+            message = Message(
+                id=str(uuid.uuid4()),
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                message_type=message_type,
+                payload=payload,
+                timestamp=time.time(),
+                expires_at=time.time() + expires_in if expires_in else None,
+                priority=priority,
+                correlation_id=correlation_id,
+            )
 
-        message = Message(
-            id=str(uuid.uuid4()),
-            from_agent=from_agent,
-            to_agent=to_agent,
-            topic=topic,
-            message_type=message_type,
-            payload=payload,
-            timestamp=time.time(),
-            expires_at=time.time() + expires_in if expires_in else None,
-            priority=priority,
-            correlation_id=correlation_id,
-        )
+            # Persist message
+            await self._persist_message(message)
 
-        # Persist message
-        await self._persist_message(message)
+            # Determine channel
+            if to_agent == "broadcast":
+                channel = "broadcast"
+            else:
+                channel = f"agent:{to_agent}"
 
-        # Determine channel
-        if to_agent == "broadcast":
-            channel = "broadcast"
-        else:
-            channel = f"agent:{to_agent}"
+            # Publish message
+            message_dict = {
+                "id": message.id,
+                "from_agent": message.from_agent,
+                "to_agent": message.to_agent,
+                "topic": message.topic,
+                "message_type": message.message_type.value,
+                "payload": message.payload,
+                "timestamp": message.timestamp,
+                "expires_at": message.expires_at,
+                "reply_to": message.reply_to,
+                "correlation_id": message.correlation_id,
+                "priority": message.priority,
+                "delivery_count": message.delivery_count,
+                "max_retries": message.max_retries,
+            }
 
-        # Publish message
-        message_data = self._serialize_message(message)
-        await self.redis_client.publish(channel, message_data)
+            await self.redis_client.publish(
+                channel, json.dumps(message_dict, default=str)
+            )
 
-        # Store in message history
-        await self._store_message_history(message)
+            logger.info(
+                "Message sent",
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                message_id=message.id,
+            )
 
-        logger.info(
-            "Message sent",
-            from_agent=from_agent,
-            to_agent=to_agent,
-            topic=topic,
-            message_id=message.id,
-        )
+            return True  # Return success indicator instead of message ID
 
-        return message.id
+        except Exception as e:
+            logger.error(
+                "Failed to send message",
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                error=str(e),
+            )
+            return False
 
     async def send_request(
         self,

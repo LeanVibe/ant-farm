@@ -121,7 +121,7 @@ class TestMessageBrokerBasicOperations:
     async def test_send_message_basic(self, message_broker, sample_message, mock_redis):
         """Test basic message sending."""
         # Act - Send message
-        message_id = await message_broker.send_message(
+        success = await message_broker.send_message(
             from_agent=sample_message.from_agent,
             to_agent=sample_message.to_agent,
             topic=sample_message.topic,
@@ -129,9 +129,9 @@ class TestMessageBrokerBasicOperations:
             message_type=sample_message.message_type,
         )
 
-        # Assert - Message sent successfully (returns message ID)
-        assert message_id is not None
-        assert isinstance(message_id, str)
+        # Assert - Message sent successfully (returns success boolean)
+        assert success is True
+        assert isinstance(success, bool)
 
         # Verify Redis operations were called
         mock_redis.publish.assert_called()  # Message published to channel

@@ -958,6 +958,15 @@ class TaskQueue:
             logger.error("Failed to get timed out tasks", error=str(e))
             return []
 
+    async def get_queue_depth(self) -> int:
+        """Get the current number of pending tasks in the queue."""
+        try:
+            depth = await self.redis_client.zcard(self.pending_queue_key)
+            return depth
+        except Exception as e:
+            logger.error("Failed to get queue depth", error=str(e))
+            return 0
+
 
 # Global task queue instance
 task_queue = TaskQueue()
