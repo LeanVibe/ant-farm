@@ -190,8 +190,8 @@ async def _start():
         else:
             info_message("API server is already running")
 
-        # TODO: Start agent processes
-        # TODO: Initialize default agents
+        # Start orchestrator and default agents
+        asyncio.run(_start_agents())
 
         success_message("Hive system startup complete!")
 
@@ -205,23 +205,8 @@ def stop():
     try:
         info_message("Stopping LeanVibe Hive system...")
 
-        # Find and stop API server process
-        try:
-            result = subprocess.run(
-                ["pkill", "-f", "uvicorn.*src.api.main:app"],
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode == 0:
-                success_message("API server stopped")
-            else:
-                warning_message("No API server process found")
-        except Exception as e:
-            warning_message(f"Could not stop API server: {e}")
-
-        # TODO: Stop agent processes
-        # TODO: Graceful shutdown of services
+        # Use the async stop function
+        asyncio.run(_stop_services())
 
         success_message("Hive system stopped")
 
@@ -250,14 +235,68 @@ def restart():
         error_handler(e)
 
 
+async def _start_agents():
+    """Internal async function to start orchestrator and agents"""
+    # Start orchestrator and agent processes
+    try:
+        from ...core.orchestrator import orchestrator
+
+        info_message("Starting agent orchestrator...")
+        await orchestrator.start()
+        success_message("Agent orchestrator started")
+    except Exception as e:
+        warning_message(f"Could not start orchestrator: {e}")
+
+    # Initialize default agents if configured
+    try:
+        from ...core.config import settings
+
+        if hasattr(settings, "AUTO_START_AGENTS") and settings.AUTO_START_AGENTS:
+            info_message("Initializing default agents...")
+            # Start meta agent by default
+            await orchestrator.spawn_agent("meta", "meta-system")
+            success_message("Default agents initialized")
+    except Exception as e:
+        warning_message(f"Could not initialize default agents: {e}")
+
+
 async def _stop_services():
     """Internal async stop function"""
     try:
+        # Stop API server
         subprocess.run(
             ["pkill", "-f", "uvicorn.*src.api.main:app"], capture_output=True, text=True
         )
     except Exception:
         pass
+
+    # Stop agent processes and orchestrator
+    try:
+        from ...core.orchestrator import orchestrator
+
+        await orchestrator.stop()
+    except Exception:
+        pass  # Orchestrator may not be running
+
+    # Graceful shutdown of services
+    try:
+        # Stop message broker
+        try:
+            from ...core.message_broker import message_broker
+
+            await message_broker.stop()
+        except Exception:
+            pass  # Message broker may not be running
+
+        # Stop task queue
+        try:
+            from ...core.task_queue import task_queue
+
+            await task_queue.stop()
+        except Exception:
+            pass  # Task queue may not be running
+    except Exception:
+        pass  # Services may not be running
 
 
 @app.command()
