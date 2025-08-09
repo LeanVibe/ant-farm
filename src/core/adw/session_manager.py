@@ -18,6 +18,9 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from ..safety import AutoRollbackSystem, AutonomousQualityGates, ResourceGuardian
+from ..monitoring.autonomous_dashboard import AutonomousDashboard
+from ..prediction.failure_prediction import FailurePredictionSystem
+from .cognitive_load_manager import CognitiveLoadManager, SessionMode
 from .session_persistence import SessionStatePersistence
 
 logger = structlog.get_logger()
@@ -54,6 +57,16 @@ class ADWSessionConfig:
     test_first_enforced: bool = True
     auto_commit_enabled: bool = True
     performance_tracking_enabled: bool = True
+
+    # New ADW component settings
+    cognitive_load_management_enabled: bool = True
+    failure_prediction_enabled: bool = True
+    autonomous_dashboard_enabled: bool = True
+
+    # Extended session settings
+    extended_session_mode: bool = False
+    max_extended_duration_hours: float = 24.0
+    cognitive_fatigue_threshold: float = 0.7
 
 
 @dataclass
@@ -111,11 +124,28 @@ class ADWSession:
         self.quality_gates = AutonomousQualityGates(project_path)
         self.resource_guardian = ResourceGuardian(project_path)
 
+        # Initialize new ADW components
+        self.cognitive_load_manager = None
+        self.failure_predictor = None
+        self.dashboard = None
+
+        if self.config.cognitive_load_management_enabled:
+            self.cognitive_load_manager = CognitiveLoadManager(
+                fatigue_threshold=self.config.cognitive_fatigue_threshold
+            )
+
+        if self.config.failure_prediction_enabled:
+            self.failure_predictor = FailurePredictionSystem(project_path)
+
+        if self.config.autonomous_dashboard_enabled:
+            self.dashboard = AutonomousDashboard(project_path)
+
         # Session state
         self.metrics = SessionMetrics(start_time=time.time())
         self.session_id = f"adw-{int(time.time())}"
         self.active = False
         self.consecutive_failures = 0
+        self.current_session_mode = SessionMode.FOCUS
 
         # Session persistence
         self.persistence = SessionStatePersistence(project_path, self.session_id)
@@ -132,6 +162,9 @@ class ADWSession:
             "ADW Session initialized",
             session_id=self.session_id,
             project=str(project_path),
+            cognitive_load_enabled=self.config.cognitive_load_management_enabled,
+            failure_prediction_enabled=self.config.failure_prediction_enabled,
+            dashboard_enabled=self.config.autonomous_dashboard_enabled,
         )
 
     async def start_session(
@@ -163,21 +196,81 @@ class ADWSession:
             # Create initial safety checkpoint
             await self.rollback_system.create_safety_checkpoint("ADW session start")
 
+            # Initialize cognitive load tracking
+            if self.cognitive_load_manager:
+                await self.cognitive_load_manager.start_session()
+                self.current_session_mode = SessionMode.FOCUS
+
+            # Start autonomous dashboard if enabled
+            if self.dashboard:
+                await self.dashboard.start_monitoring(self.session_id)
+
+            # Initialize failure prediction
+            if self.failure_predictor:
+                await self.failure_predictor.start_monitoring()
+
             # Start resource monitoring if enabled
             if self.config.resource_monitoring_enabled:
                 asyncio.create_task(self.resource_guardian.start_monitoring())
 
-            # Run through all phases
-            phases = [
-                SessionPhase.RECONNAISSANCE,
-                SessionPhase.MICRO_DEVELOPMENT,
-                SessionPhase.INTEGRATION_VALIDATION,
-                SessionPhase.META_LEARNING,
-            ]
+            # Determine session type and phases
+            if self.config.extended_session_mode:
+                phases = await self._plan_extended_session()
+            else:
+                phases = [
+                    SessionPhase.RECONNAISSANCE,
+                    SessionPhase.MICRO_DEVELOPMENT,
+                    SessionPhase.INTEGRATION_VALIDATION,
+                    SessionPhase.META_LEARNING,
+                ]
 
             for phase in phases:
                 if not self.active:  # Check if session was aborted
                     break
+
+                # Check cognitive load before each phase
+                if self.cognitive_load_manager:
+                    cognitive_state = (
+                        await self.cognitive_load_manager.assess_cognitive_state()
+                    )
+
+                    # Handle cognitive fatigue
+                    if (
+                        cognitive_state.fatigue_level
+                        > self.config.cognitive_fatigue_threshold
+                    ):
+                        logger.warning(
+                            "High cognitive fatigue detected, entering rest mode",
+                            fatigue_level=cognitive_state.fatigue_level,
+                        )
+                        optimal_mode = (
+                            await self.cognitive_load_manager.get_optimal_mode(
+                                cognitive_state
+                            )
+                        )
+                        await self._transition_session_mode(optimal_mode)
+
+                # Predict potential failures before phase
+                if self.failure_predictor:
+                    failure_risk = await self.failure_predictor.predict_failure_risk(
+                        {
+                            "phase": phase.value,
+                            "session_duration": self.metrics.duration(),
+                            "consecutive_failures": self.consecutive_failures,
+                            "current_mode": self.current_session_mode.value
+                            if self.cognitive_load_manager
+                            else "focus",
+                        }
+                    )
+
+                    if failure_risk > 0.7:  # High risk threshold
+                        logger.warning(
+                            "High failure risk predicted for phase",
+                            phase=phase.value,
+                            risk=failure_risk,
+                        )
+                        # Take preventive action
+                        await self._handle_high_failure_risk(phase, failure_risk)
 
                 await self._run_phase(phase)
 
@@ -185,7 +278,15 @@ class ADWSession:
                 await self.persistence.save_checkpoint(
                     self,
                     phase_progress={f"{phase.value}_completed": True},
-                    additional_context={"goals": target_goals},
+                    additional_context={
+                        "goals": target_goals,
+                        "cognitive_mode": self.current_session_mode.value
+                        if self.cognitive_load_manager
+                        else "focus",
+                        "failure_predictions": failure_risk
+                        if self.failure_predictor
+                        else None,
+                    },
                 )
 
                 # Check for critical failures
@@ -687,12 +788,31 @@ class ADWSession:
         if self.config.resource_monitoring_enabled:
             await self.resource_guardian.stop_monitoring()
 
+        # Finalize cognitive load tracking
+        cognitive_summary = None
+        if self.cognitive_load_manager:
+            cognitive_summary = await self.cognitive_load_manager.end_session()
+
+        # Stop failure prediction monitoring
+        if self.failure_predictor:
+            await self.failure_predictor.stop_monitoring()
+
+        # Stop dashboard monitoring
+        if self.dashboard:
+            await self.dashboard.stop_monitoring()
+
         # Create final checkpoint
         await self.rollback_system.create_safety_checkpoint("ADW session completed")
         await self.persistence.save_checkpoint(
             self,
             phase_progress={"session_completed": True},
-            additional_context={"final_status": self.metrics.current_phase.value},
+            additional_context={
+                "final_status": self.metrics.current_phase.value,
+                "cognitive_summary": cognitive_summary,
+                "final_mode": self.current_session_mode.value
+                if self.cognitive_load_manager
+                else "focus",
+            },
         )
 
         # Compile session summary
@@ -700,6 +820,9 @@ class ADWSession:
             "session_id": self.session_id,
             "status": self.metrics.current_phase.value,
             "duration_hours": self.metrics.duration() / 3600,
+            "final_mode": self.current_session_mode.value
+            if self.cognitive_load_manager
+            else "focus",
             "metrics": {
                 "commits_made": self.metrics.commits_made,
                 "tests_written": self.metrics.tests_written,
@@ -719,11 +842,113 @@ class ADWSession:
             "quality_stats": self.quality_gates.get_gate_statistics(),
         }
 
+        # Add cognitive load summary if available
+        if cognitive_summary:
+            summary["cognitive_stats"] = cognitive_summary
+
+        # Add failure prediction summary if available
+        if self.failure_predictor:
+            summary[
+                "failure_prediction_stats"
+            ] = await self.failure_predictor.get_session_summary()
+
+        # Add dashboard metrics if available
+        if self.dashboard:
+            summary["dashboard_metrics"] = await self.dashboard.get_session_metrics()
+
         logger.info(
             "ADW session finalized", session_id=self.session_id, summary=summary
         )
 
         return summary
+
+    async def _plan_extended_session(self) -> List[SessionPhase]:
+        """Plan phases for extended 16-24 hour sessions."""
+        phases = []
+        total_hours = self.config.max_extended_duration_hours
+
+        # Calculate number of 4-hour cycles
+        cycles = int(total_hours / 4)
+
+        for cycle in range(cycles):
+            # Add full cycle phases
+            phases.extend(
+                [
+                    SessionPhase.RECONNAISSANCE,
+                    SessionPhase.MICRO_DEVELOPMENT,
+                    SessionPhase.INTEGRATION_VALIDATION,
+                    SessionPhase.META_LEARNING,
+                ]
+            )
+
+            # Add rest phase every 2 cycles (8 hours)
+            if (cycle + 1) % 2 == 0 and cycle < cycles - 1:
+                # Rest mode handled by cognitive load manager
+                logger.info(f"Extended session: planning rest after cycle {cycle + 1}")
+
+        return phases
+
+    async def _transition_session_mode(self, new_mode: SessionMode) -> None:
+        """Transition to a new session mode."""
+        if not self.cognitive_load_manager:
+            return
+
+        old_mode = self.current_session_mode
+        self.current_session_mode = new_mode
+
+        logger.info(
+            "Session mode transition",
+            session_id=self.session_id,
+            old_mode=old_mode.value,
+            new_mode=new_mode.value,
+        )
+
+        # Apply mode-specific adjustments
+        if new_mode == SessionMode.REST:
+            # Reduce session intensity
+            self.config.micro_iteration_minutes = 45  # Longer iterations
+            logger.info("Entering rest mode - reduced session intensity")
+        elif new_mode == SessionMode.EXPLORATION:
+            # Increase exploration time
+            self.config.reconnaissance_minutes = 25
+            logger.info("Entering exploration mode - extended reconnaissance")
+        elif new_mode == SessionMode.INTEGRATION:
+            # Focus on integration
+            self.config.integration_validation_minutes = 45
+            logger.info("Entering integration mode - extended validation")
+        else:  # FOCUS mode
+            # Reset to standard timings
+            self.config.micro_iteration_minutes = 30
+            self.config.reconnaissance_minutes = 15
+            self.config.integration_validation_minutes = 30
+            logger.info("Entering focus mode - standard timings")
+
+    async def _handle_high_failure_risk(self, phase: SessionPhase, risk: float) -> None:
+        """Handle high failure risk prediction."""
+        logger.warning(
+            "Taking preventive action for high failure risk",
+            phase=phase.value,
+            risk=risk,
+            session_id=self.session_id,
+        )
+
+        # Create extra safety checkpoint
+        await self.rollback_system.create_safety_checkpoint(
+            f"Pre-{phase.value} high-risk checkpoint"
+        )
+
+        # Switch to more conservative mode
+        if self.cognitive_load_manager:
+            await self._transition_session_mode(SessionMode.REST)
+
+        # Reduce iteration complexity
+        if phase == SessionPhase.MICRO_DEVELOPMENT:
+            self.config.micro_iteration_minutes = min(
+                self.config.micro_iteration_minutes + 10, 45
+            )
+
+        # Enable extra quality gates
+        self.config.quality_gates_enabled = True
 
     async def abort_session(self, reason: str = "Manual abort") -> Dict[str, Any]:
         """Abort the current session."""

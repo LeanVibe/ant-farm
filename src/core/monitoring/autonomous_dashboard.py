@@ -584,12 +584,18 @@ class AutonomousDashboard:
         # Load historical data
         self._load_metrics_history()
 
-    async def start_monitoring(self, interval_minutes: float = 5.0) -> None:
+    async def start_monitoring(
+        self, session_id: str = None, interval_minutes: float = 5.0
+    ) -> None:
         """Start autonomous monitoring."""
         self.monitoring_active = True
         interval_seconds = interval_minutes * 60
 
-        logger.info("Autonomous monitoring started", interval_minutes=interval_minutes)
+        logger.info(
+            "Autonomous monitoring started",
+            session_id=session_id,
+            interval_minutes=interval_minutes,
+        )
 
         while self.monitoring_active:
             try:
