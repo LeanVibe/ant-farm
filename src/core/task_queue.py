@@ -104,6 +104,13 @@ class TaskQueue:
         self.task_prefix = "hive:task"
         self.dependency_prefix = "hive:dep"
         self.stats_key = "hive:stats"
+
+        # Define queue keys for different priority levels and statuses
+        self.pending_queue_key = f"{self.queue_prefix}:pending"
+        self.processing_queue_key = f"{self.queue_prefix}:processing"
+        self.completed_queue_key = f"{self.queue_prefix}:completed"
+        self.failed_queue_key = f"{self.queue_prefix}:failed"
+
         self.cache_manager = None
 
     async def initialize(self) -> None:
@@ -961,7 +968,8 @@ class TaskQueue:
     async def get_queue_depth(self) -> int:
         """Get the current number of pending tasks in the queue."""
         try:
-            depth = await self.redis_client.zcard(self.pending_queue_key)
+            # Check the priority queue (where pending tasks are stored)
+            depth = await self.redis_client.zcard(f"{self.queue_prefix}:priority")
             return depth
         except Exception as e:
             logger.error("Failed to get queue depth", error=str(e))
