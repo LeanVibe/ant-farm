@@ -15,6 +15,12 @@ class Intervals:
     AGENT_HEALTH_CHECK = 60
     AGENT_REGISTRATION_RETRY = 10
 
+    # Meta-Agent specific intervals
+    META_AGENT_CYCLE = 10
+    META_AGENT_ERROR_DELAY = 5
+    META_ANALYSIS_INTERVAL = 10
+    DEEP_ANALYSIS_CYCLE = 30
+
     # Task coordination intervals
     TASK_COORDINATION_CYCLE = 5
     TASK_QUEUE_POLL = 1

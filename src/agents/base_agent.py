@@ -1306,14 +1306,12 @@ class BaseAgent(ABC):
 
         return {"status": "acknowledged"}
 
-    @abstractmethod
     async def _on_collaboration_completed(self, result: dict[str, Any]) -> None:
         """Called when a collaboration is completed."""
         # Default implementation does nothing
         # Subclasses can override for learning or cleanup
         pass
 
-    @abstractmethod
     async def _on_collaboration_failed(self, failure_info: dict[str, Any]) -> None:
         """Called when a collaboration fails."""
         # Default implementation does nothing

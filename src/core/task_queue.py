@@ -494,7 +494,9 @@ class TaskQueue:
 
         return count
 
-    async def get_task(self, task_id_or_agent: str = None) -> Task | None:
+    async def get_task(
+        self, task_id_or_agent: str = None, priorities: list[int] = None
+    ) -> Task | None:
         """Get task by ID if provided, otherwise get next available task."""
         # If parameter looks like a task ID (UUID format), get specific task
         if task_id_or_agent and (
@@ -503,7 +505,7 @@ class TaskQueue:
             return await self._get_task_by_id(task_id_or_agent)
         else:
             # Get next available task for agent
-            return await self._get_next_available_task(task_id_or_agent)
+            return await self._get_next_available_task(task_id_or_agent, priorities)
 
     async def _get_task_by_id(self, task_id: str) -> Task | None:
         """Get a specific task by ID."""
@@ -520,13 +522,19 @@ class TaskQueue:
             logger.error("Failed to get task by ID", task_id=task_id, error=str(e))
             return None
 
-    async def _get_next_available_task(self, agent_id: str = None) -> Task | None:
+    async def _get_next_available_task(
+        self, agent_id: str = None, priorities: list[int] = None
+    ) -> Task | None:
         """Get next available task from priority queues using BRPOP."""
         try:
             # Check queues in priority order (lower number = higher priority)
             queue_keys = []
-            for priority in sorted(TaskPriority):
-                queue_key = f"{self.queue_prefix}:p{priority.value}"
+            priority_list = (
+                priorities if priorities else [p.value for p in sorted(TaskPriority)]
+            )
+
+            for priority_val in sorted(priority_list):
+                queue_key = f"{self.queue_prefix}:p{priority_val}"
                 queue_keys.append(queue_key)
 
             # Use BRPOP to atomically get task from highest priority queue
