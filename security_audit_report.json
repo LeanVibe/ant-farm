@@ -1,0 +1,343 @@
+{
+  "total_endpoints": 62,
+  "protected_endpoints": 10,
+  "unprotected_endpoints": 47,
+  "unprotected_details": [
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/status",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents/{agent_name}",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agents",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agents/{agent_name}/stop",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agents/{agent_name}/health",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks/self-improvement",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks/{task_id}",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks/{task_id}/cancel",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/messages",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "LOW"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/broadcast",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/system/shutdown",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance",
+      "function": "_generate_performance_recommendations",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/optimize",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "LOW"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/context/{agent_id}",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/context/{agent_id}/search",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/context/{agent_id}/add",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/context/{agent_id}/consolidate",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/modifications",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modifications/{proposal_id}/validate",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workflows",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workflows",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workflows/{workflow_id}/complete",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/adw/metrics/current",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/adw/cognitive/state",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/adw/predictions/current",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/adw/monitoring/start",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/adw/monitoring/stop",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/adw/sessions/history",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/adw/emergency/status",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/adw/emergency/resolve/{event_index}",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/adw/emergency/request-intervention",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "LOW"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id}/join",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "LOW"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id}/tasks/decompose",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "CRITICAL"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id}/status",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "MEDIUM"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collaboration/enhanced-session",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collaboration/{session_id}/share-context",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/collaboration/{session_id}/context",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collaboration/{session_id}/suggest-patterns",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collaboration/{session_id}/switch-driver",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collaboration/{session_id}/track-live",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/collaboration/{session_id}/metrics",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/diagnostics",
+      "function": "start_server",
+      "has_auth": false,
+      "severity": "HIGH"
+    }
+  ],
+  "summary": {
+    "critical_vulnerabilities": 10,
+    "high_risk_endpoints": 24,
+    "medium_risk_endpoints": 9,
+    "low_risk_endpoints": 4,
+    "compliance_score": 0.0
+  }
+}
