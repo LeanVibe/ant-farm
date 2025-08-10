@@ -287,3 +287,11 @@ class Permissions:
         return require_permissions(
             Permission.MODIFICATION_PROPOSE, Permission.MODIFICATION_READ
         )
+
+    @staticmethod
+    def context_read():
+        return require_permissions(Permission.CONTEXT_READ)
+
+    @staticmethod
+    def context_write():
+        return require_permissions(Permission.CONTEXT_WRITE, Permission.CONTEXT_READ)

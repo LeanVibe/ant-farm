@@ -896,7 +896,8 @@ async def detailed_health_check():
 
 
 @app.get("/api/v1/status", response_model=APIResponse)
-async def get_system_status():
+@Permissions.system_read()
+async def get_system_status(current_user: User = Depends(get_current_user)):
     """Get comprehensive system status."""
     try:
         # Get basic metrics
@@ -937,7 +938,8 @@ async def get_system_status():
 
 # Agent management endpoints
 @app.get("/api/v1/agents", response_model=APIResponse)
-async def list_agents(current_user: User = Depends(get_cli_user)):
+@Permissions.agent_read()
+async def list_agents(current_user: User = Depends(get_current_user)):
     """List all agents."""
     try:
         from pathlib import Path
@@ -996,8 +998,8 @@ async def list_agents(current_user: User = Depends(get_cli_user)):
 
 
 @app.get("/api/v1/agents/{agent_name}", response_model=APIResponse)
-# @Permissions.agent_read()  # Temporarily disabled for CLI testing
-async def get_agent(agent_name: str, current_user: User = Depends(get_cli_user)):
+@Permissions.agent_read()
+async def get_agent(agent_name: str, current_user: User = Depends(get_current_user)):
     """Get specific agent information."""
     try:
         from pathlib import Path
@@ -1029,12 +1031,12 @@ async def get_agent(agent_name: str, current_user: User = Depends(get_cli_user))
 
 
 @app.post("/api/v1/agents", response_model=APIResponse)
-# @Permissions.agent_spawn()  # Temporarily disabled for CLI testing
+@Permissions.agent_spawn()
 async def spawn_agent(
     agent_type: str,
     agent_name: str | None = None,
     background_tasks: BackgroundTasks = None,
-    current_user: User = Depends(get_cli_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Spawn a new agent."""
     try:
@@ -1115,7 +1117,10 @@ async def stop_agent(agent_name: str, current_user: User = Depends(get_current_u
 
 
 @app.post("/api/v1/agents/{agent_name}/health", response_model=APIResponse)
-async def check_agent_health(agent_name: str):
+@Permissions.agent_read()
+async def check_agent_health(
+    agent_name: str, current_user: User = Depends(get_current_user)
+):
     """Check agent health."""
     try:
         # Send health check message to agent
@@ -1146,11 +1151,11 @@ async def test_endpoint():
 
 # Task management endpoints
 @app.get("/api/v1/tasks", response_model=APIResponse)
-# @Permissions.task_read()  # Temporarily disabled for CLI testing
+@Permissions.task_read()
 async def list_tasks(
     status: str | None = None,
     assigned_to: str | None = None,
-    current_user: User = Depends(get_cli_user),
+    current_user: User = Depends(get_current_user),
 ):
     """List tasks with optional filtering."""
     try:
@@ -1182,9 +1187,9 @@ async def list_tasks(
 
 
 @app.post("/api/v1/tasks", response_model=APIResponse)
-# @Permissions.task_create()  # Temporarily disabled for CLI testing
+@Permissions.task_create()
 async def create_task(
-    task_create: TaskCreate, current_user: User = Depends(get_cli_user)
+    task_create: TaskCreate, current_user: User = Depends(get_current_user)
 ):
     """Create a new task and submit it to the task queue for MetaAgent processing."""
     try:
@@ -1240,9 +1245,9 @@ async def create_task(
 
 
 @app.post("/api/v1/tasks/self-improvement", response_model=APIResponse)
-# @Permissions.task_create()  # Temporarily disabled for CLI testing
+@Permissions.task_create()
 async def create_self_improvement_task(
-    title: str, description: str, current_user: User = Depends(get_cli_user)
+    title: str, description: str, current_user: User = Depends(get_current_user)
 ):
     """Create a self-improvement task for the MetaAgent as specified in PLAN.md.
 
@@ -1301,7 +1306,8 @@ async def create_self_improvement_task(
 
 
 @app.get("/api/v1/tasks/{task_id}", response_model=APIResponse)
-async def get_task(task_id: str):
+@Permissions.task_read()
+async def get_task(task_id: str, current_user: User = Depends(get_current_user)):
     """Get specific task information."""
     try:
         task = await task_queue.get_task_by_id(task_id)
@@ -1333,7 +1339,8 @@ async def get_task(task_id: str):
 
 
 @app.post("/api/v1/tasks/{task_id}/cancel", response_model=APIResponse)
-async def cancel_task(task_id: str):
+@Permissions.task_write()
+async def cancel_task(task_id: str, current_user: User = Depends(get_current_user)):
     """Cancel a task."""
     try:
         success = await task_queue.cancel_task(task_id)
@@ -1354,7 +1361,10 @@ async def cancel_task(task_id: str):
 
 # Messaging endpoints
 @app.post("/api/v1/messages", response_model=APIResponse)
-async def send_message(message: MessageSend):
+@Permissions.message_send()
+async def send_message(
+    message: MessageSend, current_user: User = Depends(get_current_user)
+):
     """Send a message to an agent."""
     try:
         message_id = await get_message_broker().send_message(
@@ -1380,7 +1390,10 @@ async def send_message(message: MessageSend):
 
 
 @app.post("/api/v1/broadcast", response_model=APIResponse)
-async def broadcast_message(topic: str, content: dict[str, Any]):
+@Permissions.message_send()
+async def broadcast_message(
+    topic: str, content: dict[str, Any], current_user: User = Depends(get_current_user)
+):
     """Broadcast a message to all agents."""
     try:
         message_id = await get_message_broker().broadcast_message(
@@ -1679,7 +1692,8 @@ def _generate_performance_recommendations(collector) -> list[dict[str, Any]]:
 
 
 @app.post("/api/v1/performance/optimize", response_model=APIResponse)
-async def trigger_optimization():
+@Permissions.system_write()
+async def trigger_optimization(current_user: User = Depends(get_current_user)):
     """Trigger performance optimization."""
     try:
         from ..core.performance_optimizer import get_performance_optimizer
@@ -1759,7 +1773,10 @@ async def resolve_agent_uuid(agent_identifier: str) -> str:
 
 
 @app.get("/api/v1/context/{agent_id}", response_model=APIResponse)
-async def get_agent_context(agent_id: str, limit: int = 10):
+@Permissions.context_read()
+async def get_agent_context(
+    agent_id: str, limit: int = 10, current_user: User = Depends(get_current_user)
+):
     """Get context/memory for a specific agent."""
     try:
         from src.core.context_engine import get_context_engine
@@ -1790,7 +1807,13 @@ async def get_agent_context(agent_id: str, limit: int = 10):
 
 
 @app.post("/api/v1/context/{agent_id}/search", response_model=APIResponse)
-async def search_context(agent_id: str, query: str, limit: int = 10):
+@Permissions.context_read()
+async def search_context(
+    agent_id: str,
+    query: str,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+):
     """Perform semantic search on agent context."""
     try:
         from src.core.context_engine import get_context_engine
@@ -1846,6 +1869,7 @@ async def search_context(agent_id: str, query: str, limit: int = 10):
 
 
 @app.post("/api/v1/context/{agent_id}/add", response_model=APIResponse)
+@Permissions.context_write()
 async def add_context(
     agent_id: str,
     content: str,
@@ -1854,6 +1878,7 @@ async def add_context(
     importance_score: float = 0.5,
     topic: str = None,
     metadata: dict = None,
+    current_user: User = Depends(get_current_user),
 ):
     """Add a document to the context engine."""
     try:
@@ -1903,7 +1928,10 @@ async def add_context(
 
 
 @app.post("/api/v1/context/{agent_id}/consolidate", response_model=APIResponse)
-async def consolidate_agent_memory(agent_id: str):
+@Permissions.context_write()
+async def consolidate_agent_memory(
+    agent_id: str, current_user: User = Depends(get_current_user)
+):
     """Trigger memory consolidation for an agent."""
     try:
         from src.core.context_engine import get_context_engine
@@ -1923,7 +1951,8 @@ async def consolidate_agent_memory(agent_id: str):
 
 # Self-modification endpoints
 @app.get("/api/v1/modifications", response_model=APIResponse)
-async def get_modification_stats():
+@Permissions.modification_read()
+async def get_modification_stats(current_user: User = Depends(get_current_user)):
     """Get self-modification statistics."""
     try:
         from ..core.self_modifier import get_self_modifier
@@ -1939,12 +1968,14 @@ async def get_modification_stats():
 
 
 @app.post("/api/v1/modifications/proposal", response_model=APIResponse)
+@Permissions.modification_propose()
 async def create_modification_proposal(
     title: str,
     description: str,
     modification_type: str,
     file_paths: list[str],
     agent_id: str = "api-user",
+    current_user: User = Depends(get_current_user),
 ):
     """Create a new modification proposal."""
     try:
@@ -1984,7 +2015,10 @@ async def create_modification_proposal(
 
 
 @app.post("/api/v1/modifications/{proposal_id}/validate", response_model=APIResponse)
-async def validate_modification(proposal_id: str):
+@Permissions.modification_propose()
+async def validate_modification(
+    proposal_id: str, current_user: User = Depends(get_current_user)
+):
     """Validate a modification proposal."""
     try:
         from ..core.self_modifier import get_self_modifier
@@ -2014,7 +2048,8 @@ async def validate_modification(proposal_id: str):
 
 # Git workflow endpoints
 @app.get("/api/v1/workflows", response_model=APIResponse)
-async def list_workflows():
+@Permissions.system_read()
+async def list_workflows(current_user: User = Depends(get_current_user)):
     """List active development workflows."""
     try:
         from ..core.cli_git_integration import get_enhanced_cli_executor
@@ -2047,8 +2082,13 @@ async def list_workflows():
 
 
 @app.post("/api/v1/workflows", response_model=APIResponse)
+@Permissions.system_write()
 async def create_workflow(
-    workflow_type: str, description: str, agent_id: str, target_branch: str = "main"
+    workflow_type: str,
+    description: str,
+    agent_id: str,
+    target_branch: str = "main",
+    current_user: User = Depends(get_current_user),
 ):
     """Create a new development workflow."""
     try:
@@ -2077,7 +2117,12 @@ async def create_workflow(
 
 
 @app.post("/api/v1/workflows/{workflow_id}/complete", response_model=APIResponse)
-async def complete_workflow(workflow_id: str, merge_to_main: bool = False):
+@Permissions.system_write()
+async def complete_workflow(
+    workflow_id: str,
+    merge_to_main: bool = False,
+    current_user: User = Depends(get_current_user),
+):
     """Complete a development workflow."""
     try:
         from ..core.cli_git_integration import get_enhanced_cli_executor
@@ -2105,7 +2150,8 @@ async def complete_workflow(workflow_id: str, merge_to_main: bool = False):
 
 # ADW Monitoring endpoints
 @app.get("/api/v1/adw/metrics/current", response_model=APIResponse)
-async def get_current_adw_metrics():
+@Permissions.metrics_read()
+async def get_current_adw_metrics(current_user: User = Depends(get_current_user)):
     """Get current ADW monitoring metrics."""
     try:
         # This would integrate with the actual monitoring dashboard
@@ -2127,7 +2173,8 @@ async def get_current_adw_metrics():
 
 
 @app.get("/api/v1/adw/cognitive/state", response_model=APIResponse)
-async def get_cognitive_state():
+@Permissions.system_read()
+async def get_cognitive_state(current_user: User = Depends(get_current_user)):
     """Get current cognitive load state."""
     try:
         # This would integrate with the cognitive load manager
@@ -2149,7 +2196,8 @@ async def get_cognitive_state():
 
 
 @app.get("/api/v1/adw/predictions/current", response_model=APIResponse)
-async def get_failure_predictions():
+@Permissions.system_read()
+async def get_failure_predictions(current_user: User = Depends(get_current_user)):
     """Get current failure predictions."""
     try:
         # This would integrate with the failure prediction system
@@ -2172,7 +2220,8 @@ async def get_failure_predictions():
 
 
 @app.post("/api/v1/adw/monitoring/start", response_model=APIResponse)
-async def start_adw_monitoring():
+@Permissions.system_write()
+async def start_adw_monitoring(current_user: User = Depends(get_current_user)):
     """Start ADW monitoring session."""
     try:
         # This would start the actual monitoring
@@ -2197,7 +2246,8 @@ async def start_adw_monitoring():
 
 
 @app.post("/api/v1/adw/monitoring/stop", response_model=APIResponse)
-async def stop_adw_monitoring():
+@Permissions.system_write()
+async def stop_adw_monitoring(current_user: User = Depends(get_current_user)):
     """Stop ADW monitoring session."""
     try:
         # This would stop the actual monitoring
@@ -2215,7 +2265,8 @@ async def stop_adw_monitoring():
 
 
 @app.get("/api/v1/adw/sessions/history", response_model=APIResponse)
-async def get_adw_session_history():
+@Permissions.system_read()
+async def get_adw_session_history(current_user: User = Depends(get_current_user)):
     """Get ADW session history."""
     try:
         # This would retrieve actual session history
@@ -2249,7 +2300,8 @@ async def get_adw_session_history():
 
 
 @app.get("/api/v1/adw/emergency/status", response_model=APIResponse)
-async def get_emergency_status():
+@Permissions.system_read()
+async def get_emergency_status(current_user: User = Depends(get_current_user)):
     """Get current emergency intervention status."""
     try:
         # Mock emergency status data
@@ -2293,7 +2345,12 @@ async def get_emergency_status():
 
 
 @app.post("/api/v1/adw/emergency/resolve/{event_index}", response_model=APIResponse)
-async def resolve_emergency_event(event_index: int, resolution_notes: str = ""):
+@Permissions.system_write()
+async def resolve_emergency_event(
+    event_index: int,
+    resolution_notes: str = "",
+    current_user: User = Depends(get_current_user),
+):
     """Resolve a specific emergency event."""
     try:
         # Mock emergency event resolution
@@ -2312,7 +2369,10 @@ async def resolve_emergency_event(event_index: int, resolution_notes: str = ""):
 
 
 @app.post("/api/v1/adw/emergency/request-intervention", response_model=APIResponse)
-async def request_human_intervention(reason: str):
+@Permissions.system_write()
+async def request_human_intervention(
+    reason: str, current_user: User = Depends(get_current_user)
+):
     """Request human intervention for the current ADW session."""
     try:
         # Mock human intervention request
@@ -2333,8 +2393,9 @@ async def request_human_intervention(reason: str):
 
 # Large Project Coordination endpoints
 @app.post("/api/v1/projects", response_model=APIResponse)
+@Permissions.system_write()
 async def create_project_workspace(
-    project_data: dict = Body(...), current_user: dict = Depends(get_current_user)
+    project_data: dict = Body(...), current_user: User = Depends(get_current_user)
 ):
     """Create a new large project workspace."""
     try:
@@ -2383,9 +2444,12 @@ async def create_project_workspace(
 
 
 @app.post("/api/v1/projects/{project_id}/join", response_model=APIResponse)
+@Permissions.system_write()
 async def join_project(
     project_id: str,
     join_data: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+):
     current_user: dict = Depends(get_current_user),
 ):
     """Add an agent to a project workspace."""
@@ -2418,9 +2482,12 @@ async def join_project(
 
 
 @app.post("/api/v1/projects/{project_id}/tasks/decompose", response_model=APIResponse)
+@Permissions.task_create()
 async def decompose_large_task(
     project_id: str,
     task_data: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+):
     current_user: dict = Depends(get_current_user),
 ):
     """Decompose a large task into coordinated sub-tasks."""
@@ -2453,8 +2520,9 @@ async def decompose_large_task(
 
 
 @app.get("/api/v1/projects/{project_id}/status", response_model=APIResponse)
+@Permissions.system_read()
 async def get_project_status(
-    project_id: str, current_user: dict = Depends(get_current_user)
+    project_id: str, current_user: User = Depends(get_current_user)
 ):
     """Get comprehensive status of a large project."""
     try:
@@ -2473,8 +2541,9 @@ async def get_project_status(
 
 
 @app.get("/api/v1/projects/{project_id}/progress", response_model=APIResponse)
+@Permissions.system_read()
 async def monitor_project_progress(
-    project_id: str, current_user: dict = Depends(get_current_user)
+    project_id: str, current_user: User = Depends(get_current_user)
 ):
     """Monitor and report on project progress."""
     try:
@@ -2493,9 +2562,12 @@ async def monitor_project_progress(
 
 
 @app.post("/api/v1/projects/{project_id}/conflicts/resolve", response_model=APIResponse)
+@Permissions.system_write()
 async def resolve_project_conflict(
     project_id: str,
     conflict_data: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+):
     current_user: dict = Depends(get_current_user),
 ):
     """Handle conflicts in large project coordination."""
@@ -2529,8 +2601,9 @@ async def resolve_project_conflict(
 
 # Enhanced AI Pair Programming endpoints
 @app.post("/api/v1/collaboration/enhanced-session", response_model=APIResponse)
+@Permissions.system_write()
 async def start_enhanced_collaboration(
-    session_data: dict = Body(...), current_user: dict = Depends(get_current_user)
+    session_data: dict = Body(...), current_user: User = Depends(get_current_user)
 ):
     """Start an enhanced AI pair programming session."""
     try:
@@ -2583,9 +2656,12 @@ async def start_enhanced_collaboration(
 @app.post(
     "/api/v1/collaboration/{session_id}/share-context", response_model=APIResponse
 )
+@Permissions.system_write()
 async def share_collaboration_context(
     session_id: str,
     context_data: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+):
     current_user: dict = Depends(get_current_user),
 ):
     """Share context between agents in a collaboration session."""
@@ -2637,9 +2713,12 @@ async def share_collaboration_context(
 
 
 @app.get("/api/v1/collaboration/{session_id}/context", response_model=APIResponse)
+@Permissions.system_read()
 async def get_relevant_context(
     session_id: str,
     requesting_agent: str,
+    current_user: User = Depends(get_current_user),
+):
     query: str,
     context_types: list[str] = None,
     current_user: dict = Depends(get_current_user),
@@ -2696,10 +2775,11 @@ async def get_relevant_context(
 @app.post(
     "/api/v1/collaboration/{session_id}/suggest-patterns", response_model=APIResponse
 )
+@Permissions.system_write()
 async def suggest_code_patterns(
     session_id: str,
     code_data: dict = Body(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Get code pattern suggestions for current work."""
     try:
@@ -2733,10 +2813,12 @@ async def suggest_code_patterns(
 @app.post(
     "/api/v1/collaboration/{session_id}/switch-driver", response_model=APIResponse
 )
+@Permissions.system_write()
 async def switch_collaboration_driver(
     session_id: str,
     driver_data: dict = Body(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+):
 ):
     """Switch the active driver in a collaboration session."""
     try:
@@ -2773,9 +2855,12 @@ async def switch_collaboration_driver(
 
 
 @app.post("/api/v1/collaboration/{session_id}/track-live", response_model=APIResponse)
+@Permissions.system_write()
 async def track_live_collaboration(
     session_id: str,
     tracking_data: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+):
     current_user: dict = Depends(get_current_user),
 ):
     """Track live collaboration state."""
@@ -2814,8 +2899,9 @@ async def track_live_collaboration(
 
 
 @app.get("/api/v1/collaboration/{session_id}/metrics", response_model=APIResponse)
+@Permissions.metrics_read()
 async def get_collaboration_metrics(
-    session_id: str, current_user: dict = Depends(get_current_user)
+    session_id: str, current_user: User = Depends(get_current_user)
 ):
     """Get collaboration metrics for a session."""
     try:
@@ -2834,8 +2920,9 @@ async def get_collaboration_metrics(
 
 
 @app.post("/api/v1/collaboration/{session_id}/end", response_model=APIResponse)
+@Permissions.system_write()
 async def end_collaboration_session(
-    session_id: str, current_user: dict = Depends(get_current_user)
+    session_id: str, current_user: User = Depends(get_current_user)
 ):
     """End an enhanced collaboration session."""
     try:
@@ -2862,7 +2949,8 @@ async def end_collaboration_session(
 
 # System diagnostics endpoints
 @app.get("/api/v1/diagnostics", response_model=APIResponse)
-async def get_system_diagnostics():
+@Permissions.system_read()
+async def get_system_diagnostics(current_user: User = Depends(get_current_user)):
     """Get comprehensive system diagnostics."""
     try:
         # Collect various diagnostic information
