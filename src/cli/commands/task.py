@@ -3,6 +3,7 @@ Task management commands for the Hive CLI
 """
 
 import asyncio
+from pathlib import Path
 import json
 from pathlib import Path
 
@@ -272,13 +273,12 @@ async def _show_task_logs(task_identifier: str, follow: bool):
                         console.print("\n✅ [bold green]Result:[/bold green]")
                         console.print(json.dumps(task["result"], indent=2))
 
-                    # TODO: In a real implementation, this would tail actual log files
-                    # For now, show task status
+                    # Real log file tailing implementation
                     if follow:
                         info_message("Following task logs (press Ctrl+C to exit)...")
-                        info_message(
-                            "Note: Real-time log following not yet implemented"
-                        )
+                        await _follow_task_logs(task_identifier)
+
+                    return  # Exit after showing logs
 
                 else:
                     error_handler(Exception(data.get("error", "Unknown API error")))
@@ -468,6 +468,68 @@ async def _search_tasks(query: str):
         )
     except Exception as e:
         error_handler(e)
+
+
+async def _follow_task_logs(task_identifier: str):
+    """Follow task logs in real-time by tailing log files."""
+    try:
+        # Look for log files related to the task
+        log_dir = Path(".")
+
+        # Common log file patterns for tasks
+        log_patterns = [
+            f"*{task_identifier}*.log",
+            f"task-{task_identifier}.log",
+            f"{task_identifier}.log",
+            "*.log",  # Fallback to all log files
+        ]
+
+        log_file = None
+        for pattern in log_patterns:
+            matching_files = list(log_dir.glob(pattern))
+            if matching_files:
+                # Use the most recently modified log file
+                log_file = max(matching_files, key=lambda f: f.stat().st_mtime)
+                break
+
+        if not log_file:
+            # Create log directory structure if it doesn't exist
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
+
+            # Check agent log files
+            agent_logs = list(log_dir.glob("*agent*.log"))
+            if agent_logs:
+                log_file = max(agent_logs, key=lambda f: f.stat().st_mtime)
+            else:
+                info_message("No log files found for this task")
+                return
+
+        console.print(f"📋 Tailing log file: {log_file}")
+
+        # Follow the log file
+        try:
+            with open(log_file, "r") as f:
+                # Seek to end of file
+                f.seek(0, 2)
+
+                while True:
+                    line = f.readline()
+                    if line:
+                        # Filter for relevant log entries
+                        if task_identifier in line or "task" in line.lower():
+                            console.print(line.strip())
+                    else:
+                        # Wait for new content
+                        await asyncio.sleep(0.5)
+
+        except KeyboardInterrupt:
+            info_message("\nStopped following logs")
+        except Exception as e:
+            error_handler(Exception(f"Error reading log file: {e}"))
+
+    except Exception as e:
+        error_handler(Exception(f"Error setting up log following: {e}"))
 
 
 if __name__ == "__main__":

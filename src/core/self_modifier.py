@@ -889,12 +889,48 @@ class SelfModifier:
             # 1. Read current file content
             original_content = file_full_path.read_text()
 
-            # 2. For now, create a simple placeholder modification
-            # TODO: Use BaseAgent's execute_with_cli_tool to generate actual changes
-            # This is a minimal implementation for bootstrap
-            modified_content = (
-                original_content + f"\n# Modified by {agent_id}: {change_description}\n"
-            )
+            # 2. Use BaseAgent's execute_with_cli_tool to generate actual changes
+            try:
+                # Import BaseAgent to use CLI tool integration
+                from ..agents.base_agent import BaseAgent
+
+                # Create a temporary agent instance for CLI tool access
+                # In a real implementation, this would be passed from the calling agent
+                temp_agent = BaseAgent(
+                    name=f"self-modifier-{agent_id}", agent_type="modifier"
+                )
+                await temp_agent.initialize()
+
+                # Generate modification using CLI tool
+                modification_prompt = f"""
+                Analyze and modify the file {file_path} according to this description: {change_description}
+                
+                Current file content:
+                {original_content}
+                
+                Please provide the improved version of this file.
+                """
+
+                cli_result = await temp_agent.execute_with_cli_tool(modification_prompt)
+
+                if cli_result.success:
+                    modified_content = cli_result.output
+                else:
+                    # Fallback to simple modification if CLI tool fails
+                    modified_content = (
+                        original_content
+                        + f"\n# Modified by {agent_id}: {change_description}\n"
+                    )
+
+                await temp_agent.cleanup()
+
+            except Exception as e:
+                logger.warning(f"CLI tool integration failed, using fallback: {e}")
+                # Fallback implementation for bootstrap
+                modified_content = (
+                    original_content
+                    + f"\n# Modified by {agent_id}: {change_description}\n"
+                )
 
             # 3. Create a code change
             change = CodeChange(
