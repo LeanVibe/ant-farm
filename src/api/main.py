@@ -1911,17 +1911,6 @@ async def add_context(
             },
         )
 
-        return APIResponse(
-            success=True,
-            data={
-                "agent_id": agent_id,
-                "agent_uuid": agent_uuid,
-                "context_id": str(context_id),
-                "content_length": len(content),
-                "category": category,
-            },
-        )
-
     except Exception as e:
         logger.error(f"Failed to add context for agent {agent_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -2450,8 +2439,6 @@ async def join_project(
     join_data: dict = Body(...),
     current_user: User = Depends(get_current_user),
 ):
-    current_user: dict = Depends(get_current_user),
-):
     """Add an agent to a project workspace."""
     try:
         from ..core.collaboration import get_large_project_coordinator
@@ -2487,8 +2474,6 @@ async def decompose_large_task(
     project_id: str,
     task_data: dict = Body(...),
     current_user: User = Depends(get_current_user),
-):
-    current_user: dict = Depends(get_current_user),
 ):
     """Decompose a large task into coordinated sub-tasks."""
     try:
@@ -2567,8 +2552,6 @@ async def resolve_project_conflict(
     project_id: str,
     conflict_data: dict = Body(...),
     current_user: User = Depends(get_current_user),
-):
-    current_user: dict = Depends(get_current_user),
 ):
     """Handle conflicts in large project coordination."""
     try:
@@ -2662,8 +2645,6 @@ async def share_collaboration_context(
     context_data: dict = Body(...),
     current_user: User = Depends(get_current_user),
 ):
-    current_user: dict = Depends(get_current_user),
-):
     """Share context between agents in a collaboration session."""
     try:
         from ..core.collaboration.enhanced_pair_programming import (
@@ -2717,11 +2698,9 @@ async def share_collaboration_context(
 async def get_relevant_context(
     session_id: str,
     requesting_agent: str,
-    current_user: User = Depends(get_current_user),
-):
     query: str,
     context_types: list[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Get relevant context for an agent."""
     try:
@@ -2819,7 +2798,6 @@ async def switch_collaboration_driver(
     driver_data: dict = Body(...),
     current_user: User = Depends(get_current_user),
 ):
-):
     """Switch the active driver in a collaboration session."""
     try:
         from ..core.collaboration.enhanced_pair_programming import (
@@ -2860,8 +2838,6 @@ async def track_live_collaboration(
     session_id: str,
     tracking_data: dict = Body(...),
     current_user: User = Depends(get_current_user),
-):
-    current_user: dict = Depends(get_current_user),
 ):
     """Track live collaboration state."""
     try:
