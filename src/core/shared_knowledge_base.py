@@ -14,6 +14,7 @@ import structlog
 
 from .context_engine import ContextEngine
 from .enhanced_message_broker import EnhancedMessageBroker, ContextShareType
+from .communication_monitor import get_communication_monitor
 
 logger = structlog.get_logger()
 
@@ -154,6 +155,9 @@ class SharedKnowledgeBase:
     ) -> str:
         """Add new knowledge to the shared knowledge base."""
 
+        start_time = time.time()
+        communication_monitor = get_communication_monitor()
+
         knowledge_id = str(uuid.uuid4())
 
         knowledge_item = KnowledgeItem(
@@ -189,12 +193,30 @@ class SharedKnowledgeBase:
 
         self.learning_metrics["knowledge_items_total"] += 1
 
+        # Record knowledge metrics
+        processing_time = time.time() - start_time
+        content_size = len(json.dumps(content).encode("utf-8"))
+
+        await self._record_knowledge_metrics(
+            "knowledge_added",
+            author_agent,
+            {
+                "knowledge_id": knowledge_id,
+                "knowledge_type": knowledge_type.value,
+                "processing_time": processing_time,
+                "content_size": content_size,
+                "tag_count": len(tags) if tags else 0,
+                "confidence_score": confidence_score,
+            },
+        )
+
         logger.info(
             "Knowledge added",
             knowledge_id=knowledge_id,
             type=knowledge_type.value,
             author=author_agent,
             tags=list(tags or []),
+            processing_time=processing_time,
         )
 
         return knowledge_id
@@ -868,6 +890,100 @@ class SharedKnowledgeBase:
                     if len(users.intersection(other_users)) >= 2:
                         item.related_items.add(other_id)
                         other_item.related_items.add(item_id)
+
+    async def _record_knowledge_metrics(
+        self,
+        metric_type: str,
+        agent_name: str,
+        metric_data: Dict[str, Any],
+    ) -> None:
+        """Record knowledge base performance metrics."""
+
+        communication_monitor = get_communication_monitor()
+
+        if hasattr(communication_monitor, "metrics_buffer"):
+            from .communication_monitor import CommunicationMetric, MetricType
+
+            # Map knowledge metrics to communication metric types
+            metric_type_mapping = {
+                "knowledge_added": MetricType.THROUGHPUT,
+                "knowledge_queried": MetricType.LATENCY,
+                "knowledge_validated": MetricType.RELIABILITY,
+                "knowledge_shared": MetricType.BANDWIDTH,
+                "recommendation_generated": MetricType.RESPONSE_TIME,
+            }
+
+            comm_metric_type = metric_type_mapping.get(
+                metric_type, MetricType.THROUGHPUT
+            )
+
+            # Extract meaningful value based on metric type
+            value = 1.0  # Default value for count-based metrics
+            if metric_type == "knowledge_queried" and "search_time" in metric_data:
+                value = metric_data["search_time"] * 1000  # Convert to milliseconds
+            elif metric_type == "knowledge_added" and "processing_time" in metric_data:
+                value = metric_data["processing_time"] * 1000  # Convert to milliseconds
+            elif metric_type == "knowledge_shared" and "content_size" in metric_data:
+                value = metric_data["content_size"]
+
+            metric = CommunicationMetric(
+                metric_type=comm_metric_type,
+                value=value,
+                timestamp=time.time(),
+                agent_name=agent_name,
+                metadata={
+                    "knowledge_metric": metric_type,
+                    **metric_data,
+                },
+            )
+
+            communication_monitor.metrics_buffer.append(metric)
+
+    async def get_knowledge_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics for knowledge base operations."""
+
+        current_time = time.time()
+
+        # Calculate knowledge statistics
+        total_knowledge = len(self.knowledge_items)
+        knowledge_by_type = {
+            ktype.value: len(items)
+            for ktype, items in self.knowledge_categories.items()
+        }
+
+        # Calculate agent contribution statistics
+        agent_contributions = {}
+        for agent, graph in self.agent_knowledge_graphs.items():
+            agent_contributions[agent] = len(graph["contributed"])
+
+        top_contributors = sorted(
+            agent_contributions.items(), key=lambda x: x[1], reverse=True
+        )[:5]
+
+        # Calculate knowledge sharing efficiency
+        total_sharing_events = sum(
+            len(usages) for usages in self.usage_patterns.values()
+        )
+
+        sharing_efficiency = (
+            total_sharing_events / total_knowledge if total_knowledge > 0 else 0
+        )
+
+        return {
+            "total_knowledge_items": total_knowledge,
+            "knowledge_by_type": dict(knowledge_by_type),
+            "top_contributors": top_contributors,
+            "total_agents_contributing": len(self.agent_knowledge_graphs),
+            "average_confidence_score": (
+                sum(item.confidence_score for item in self.knowledge_items.values())
+                / total_knowledge
+                if total_knowledge > 0
+                else 0
+            ),
+            "sharing_efficiency": sharing_efficiency,
+            "learning_metrics": self.learning_metrics.copy(),
+            "timestamp": current_time,
+        }
 
 
 # Global shared knowledge base instance

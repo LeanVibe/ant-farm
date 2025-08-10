@@ -13,6 +13,7 @@ import structlog
 
 from .message_broker import MessageBroker, MessageType, Message
 from .context_engine import ContextEngine
+from .communication_monitor import get_communication_monitor
 
 logger = structlog.get_logger()
 
@@ -356,6 +357,9 @@ class EnhancedMessageBroker(MessageBroker):
     ) -> bool:
         """Send a message with relevant context automatically included."""
 
+        start_time = time.time()
+        communication_monitor = get_communication_monitor()
+
         enhanced_payload = payload.copy()
 
         if include_relevant_context and context_ids:
@@ -374,13 +378,42 @@ class EnhancedMessageBroker(MessageBroker):
                 "capabilities": self.agent_states[from_agent].capabilities,
             }
 
-        return await self.send_message(
+        # Calculate message size for monitoring
+        message_size = len(json.dumps(enhanced_payload).encode("utf-8"))
+
+        # Record message sent metrics
+        await communication_monitor.record_message_sent(
+            from_agent=from_agent,
+            to_agent=to_agent,
+            message_id=str(uuid.uuid4()),
+            topic=topic,
+            message_size=message_size,
+            timestamp=start_time,
+        )
+
+        result = await self.send_message(
             from_agent=from_agent,
             to_agent=to_agent,
             topic=topic,
             payload=enhanced_payload,
             message_type=MessageType.DIRECT,
         )
+
+        # Record performance metrics
+        end_time = time.time()
+        latency = (end_time - start_time) * 1000  # Convert to milliseconds
+
+        await self._record_enhanced_metrics(
+            from_agent=from_agent,
+            to_agent=to_agent,
+            topic=topic,
+            latency=latency,
+            message_size=message_size,
+            context_count=len(context_ids) if context_ids else 0,
+            success=result,
+        )
+
+        return result
 
     async def broadcast_context_update(
         self,
@@ -627,6 +660,100 @@ class EnhancedMessageBroker(MessageBroker):
                 result[key] = value
 
         return result
+
+    async def _record_enhanced_metrics(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        latency: float,
+        message_size: int,
+        context_count: int,
+        success: bool,
+    ) -> None:
+        """Record enhanced messaging performance metrics."""
+
+        communication_monitor = get_communication_monitor()
+
+        # Record latency metric
+        if hasattr(communication_monitor, "metrics_buffer"):
+            from .communication_monitor import CommunicationMetric, MetricType
+
+            latency_metric = CommunicationMetric(
+                metric_type=MetricType.LATENCY,
+                value=latency,
+                timestamp=time.time(),
+                agent_name=from_agent,
+                target_agent=to_agent,
+                topic=topic,
+                metadata={
+                    "message_size": message_size,
+                    "context_count": context_count,
+                    "enhanced_message": True,
+                },
+            )
+
+            communication_monitor.metrics_buffer.append(latency_metric)
+
+            # Record success/failure rate
+            reliability_metric = CommunicationMetric(
+                metric_type=MetricType.RELIABILITY,
+                value=1.0 if success else 0.0,
+                timestamp=time.time(),
+                agent_name=from_agent,
+                target_agent=to_agent,
+                topic=topic,
+                metadata={
+                    "enhanced_message": True,
+                    "context_sharing": context_count > 0,
+                },
+            )
+
+            communication_monitor.metrics_buffer.append(reliability_metric)
+
+    async def get_communication_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics for enhanced communication features."""
+
+        communication_monitor = get_communication_monitor()
+
+        # Get basic real-time stats
+        base_stats = await communication_monitor.get_real_time_stats()
+
+        # Add enhanced communication specific metrics
+        enhanced_stats = {
+            "shared_contexts_active": len(self.shared_contexts),
+            "agents_with_state": len(self.agent_states),
+            "context_subscribers": sum(
+                len(subs) for subs in self.context_subscribers.values()
+            ),
+            "sync_tasks_running": len(
+                [t for t in self.sync_tasks.values() if not t.done()]
+            ),
+        }
+
+        # Calculate context sharing efficiency
+        total_contexts = len(self.shared_contexts)
+        if total_contexts > 0:
+            avg_participants = (
+                sum(len(ctx.participants) for ctx in self.shared_contexts.values())
+                / total_contexts
+            )
+            enhanced_stats["average_participants_per_context"] = avg_participants
+
+        # Calculate sync performance
+        real_time_contexts = sum(
+            1
+            for ctx in self.shared_contexts.values()
+            if ctx.sync_mode == SyncMode.REAL_TIME
+        )
+        enhanced_stats["real_time_sync_ratio"] = (
+            real_time_contexts / total_contexts if total_contexts > 0 else 0
+        )
+
+        return {
+            **base_stats,
+            "enhanced_features": enhanced_stats,
+        }
 
     async def shutdown(self) -> None:
         """Shutdown enhanced message broker."""

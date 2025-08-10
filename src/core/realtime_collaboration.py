@@ -17,6 +17,7 @@ from .enhanced_message_broker import (
     SyncMode,
     AgentState,
 )
+from .communication_monitor import get_communication_monitor
 
 logger = structlog.get_logger()
 
@@ -141,6 +142,9 @@ class RealTimeCollaborationSync:
     ) -> str:
         """Start a new collaborative session."""
 
+        start_time = time.time()
+        communication_monitor = get_communication_monitor()
+
         session_id = str(uuid.uuid4())
 
         session = CollaborativeSession(
@@ -179,11 +183,26 @@ class RealTimeCollaborationSync:
 
         self.sync_metrics["sessions_active"] += 1
 
+        # Record collaboration metrics
+        session_start_time = time.time() - start_time
+        await self._record_collaboration_metrics(
+            "session_started",
+            coordinator,
+            {
+                "session_id": session_id,
+                "participant_count": len(session.participants),
+                "setup_time": session_start_time,
+                "has_shared_resources": bool(shared_resources),
+                "conflict_resolution": conflict_resolution.value,
+            },
+        )
+
         logger.info(
             "Collaboration session started",
             session_id=session_id,
             coordinator=coordinator,
             participants=len(session.participants),
+            setup_time=session_start_time,
         )
 
         return session_id
@@ -840,6 +859,89 @@ class RealTimeCollaborationSync:
             success = False
 
         return {"status": "changed" if success else "failed"}
+
+    async def _record_collaboration_metrics(
+        self,
+        metric_type: str,
+        agent_name: str,
+        metric_data: Dict[str, Any],
+    ) -> None:
+        """Record collaboration-specific performance metrics."""
+
+        communication_monitor = get_communication_monitor()
+
+        if hasattr(communication_monitor, "metrics_buffer"):
+            from .communication_monitor import CommunicationMetric, MetricType
+
+            # Map collaboration metrics to communication metric types
+            metric_type_mapping = {
+                "session_started": MetricType.THROUGHPUT,
+                "session_joined": MetricType.THROUGHPUT,
+                "operation_submitted": MetricType.LATENCY,
+                "sync_completed": MetricType.RELIABILITY,
+                "conflict_resolved": MetricType.ERROR_RATE,
+            }
+
+            comm_metric_type = metric_type_mapping.get(
+                metric_type, MetricType.THROUGHPUT
+            )
+
+            # Extract meaningful value based on metric type
+            value = 1.0  # Default value for count-based metrics
+            if metric_type == "operation_submitted" and "latency" in metric_data:
+                value = metric_data["latency"]
+            elif metric_type == "session_started" and "setup_time" in metric_data:
+                value = metric_data["setup_time"] * 1000  # Convert to milliseconds
+
+            metric = CommunicationMetric(
+                metric_type=comm_metric_type,
+                value=value,
+                timestamp=time.time(),
+                agent_name=agent_name,
+                metadata={
+                    "collaboration_metric": metric_type,
+                    **metric_data,
+                },
+            )
+
+            communication_monitor.metrics_buffer.append(metric)
+
+    async def get_collaboration_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics for collaboration features."""
+
+        current_time = time.time()
+
+        # Calculate session statistics
+        active_sessions = len(self.active_sessions)
+        total_participants = sum(
+            len(session.participants) for session in self.active_sessions.values()
+        )
+
+        # Calculate average session duration for completed sessions
+        session_durations = []
+        for session in self.active_sessions.values():
+            if session.state == CollaborationState.COMPLETED:
+                duration = current_time - session.created_at
+                session_durations.append(duration)
+
+        avg_session_duration = (
+            sum(session_durations) / len(session_durations) if session_durations else 0
+        )
+
+        # Calculate sync efficiency
+        total_operations = sum(len(ops) for ops in self.pending_operations.values())
+
+        return {
+            "active_sessions": active_sessions,
+            "total_participants": total_participants,
+            "average_participants_per_session": (
+                total_participants / active_sessions if active_sessions > 0 else 0
+            ),
+            "pending_operations": total_operations,
+            "average_session_duration": avg_session_duration,
+            "sync_metrics": self.sync_metrics.copy(),
+            "timestamp": current_time,
+        }
 
 
 # Global collaboration sync instance
