@@ -14,8 +14,108 @@ import structlog
 from .message_broker import MessageBroker, MessageType, Message
 from .context_engine import ContextEngine
 from .communication_monitor import get_communication_monitor
+from .enums import TaskPriority
 
 logger = structlog.get_logger()
+
+
+class MessagePriority(Enum):
+    """Message priority levels for enhanced message broker."""
+
+    CRITICAL = 1
+    HIGH = 2
+    NORMAL = 3
+    LOW = 4
+
+
+class RoutingStrategy(Enum):
+    """Routing strategies for load balancing."""
+
+    ROUND_ROBIN = "round_robin"
+    LEAST_LOAD = "least_load"
+    WEIGHTED = "weighted"
+    HASH_BASED = "hash_based"
+    RANDOM = "random"
+
+
+@dataclass
+class LoadBalancerConfig:
+    """Configuration for load balancer."""
+
+    strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN
+    weights: Dict[str, float] = field(default_factory=dict)
+    enable_health_checks: bool = True
+    health_check_interval: int = 30
+
+
+class LoadBalancer:
+    """Load balancer for enhanced message routing."""
+
+    def __init__(self, strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN):
+        self.strategy = strategy
+        self.agent_weights: Dict[str, float] = {}
+        self.agent_loads: Dict[str, float] = {}
+        self.last_selected_index = 0
+
+    def select_agent(self, agents: List[Dict], topic: str = None) -> Optional[Dict]:
+        """Select an agent based on the configured strategy."""
+        if not agents:
+            return None
+        # Filter out inactive agents
+        active_agents = [
+            agent for agent in agents if agent.get("status", "active") != "inactive"
+        ]
+        if not active_agents:
+            return None
+        if self.strategy == RoutingStrategy.ROUND_ROBIN:
+            return self._round_robin_select(active_agents)
+        elif self.strategy == RoutingStrategy.LEAST_LOAD:
+            return self._least_load_select(active_agents)
+        elif self.strategy == RoutingStrategy.WEIGHTED:
+            return self._weighted_select(active_agents)
+        elif self.strategy == RoutingStrategy.HASH_BASED:
+            return self._hash_based_select(active_agents, topic)
+        elif self.strategy == RoutingStrategy.RANDOM:
+            return self._random_select(active_agents)
+        else:
+            return self._round_robin_select(active_agents)
+
+    def _round_robin_select(self, agents: List[Dict]) -> Optional[Dict]:
+        """Select agent using round-robin strategy."""
+        if not agents:
+            return None
+        selected = agents[self.last_selected_index % len(agents)]
+        self.last_selected_index += 1
+        return selected
+
+    def _least_load_select(self, agents: List[Dict]) -> Optional[Dict]:
+        """Select agent with least load."""
+        if not agents:
+            return None
+        return min(agents, key=lambda a: a.get("load", 0.0))
+
+    def _weighted_select(self, agents: List[Dict]) -> Optional[Dict]:
+        """Select agent based on weights."""
+        if not agents:
+            return None
+        # Simple weighted selection - could be enhanced with more sophisticated algorithms
+        return max(agents, key=lambda a: self.agent_weights.get(a.get("id", ""), 1.0))
+
+    def _hash_based_select(self, agents: List[Dict], topic: str) -> Optional[Dict]:
+        """Select agent based on hash of topic."""
+        if not agents or not topic:
+            return self._round_robin_select(agents)
+        # Simple hash-based selection for consistent routing
+        hash_value = hash(topic) % len(agents)
+        return agents[hash_value]
+
+    def _random_select(self, agents: List[Dict]) -> Optional[Dict]:
+        """Select agent randomly."""
+        import random
+
+        if not agents:
+            return None
+        return random.choice(agents)
 
 
 class ContextShareType(Enum):
@@ -754,6 +854,213 @@ class EnhancedMessageBroker(MessageBroker):
             **base_stats,
             "enhanced_features": enhanced_stats,
         }
+
+    async def send_priority_message(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        payload: Dict[str, Any],
+        priority: MessagePriority = MessagePriority.NORMAL,
+        message_type: MessageType = MessageType.DIRECT,
+    ) -> str:
+        """Send a message with priority level."""
+
+        # Convert priority to numeric value for sorting
+        priority_value = priority.value
+
+        # Add priority to payload for tracking
+        enhanced_payload = payload.copy()
+        enhanced_payload["priority"] = priority.name
+
+        # Generate message ID
+        message_id = str(uuid.uuid4())
+
+        # Add to priority queue in Redis
+        priority_key = f"hive:priority_queue:{priority.name.lower()}"
+        message_data = {
+            "id": message_id,
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "topic": topic,
+            "payload": json.dumps(enhanced_payload),
+            "message_type": message_type.value,
+            "timestamp": time.time(),
+            "priority": priority_value,
+        }
+
+        # Add to priority queue in Redis
+        await self.redis_client.zadd(
+            priority_key, {json.dumps(message_data): time.time()}
+        )
+        await self.redis_client.expire(priority_key, 3600)  # 1 hour TTL
+
+        # Publish notification for immediate processing
+        await self.redis_client.publish(
+            f"priority_message:{priority.name.lower()}", json.dumps(message_data)
+        )
+
+        # Also send via normal message broker for immediate delivery
+        await self.send_message(
+            from_agent=from_agent,
+            to_agent=to_agent,
+            topic=topic,
+            payload=enhanced_payload,
+            message_type=message_type,
+            priority=priority_value,
+        )
+
+        # Record message metrics
+        metrics_key = "hive:broker_metrics"
+        await self.redis_client.hincrby(metrics_key, "messages_sent", 1)
+        await self.redis_client.hincrby(
+            metrics_key, f"priority_{priority.name.lower()}_sent", 1
+        )
+
+        return message_id
+
+    async def get_priority_messages(self, limit: int = 10) -> List[Dict]:
+        """Get messages from priority queues."""
+        messages = []
+
+        # Check queues in priority order (critical first)
+        priority_queues = ["critical", "high", "normal", "low"]
+
+        for queue_name in priority_queues:
+            priority_key = f"hive:priority_queue:{queue_name}"
+            queue_messages = await self.redis_client.zrange(
+                priority_key, 0, limit - 1, withscores=False
+            )
+
+            for msg_data in queue_messages:
+                try:
+                    msg = json.loads(msg_data)
+                    messages.append(msg)
+                    if len(messages) >= limit:
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+            if len(messages) >= limit:
+                break
+
+        return messages[:limit]
+
+    async def update_agent_load(
+        self, agent_name: str, load: float, capacity: int
+    ) -> None:
+        """Update agent load information for load balancing."""
+        load_key = f"hive:agent_load:{agent_name}"
+
+        load_data = {
+            "load": str(load),
+            "capacity": str(capacity),
+            "last_updated": str(time.time()),
+            "status": "active",
+        }
+
+        await self.redis_client.hset(load_key, mapping=load_data)
+        await self.redis_client.expire(load_key, 300)  # 5 minutes TTL
+
+    async def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics for message broker."""
+        metrics_key = "hive:broker_metrics"
+        metrics = await self.redis_client.hgetall(metrics_key)
+
+        # Convert string values to appropriate types
+        converted_metrics = {}
+        for key, value in metrics.items():
+            try:
+                if "." in value:
+                    converted_metrics[key] = float(value)
+                else:
+                    converted_metrics[key] = int(value)
+            except ValueError:
+                converted_metrics[key] = value
+
+        return converted_metrics
+
+    async def send_message_batch(self, messages: List[Dict[str, Any]]) -> bool:
+        """Send a batch of messages efficiently."""
+        if not messages:
+            return True
+
+        success_count = 0
+        for msg_data in messages:
+            try:
+                result = await self.send_priority_message(
+                    from_agent=msg_data.get("from_agent", "batch_sender"),
+                    to_agent=msg_data.get("to_agent", "broadcast"),
+                    topic=msg_data.get("topic", "batch_message"),
+                    payload=msg_data.get("payload", {}),
+                    priority=MessagePriority(
+                        msg_data.get("priority", MessagePriority.NORMAL)
+                    ),
+                    message_type=MessageType(
+                        msg_data.get("message_type", MessageType.DIRECT)
+                    ),
+                )
+                if result:
+                    success_count += 1
+            except Exception:
+                continue
+
+        return success_count == len(messages)
+
+    async def route_by_topic(
+        self,
+        topic: str,
+        available_agents: List[str],
+    ) -> Optional[str]:
+        """Route message based on topic specialization."""
+        if not available_agents:
+            return None
+
+        # Simple hash-based routing for consistent topic-agent mapping
+        hash_value = hash(topic) % len(available_agents)
+        return available_agents[hash_value]
+
+    async def route_message_intelligently(
+        self,
+        topic: str,
+        message_priority: MessagePriority = MessagePriority.NORMAL,
+        required_capacity: int = 1,
+    ) -> Optional[str]:
+        """Route message to best available agent based on capacity and priority."""
+        # Get available agents
+        agent_keys = await self.redis_client.keys("hive:agent_load:*")
+        available_agents = []
+
+        for key in agent_keys:
+            agent_data = await self.redis_client.hgetall(key)
+            # Handle both bytes and string keys
+            if isinstance(key, bytes):
+                agent_name = key.decode("utf-8").split(":")[-1]
+            else:
+                agent_name = key.split(":")[-1]
+
+            try:
+                load = float(agent_data.get("load", 0))
+                capacity = int(agent_data.get("capacity", 10))
+                status = agent_data.get("status", "inactive")
+
+                if status == "active" and (capacity - load) >= required_capacity:
+                    available_agents.append(
+                        {
+                            "id": agent_name,
+                            "load": load,
+                            "capacity": capacity,
+                        }
+                    )
+            except (ValueError, TypeError):
+                continue
+
+        if not available_agents:
+            return None
+
+        # Simple routing - select agent with lowest load
+        selected_agent = min(available_agents, key=lambda a: a["load"])
+        return selected_agent["id"]
 
     async def shutdown(self) -> None:
         """Shutdown enhanced message broker."""
