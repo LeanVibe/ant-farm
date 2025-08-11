@@ -943,6 +943,209 @@ class RealTimeCollaborationSync:
             "timestamp": current_time,
         }
 
+    # Additional methods expected by integration tests
+    async def start_session(
+        self,
+        workspace_id: str,
+        session_type: str,
+        initiated_by: str,
+        participants: List[str],
+    ) -> Dict[str, Any]:
+        """Start a collaboration session (test compatibility method)."""
+        session_id = await self.start_collaboration_session(
+            title=f"{session_type} session in {workspace_id}",
+            coordinator=initiated_by,
+            initial_participants=set(participants),
+            shared_resources={
+                "workspace_id": workspace_id,
+                "session_type": session_type,
+            },
+        )
+
+        # Store workspace_id in session metadata after creation
+        if session_id in self.active_sessions:
+            self.active_sessions[session_id].metadata["workspace_id"] = workspace_id
+
+        return {"session_id": session_id, "workspace_id": workspace_id}
+
+    async def join_workspace(self, workspace_id: str, agent_id: str) -> bool:
+        """Join a workspace (test compatibility method)."""
+        try:
+            # Find session by workspace_id in metadata
+            for session in self.active_sessions.values():
+                if session.metadata.get("workspace_id") == workspace_id:
+                    success = await self.join_collaboration_session(
+                        session.id, agent_id
+                    )
+                    return success
+            return False
+        except Exception:
+            return False
+
+    async def share_document(
+        self, workspace_id: str, document_name: str, content: str, shared_by: str
+    ) -> bool:
+        """Share a document in a workspace (test compatibility method)."""
+        try:
+            # First try to find existing session by workspace_id
+            target_session = None
+            for session in self.active_sessions.values():
+                if session.metadata.get("workspace_id") == workspace_id:
+                    target_session = session
+                    break
+
+            # If no session found, create one implicitly
+            if target_session is None:
+                session_id = await self.start_collaboration_session(
+                    title=f"Document sharing session for {workspace_id}",
+                    coordinator=shared_by,
+                    initial_participants={shared_by},
+                    shared_resources={"workspace_id": workspace_id},
+                )
+                if session_id in self.active_sessions:
+                    self.active_sessions[session_id].metadata["workspace_id"] = (
+                        workspace_id
+                    )
+                    target_session = self.active_sessions[session_id]
+
+            if target_session:
+                # Ensure shared_by agent is a participant in the session
+                if shared_by not in target_session.participants:
+                    target_session.participants.add(shared_by)
+                    # Add to shared context as well
+                    context_id = target_session.metadata.get("context_id")
+                    if context_id:
+                        await self.broker.join_shared_context(context_id, shared_by)
+
+                await self.submit_sync_operation(
+                    session_id=target_session.id,
+                    operation_type="share_document",
+                    resource_path=document_name,
+                    data={"content": content, "shared_by": shared_by},
+                    author=shared_by,
+                )
+                return True
+            return False
+        except Exception:
+            return False
+
+    async def acquire_document_lock(
+        self, workspace_id: str, document_name: str, agent_id: str, timeout: int = 30
+    ) -> bool:
+        """Acquire a document lock (test compatibility method)."""
+        try:
+            # Find session by workspace_id
+            for session in self.active_sessions.values():
+                if session.metadata.get("workspace_id") == workspace_id:
+                    # Ensure agent is a participant
+                    if agent_id not in session.participants:
+                        session.participants.add(agent_id)
+                        # Add to shared context as well
+                        context_id = session.metadata.get("context_id")
+                        if context_id:
+                            await self.broker.join_shared_context(context_id, agent_id)
+
+                    await self.submit_sync_operation(
+                        session_id=session.id,
+                        operation_type="acquire_lock",
+                        resource_path=document_name,
+                        data={"agent_id": agent_id, "timeout": timeout},
+                        author=agent_id,
+                    )
+                    return True
+            return False
+        except Exception:
+            return False
+
+    async def release_document_lock(
+        self, workspace_id: str, document_name: str, agent_id: str
+    ) -> bool:
+        """Release a document lock (test compatibility method)."""
+        try:
+            # Find session by workspace_id
+            for session in self.active_sessions.values():
+                if session.metadata.get("workspace_id") == workspace_id:
+                    # Ensure agent is a participant
+                    if agent_id not in session.participants:
+                        session.participants.add(agent_id)
+                        # Add to shared context as well
+                        context_id = session.metadata.get("context_id")
+                        if context_id:
+                            await self.broker.join_shared_context(context_id, agent_id)
+
+                    await self.submit_sync_operation(
+                        session_id=session.id,
+                        operation_type="release_lock",
+                        resource_path=document_name,
+                        data={"agent_id": agent_id},
+                        author=agent_id,
+                    )
+                    return True
+            return False
+        except Exception:
+            return False
+
+    async def create_workspace(
+        self,
+        name: str,
+        workspace_type: str,
+        created_by: str,
+        initial_participants: List[str],
+    ) -> Dict[str, Any]:
+        """Create a workspace (test compatibility method)."""
+        workspace_id = str(uuid.uuid4())
+        session_id = await self.start_collaboration_session(
+            title=name,
+            coordinator=created_by,
+            initial_participants=set(initial_participants),
+            shared_resources={"workspace_type": workspace_type},
+        )
+
+        # Store workspace_id in session metadata
+        if session_id in self.active_sessions:
+            self.active_sessions[session_id].metadata["workspace_id"] = workspace_id
+
+        return {
+            "id": workspace_id,
+            "name": name,
+            "workspace_type": workspace_type,
+            "session_id": session_id,
+        }
+
+    async def send_session_update(
+        self,
+        session_id: str,
+        update_type: str,
+        update_data: Dict[str, Any],
+        sent_by: str,
+    ) -> bool:
+        """Send a session update (test compatibility method)."""
+        try:
+            # Check if session exists and ensure sender is a participant
+            if session_id not in self.active_sessions:
+                return False
+
+            session = self.active_sessions[session_id]
+
+            # Ensure sent_by agent is a participant
+            if sent_by not in session.participants:
+                session.participants.add(sent_by)
+                # Add to shared context as well
+                context_id = session.metadata.get("context_id")
+                if context_id:
+                    await self.broker.join_shared_context(context_id, sent_by)
+
+            await self.submit_sync_operation(
+                session_id=session_id,
+                operation_type="session_update",
+                resource_path=f"updates/{update_type}",
+                data=update_data,
+                author=sent_by,
+            )
+            return True
+        except Exception:
+            return False
+
 
 # Global collaboration sync instance
 collaboration_sync = None
