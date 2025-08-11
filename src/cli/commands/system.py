@@ -300,6 +300,154 @@ async def _stop_services():
 
 
 @app.command()
+def monitor(
+    refresh_interval: int = typer.Option(
+        5, "--interval", "-i", help="Refresh interval in seconds"
+    ),
+    show_detailed: bool = typer.Option(
+        False, "--detailed", "-d", help="Show detailed metrics"
+    ),
+):
+    """Real-time system monitoring dashboard"""
+    asyncio.run(_monitor_system(refresh_interval, show_detailed))
+
+
+async def _monitor_system(refresh_interval: int, show_detailed: bool):
+    """Internal async system monitoring"""
+    try:
+        from rich.live import Live
+        from rich.layout import Layout
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich import box
+
+        console.clear()
+        info_message(
+            f"Starting real-time system monitor (refresh every {refresh_interval}s)"
+        )
+        info_message("Press Ctrl+C to exit")
+
+        def create_monitor_display():
+            """Create the monitoring display layout"""
+            layout = Layout()
+
+            # Split into top and bottom sections
+            layout.split_column(
+                Layout(name="header", size=3),
+                Layout(name="main"),
+                Layout(name="footer", size=3),
+            )
+
+            # Split main into left and right
+            layout["main"].split_row(
+                Layout(name="services", ratio=1), Layout(name="metrics", ratio=1)
+            )
+
+            return layout
+
+        async def update_display():
+            """Update the display with current data"""
+            # Get service status
+            services = await _check_all_services()
+
+            # Create services table
+            services_table = Table(title="🔧 System Services", box=box.ROUNDED)
+            services_table.add_column("Service", style="cyan", no_wrap=True)
+            services_table.add_column("Status", style="bold")
+            services_table.add_column("Details", style="dim")
+
+            for service_name, service_info in services.items():
+                status_style = "green" if service_info["status"] == "online" else "red"
+                status_icon = "🟢" if service_info["status"] == "online" else "🔴"
+                services_table.add_row(
+                    service_name,
+                    f"{status_icon} {service_info['status']}",
+                    service_info["details"],
+                )
+
+            # Get system metrics
+            metrics_table = Table(title="📊 System Metrics", box=box.ROUNDED)
+            metrics_table.add_column("Metric", style="cyan", no_wrap=True)
+            metrics_table.add_column("Value", style="bold")
+
+            try:
+                # Get metrics from API
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get(
+                        "http://localhost:9001/api/v1/cli/agents"
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        agents = data.get("data", [])
+                        active_agents = len(
+                            [a for a in agents if a.get("status") == "active"]
+                        )
+                        metrics_table.add_row("Active Agents", str(active_agents))
+                        metrics_table.add_row("Total Agents", str(len(agents)))
+
+                    # Get tasks
+                    response = await client.get(
+                        "http://localhost:9001/api/v1/cli/tasks"
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        tasks = data.get("data", [])
+                        pending_tasks = len(
+                            [t for t in tasks if t.get("status") == "pending"]
+                        )
+                        completed_tasks = len(
+                            [t for t in tasks if t.get("status") == "completed"]
+                        )
+                        metrics_table.add_row("Pending Tasks", str(pending_tasks))
+                        metrics_table.add_row("Completed Tasks", str(completed_tasks))
+                        metrics_table.add_row("Total Tasks", str(len(tasks)))
+
+            except Exception as e:
+                metrics_table.add_row(
+                    "Error", f"Failed to fetch metrics: {str(e)[:30]}"
+                )
+
+            # Create layout
+            layout = create_monitor_display()
+
+            # Header
+            layout["header"].update(
+                Panel(
+                    f"[bold cyan]LeanVibe Hive System Monitor[/bold cyan] | "
+                    f"Refresh: {refresh_interval}s | "
+                    f"Time: {time.strftime('%H:%M:%S')}",
+                    border_style="blue",
+                )
+            )
+
+            # Services and metrics
+            layout["services"].update(Panel(services_table, border_style="green"))
+            layout["metrics"].update(Panel(metrics_table, border_style="yellow"))
+
+            # Footer
+            layout["footer"].update(
+                Panel(
+                    "[dim]Press Ctrl+C to exit | Use --detailed for more metrics[/dim]",
+                    border_style="dim",
+                )
+            )
+
+            return layout
+
+        # Start live monitoring
+        with Live(await update_display(), refresh_per_second=1) as live:
+            while True:
+                await asyncio.sleep(refresh_interval)
+                live.update(await update_display())
+
+    except KeyboardInterrupt:
+        console.clear()
+        success_message("System monitoring stopped")
+    except Exception as e:
+        error_handler(e)
+
+
+@app.command()
 def logs():
     """Show system logs"""
     try:

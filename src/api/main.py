@@ -936,6 +936,290 @@ async def get_system_status(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+# CLI-friendly endpoints without authentication barriers
+@app.get("/api/v1/cli/agents", response_model=APIResponse)
+async def list_agents_cli(current_user: User = Depends(get_cli_user)):
+    """List all agents - CLI version without auth barriers."""
+    try:
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        agents = await orchestrator.registry.list_agents()
+        agent_info = []
+
+        for agent in agents:
+            # Convert orchestrator AgentStatus to API AgentStatus
+            api_status = "active"  # default
+            if agent.status.value == "starting":
+                api_status = "starting"
+            elif agent.status.value == "active":
+                api_status = "active"
+            elif agent.status.value == "idle":
+                api_status = "active"  # Map idle to active for API
+            elif agent.status.value == "busy":
+                api_status = "active"  # Map busy to active for API
+            elif agent.status.value == "stopping":
+                api_status = "stopping"
+            elif agent.status.value == "stopped":
+                api_status = "inactive"
+            elif agent.status.value == "error":
+                api_status = "error"
+
+            # Convert capabilities list to dict format for API compatibility
+            capabilities_dict = {}
+            if agent.capabilities:
+                if isinstance(agent.capabilities, list):
+                    capabilities_dict = dict.fromkeys(agent.capabilities, True)
+                elif isinstance(agent.capabilities, dict):
+                    capabilities_dict = agent.capabilities
+                else:
+                    capabilities_dict = {}
+
+            info = AgentInfo(
+                name=agent.name,
+                type=agent.type,
+                role=agent.role,
+                status=AgentStatus(api_status),
+                capabilities=capabilities_dict,
+                last_heartbeat=agent.last_heartbeat,
+                uptime=time.time() - agent.created_at if agent.created_at else 0.0,
+                short_id=agent.short_id,
+            )
+            agent_info.append(info.dict())
+
+        return APIResponse(success=True, data=agent_info)
+
+    except Exception as e:
+        logger.error(f"Failed to list agents: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/cli/agents/{agent_name}", response_model=APIResponse)
+async def get_agent_cli(agent_name: str, current_user: User = Depends(get_cli_user)):
+    """Get specific agent information - CLI version without auth barriers."""
+    try:
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        agent = await orchestrator.registry.get_agent(agent_name)
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+
+        info = AgentInfo(
+            name=agent.name,
+            type=agent.type,
+            role=agent.role,
+            status=AgentStatus(agent.status),
+            capabilities=agent.capabilities or {},
+            last_heartbeat=agent.last_heartbeat,
+            uptime=time.time() - agent.created_at if agent.created_at else 0.0,
+        )
+
+        return APIResponse(success=True, data=info.dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get agent {agent_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/cli/agents", response_model=APIResponse)
+async def spawn_agent_cli(
+    agent_type: str,
+    agent_name: str | None = None,
+    current_user: User = Depends(get_cli_user),
+):
+    """Spawn a new agent - CLI version without auth barriers."""
+    try:
+        if not agent_name:
+            agent_name = f"{agent_type}-{int(time.time())}"
+
+        # Spawn agent asynchronously
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        session_name = await orchestrator.spawn_agent(agent_type, agent_name)
+
+        # Broadcast agent creation event
+        await broadcast_event(
+            "agent-update",
+            {
+                "action": "spawned",
+                "agent": {
+                    "name": agent_name,
+                    "type": agent_type,
+                    "status": "spawning",
+                    "session_name": session_name,
+                    "timestamp": time.time(),
+                },
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            data={
+                "agent_name": agent_name,
+                "agent_type": agent_type,
+                "session_name": session_name,
+                "status": "spawning",
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to spawn agent type '{agent_type}': {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/cli/agents/{agent_name}/stop", response_model=APIResponse)
+async def stop_agent_cli(agent_name: str, current_user: User = Depends(get_cli_user)):
+    """Stop a specific agent - CLI version without auth barriers."""
+    try:
+        from pathlib import Path
+
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        success = await orchestrator.stop_agent(agent_name)
+
+        if success:
+            # Broadcast agent stop event
+            await broadcast_event(
+                "agent-update",
+                {
+                    "action": "stopped",
+                    "agent": {
+                        "name": agent_name,
+                        "status": "stopping",
+                        "timestamp": time.time(),
+                    },
+                },
+            )
+
+            return APIResponse(
+                success=True, data={"agent_name": agent_name, "status": "stopping"}
+            )
+        else:
+            raise HTTPException(status_code=404, detail="Agent not found")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to stop agent {agent_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/cli/agents/{agent_name}/health", response_model=APIResponse)
+async def check_agent_health_cli(
+    agent_name: str, current_user: User = Depends(get_cli_user)
+):
+    """Check agent health - CLI version without auth barriers."""
+    try:
+        # Send health check message to agent
+        response = await get_message_broker().send_message(
+            from_agent="api-server",
+            to_agent=agent_name,
+            topic="health_check",
+            payload={"timestamp": time.time()},
+            message_type=MessageType.DIRECT,
+        )
+
+        return APIResponse(
+            success=True, data={"message_id": response, "health_check": "requested"}
+        )
+
+    except Exception as e:
+        logger.error(
+            "Failed to check agent health", agent_name=agent_name, error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# Task CLI endpoints
+@app.get("/api/v1/cli/tasks", response_model=APIResponse)
+async def list_tasks_cli(
+    status: str | None = None,
+    assigned_to: str | None = None,
+    current_user: User = Depends(get_cli_user),
+):
+    """List tasks with optional filtering - CLI version without auth barriers."""
+    try:
+        tasks = await task_queue.list_tasks(status=status, assigned_to=assigned_to)
+        task_info = []
+
+        for task in tasks:
+            info = TaskInfo(
+                id=task.id,
+                title=task.title,
+                description=task.description,
+                type=task.task_type,
+                status=task.status,
+                priority=task.priority,
+                assigned_to=task.agent_id,
+                created_at=task.created_at,
+                started_at=task.started_at,
+                completed_at=task.completed_at,
+                result=task.result,
+                error=task.error_message,
+            )
+            task_info.append(info.dict())
+
+        return APIResponse(success=True, data=task_info)
+
+    except Exception as e:
+        logger.error("Failed to list tasks", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/cli/tasks", response_model=APIResponse)
+async def create_task_cli(
+    task_create: TaskCreate, current_user: User = Depends(get_cli_user)
+):
+    """Create a new task - CLI version without auth barriers."""
+    try:
+        logger.info(
+            f"Creating task: title={task_create.title}, type={task_create.type}, priority={task_create.priority}"
+        )
+
+        task = Task(
+            id=str(uuid.uuid4()),
+            title=task_create.title,
+            description=task_create.description,
+            task_type=task_create.type,
+            priority=task_create.priority,
+            agent_id=task_create.assigned_to or "meta-agent",
+            dependencies=task_create.dependencies,
+            status="pending",
+            created_at=time.time(),
+        )
+
+        task_id = await task_queue.add_task(task)
+
+        # Broadcast task creation event
+        await broadcast_event(
+            "task-update",
+            {
+                "action": "created",
+                "task": {
+                    "id": task_id,
+                    "title": task.title,
+                    "type": task.task_type,
+                    "status": task.status,
+                    "priority": task.priority.value,
+                    "assigned_to": task.agent_id,
+                    "created_at": task.created_at,
+                },
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            data={"task_id": task_id, "title": task.title, "status": task.status},
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create task: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # Agent management endpoints
 @app.get("/api/v1/agents", response_model=APIResponse)
 @Permissions.agent_read()

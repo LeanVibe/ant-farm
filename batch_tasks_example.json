@@ -1,0 +1,27 @@
+[
+  {
+    "title": "System Health Check",
+    "description": "Perform comprehensive system health check and report status",
+    "type": "system_analysis",
+    "priority": 3
+  },
+  {
+    "title": "Code Quality Review",
+    "description": "Review codebase for quality issues and suggest improvements",
+    "type": "code_review",
+    "priority": 5
+  },
+  {
+    "title": "Performance Optimization Analysis",
+    "description": "Analyze system performance and identify optimization opportunities",
+    "type": "performance_analysis",
+    "priority": 4
+  },
+  {
+    "title": "Documentation Update",
+    "description": "Update system documentation to reflect recent changes",
+    "type": "documentation",
+    "priority": 6,
+    "assigned_to": "developer-agent"
+  }
+]
