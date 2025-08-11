@@ -1683,3 +1683,47 @@ class BaseAgent(ABC):
         )  # Allow current operations to complete
 
         return {"shutdown": True, "timestamp": time.time()}
+
+    async def discover_collaboration_opportunities(self) -> list[dict[str, Any]]:
+        """Discover available agents for collaboration."""
+        try:
+            # Get all active agents from the communication system
+            active_agents = []
+
+            # In a real implementation, this would query the agent registry
+            # For now, return mock data based on current system state
+            opportunities = [
+                {
+                    "agent_name": "qa_agent",
+                    "agent_type": "qa",
+                    "status": "busy",
+                    "capabilities": ["code_review", "testing", "security_analysis"],
+                    "availability": "high",
+                },
+                {
+                    "agent_name": "architect_agent",
+                    "agent_type": "architect",
+                    "status": "busy",
+                    "capabilities": [
+                        "system_design",
+                        "architecture_review",
+                        "scalability_analysis",
+                    ],
+                    "availability": "medium",
+                },
+            ]
+
+            logger.info(
+                "Discovered collaboration opportunities",
+                agent=self.name,
+                opportunities=len(opportunities),
+            )
+            return opportunities
+
+        except Exception as e:
+            logger.error(
+                "Failed to discover collaboration opportunities",
+                agent=self.name,
+                error=str(e),
+            )
+            return []

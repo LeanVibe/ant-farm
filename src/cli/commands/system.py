@@ -75,13 +75,13 @@ async def _check_all_services():
     # Check API server
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:9002/api/v1/health")
+            response = await client.get("http://localhost:9001/api/v1/health")
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
                     services["API"] = {
                         "status": "online",
-                        "details": "http://localhost:9002",
+                        "details": "http://localhost:9001",
                     }
                 else:
                     services["API"] = {
@@ -180,7 +180,7 @@ async def _start():
             # Check if it started successfully
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get("http://localhost:9002/api/v1/health")
+                    response = await client.get("http://localhost:9001/api/v1/health")
                     if response.status_code == 200:
                         success_message("API server started successfully!")
                     else:
@@ -191,7 +191,7 @@ async def _start():
             info_message("API server is already running")
 
         # Start orchestrator and default agents
-        asyncio.run(_start_agents())
+        await _start_agents()
 
         success_message("Hive system startup complete!")
 
