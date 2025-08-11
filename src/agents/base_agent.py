@@ -324,7 +324,9 @@ class CLIToolManager:
 class BaseAgent(ABC):
     """Abstract base class for all agents with multi-CLI tool support."""
 
-    def __init__(self, name: str, agent_type: str, role: str):
+    def __init__(
+        self, name: str, agent_type: str, role: str, enhanced_communication: bool = True
+    ):
         self.name = name
         self.agent_type = agent_type
         self.role = role
@@ -332,6 +334,7 @@ class BaseAgent(ABC):
         self.current_task_id: str | None = None
         self.start_time = time.time()
         self.agent_uuid: str | None = None  # Database UUID for this agent
+        self.enhanced_communication = enhanced_communication
 
         # Initialize components
         self.cli_tools = CLIToolManager()
@@ -340,6 +343,33 @@ class BaseAgent(ABC):
         self.persistent_cli = get_persistent_cli_manager()
         self.cli_session_id = f"{name}_{int(time.time())}"
         self.cli_session = None
+
+        # Enhanced communication components (initialized by default)
+        if enhanced_communication:
+            try:
+                from ..core.enhanced_message_broker import get_enhanced_message_broker
+                from ..core.realtime_collaboration import get_collaboration_sync
+
+                self.enhanced_broker = get_enhanced_message_broker()
+                self.collaboration_sync = get_collaboration_sync(self.enhanced_broker)
+
+                logger.info(
+                    "Enhanced communication initialized",
+                    agent=self.name,
+                    has_enhanced_broker=True,
+                    has_collaboration_sync=True,
+                )
+            except ImportError as e:
+                logger.warning(
+                    "Enhanced communication not available, falling back to basic messaging",
+                    agent=self.name,
+                    error=str(e),
+                )
+                self.enhanced_broker = None
+                self.collaboration_sync = None
+        else:
+            self.enhanced_broker = None
+            self.collaboration_sync = None
 
         # Performance tracking
         self.tasks_completed = 0
@@ -812,6 +842,252 @@ class BaseAgent(ABC):
 
         return message_id
 
+    # Enhanced Communication Methods
+    async def create_shared_work_session(
+        self,
+        title: str,
+        participants: list[str] = None,
+        task: str = None,
+        shared_resources: dict[str, Any] = None,
+    ) -> str | None:
+        """Create a shared work session for collaboration."""
+        if not self.collaboration_sync:
+            logger.warning("Enhanced communication not available", agent=self.name)
+            return None
+
+        try:
+            session_id = await self.collaboration_sync.start_collaboration_session(
+                title=title,
+                coordinator=self.name,
+                initial_participants=set(participants or [self.name]),
+                shared_resources=shared_resources or {},
+            )
+
+            logger.info(
+                "Shared work session created",
+                agent=self.name,
+                session_id=session_id,
+                title=title,
+                participants=len(participants or []),
+            )
+
+            return session_id
+        except Exception as e:
+            logger.error(
+                "Failed to create shared work session", agent=self.name, error=str(e)
+            )
+            return None
+
+    async def join_shared_work_session(self, session_id: str) -> bool:
+        """Join an existing shared work session."""
+        if not self.collaboration_sync:
+            logger.warning("Enhanced communication not available", agent=self.name)
+            return False
+
+        try:
+            success = await self.collaboration_sync.join_collaboration_session(
+                session_id, self.name
+            )
+
+            if success:
+                logger.info(
+                    "Joined shared work session", agent=self.name, session_id=session_id
+                )
+
+            return success
+        except Exception as e:
+            logger.error(
+                "Failed to join shared work session",
+                agent=self.name,
+                session_id=session_id,
+                error=str(e),
+            )
+            return False
+
+    async def share_work_context(
+        self,
+        context_type: str,
+        data: dict[str, Any],
+        participants: set[str] = None,
+    ) -> str | None:
+        """Share work context with other agents."""
+        if not self.enhanced_broker:
+            logger.warning("Enhanced communication not available", agent=self.name)
+            return None
+
+        try:
+            # Map context type string to enum
+            from ..core.enhanced_message_broker import ContextShareType
+
+            context_type_mapping = {
+                "work_session": ContextShareType.WORK_SESSION,
+                "knowledge_base": ContextShareType.KNOWLEDGE_BASE,
+                "task_state": ContextShareType.TASK_STATE,
+                "performance_metrics": ContextShareType.PERFORMANCE_METRICS,
+                "error_patterns": ContextShareType.ERROR_PATTERNS,
+                "decision_history": ContextShareType.DECISION_HISTORY,
+            }
+
+            context_enum = context_type_mapping.get(
+                context_type, ContextShareType.WORK_SESSION
+            )
+
+            context_id = await self.enhanced_broker.create_shared_context(
+                context_type=context_enum,
+                owner_agent=self.name,
+                initial_data=data,
+                participants=participants or {self.name},
+            )
+
+            logger.info(
+                "Work context shared",
+                agent=self.name,
+                context_id=context_id,
+                context_type=context_type,
+            )
+
+            return context_id
+        except Exception as e:
+            logger.error("Failed to share work context", agent=self.name, error=str(e))
+            return None
+
+    async def send_enhanced_message(
+        self,
+        to_agent: str,
+        topic: str,
+        content: dict[str, Any],
+        context_ids: list[str] = None,
+        priority: str = "normal",
+        include_context: bool = True,
+    ) -> bool:
+        """Send enhanced message with context awareness."""
+        if not self.enhanced_broker:
+            logger.warning(
+                "Enhanced communication not available, using basic messaging",
+                agent=self.name,
+            )
+            await self.send_message(to_agent, topic, content)
+            return True
+
+        try:
+            # Map priority string to enum
+            from ..core.enhanced_message_broker import MessagePriority
+
+            priority_mapping = {
+                "critical": MessagePriority.CRITICAL,
+                "high": MessagePriority.HIGH,
+                "normal": MessagePriority.NORMAL,
+                "low": MessagePriority.LOW,
+            }
+
+            message_priority = priority_mapping.get(priority, MessagePriority.NORMAL)
+
+            if include_context and context_ids:
+                success = await self.enhanced_broker.send_context_aware_message(
+                    from_agent=self.name,
+                    to_agent=to_agent,
+                    topic=topic,
+                    payload=content,
+                    context_ids=context_ids,
+                    include_relevant_context=True,
+                )
+            else:
+                message_id = await self.enhanced_broker.send_priority_message(
+                    from_agent=self.name,
+                    to_agent=to_agent,
+                    topic=topic,
+                    payload=content,
+                    priority=message_priority,
+                )
+                success = message_id is not None
+
+            logger.info(
+                "Enhanced message sent",
+                agent=self.name,
+                to_agent=to_agent,
+                topic=topic,
+                priority=priority,
+                has_context=bool(context_ids),
+            )
+
+            return success
+        except Exception as e:
+            logger.error(
+                "Failed to send enhanced message",
+                agent=self.name,
+                to_agent=to_agent,
+                error=str(e),
+            )
+            return False
+
+    async def update_agent_status(
+        self,
+        status: str,
+        current_task: str = None,
+        capabilities: list[str] = None,
+        performance_metrics: dict[str, float] = None,
+    ) -> None:
+        """Update agent status for enhanced coordination."""
+        if not self.enhanced_broker:
+            return
+
+        try:
+            state_updates = {"status": status}
+
+            if current_task:
+                state_updates["current_task"] = current_task
+            if capabilities:
+                state_updates["capabilities"] = capabilities
+            if performance_metrics:
+                state_updates["performance_metrics"] = performance_metrics
+
+            await self.enhanced_broker.update_agent_state(
+                agent_name=self.name, state_updates=state_updates
+            )
+
+            logger.debug(
+                "Agent status updated",
+                agent=self.name,
+                status=status,
+                task=current_task,
+            )
+        except Exception as e:
+            logger.error("Failed to update agent status", agent=self.name, error=str(e))
+
+    async def get_collaboration_opportunities(self) -> list[dict[str, Any]]:
+        """Get available collaboration opportunities."""
+        if not self.enhanced_broker:
+            return []
+
+        try:
+            # Get current agent states to find collaboration opportunities
+            agent_states = await self.enhanced_broker.get_agent_states(self.name)
+
+            opportunities = []
+            for agent_name, state in agent_states.items():
+                if agent_name != self.name and state.get("status") != "inactive":
+                    # Look for agents with complementary capabilities
+                    agent_capabilities = state.get("capabilities", [])
+                    if agent_capabilities:
+                        opportunities.append(
+                            {
+                                "agent_name": agent_name,
+                                "status": state.get("status"),
+                                "capabilities": agent_capabilities,
+                                "current_task": state.get("current_task"),
+                                "shared_contexts": state.get("shared_contexts", []),
+                            }
+                        )
+
+            return opportunities
+        except Exception as e:
+            logger.error(
+                "Failed to get collaboration opportunities",
+                agent=self.name,
+                error=str(e),
+            )
+            return []
+
     async def store_context(
         self,
         content: str,
@@ -938,6 +1214,10 @@ class BaseAgent(ABC):
             "supports_context": True,
             "supports_messaging": True,
             "supports_persistent_sessions": True,
+            "enhanced_communication": self.enhanced_communication,
+            "supports_collaboration": self.collaboration_sync is not None,
+            "supports_shared_contexts": self.enhanced_broker is not None,
+            "supports_real_time_sync": self.collaboration_sync is not None,
             "agent_version": "2.0.0",
         }
 
@@ -950,7 +1230,51 @@ class BaseAgent(ABC):
                 "created_at": self.cli_session.created_at,
             }
 
+        # Add enhanced communication features
+        if self.enhanced_communication:
+            capabilities["enhanced_features"] = {
+                "shared_contexts": self.enhanced_broker is not None,
+                "real_time_collaboration": self.collaboration_sync is not None,
+                "priority_messaging": self.enhanced_broker is not None,
+                "context_aware_messaging": self.enhanced_broker is not None,
+                "agent_state_sync": self.enhanced_broker is not None,
+            }
+
         return capabilities
+
+    @property
+    def capabilities(self) -> list[str]:
+        """Get agent capabilities as a list for collaboration matching."""
+        caps = self._get_capabilities()
+
+        # Extract capability names for matching
+        capability_list = []
+
+        # Add basic capabilities
+        if caps.get("supports_context"):
+            capability_list.append("context_management")
+        if caps.get("supports_messaging"):
+            capability_list.append("messaging")
+        if caps.get("supports_persistent_sessions"):
+            capability_list.append("persistent_sessions")
+
+        # Add CLI tool capabilities
+        for tool in caps.get("cli_tools", []):
+            capability_list.append(f"cli_{tool}")
+
+        # Add enhanced communication capabilities
+        if caps.get("enhanced_communication"):
+            capability_list.append("enhanced_communication")
+        if caps.get("supports_collaboration"):
+            capability_list.append("real_time_collaboration")
+        if caps.get("supports_shared_contexts"):
+            capability_list.append("shared_contexts")
+
+        # Add agent type as capability
+        capability_list.append(self.agent_type)
+        capability_list.append(self.role)
+
+        return capability_list
 
     async def _record_task_metrics(
         self, task: Task, result: TaskResult, execution_time: float

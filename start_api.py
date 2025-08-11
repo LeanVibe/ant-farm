@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Set environment variables first
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6381")
 os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://bogdan@localhost:5432/leanvibe_hive"
 )
