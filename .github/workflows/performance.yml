@@ -70,13 +70,17 @@ jobs:
 
       - name: Run performance tests with Locust
         run: |
-          uv run locust -f tests/performance/locustfile.py --headless -u 10 -r 2 -t 30s --host http://localhost:8000
+          uv run locust -f tests/performance/locustfile.py --headless -u 10 -r 2 -t 30s --host http://localhost:8000 --html locust-report.html
 
       - name: Generate performance report
         if: always()
         run: |
           echo "Performance test completed" > performance-report.txt
-          cat locust-report.html >> performance-report.txt
+          if [ -f locust-report.html ]; then
+            echo "Locust report generated successfully" >> performance-report.txt
+          else
+            echo "No locust report found" >> performance-report.txt
+          fi
 
       - name: Upload performance report
         uses: actions/upload-artifact@v4
@@ -86,3 +90,4 @@ jobs:
           path: |
             locust-report.html
             performance-report.txt
+          if-no-files-found: ignore

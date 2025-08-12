@@ -383,6 +383,10 @@ async def _monitor_system(refresh_interval: int, show_detailed: bool):
             metrics_table.add_column("Value", style="bold")
 
             try:
+                from ..utils import get_api_headers
+
+                headers = get_api_headers()
+
                 # Get metrics from API
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     response = await client.get(

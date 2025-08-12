@@ -100,9 +100,13 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         if: always()
         with:
-          sarif_file: |
-            trivy-api-results.sarif
-            trivy-agent-results.sarif
+          sarif_file: trivy-api-results.sarif
+          
+      - name: Upload Trivy agent scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: trivy-agent-results.sarif
 
   secrets-scan:
     name: Secrets Scan
