@@ -2,6 +2,7 @@
 Utility functions for the Hive CLI
 """
 
+import os
 import sys
 from typing import Any
 
@@ -10,10 +11,40 @@ from rich.panel import Panel
 from rich.status import Status
 from rich.table import Table
 
+# Import CLI auth module
+try:
+    from .auth import get_authenticated_cli_user, get_current_auth_token
+
+    CLI_AUTH_AVAILABLE = True
+except ImportError:
+    CLI_AUTH_AVAILABLE = False
+
 console = Console()
 
 # Updated API URL for new port
 API_BASE_URL = "http://localhost:9001"
+
+
+def get_api_headers() -> dict:
+    """
+    Get appropriate headers for API requests, including authentication if available.
+
+    Returns:
+        dict: Headers for API requests
+    """
+    headers = {"Content-Type": "application/json"}
+
+    # Check for CLI auth token in environment
+    token = os.getenv("HIVE_CLI_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    elif CLI_AUTH_AVAILABLE:
+        # Check for token from auth module
+        token = get_current_auth_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+    return headers
 
 
 def error_handler(error: Exception) -> None:

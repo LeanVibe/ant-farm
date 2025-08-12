@@ -74,8 +74,14 @@ async def _check_all_services():
 
     # Check API server
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:9001/api/v1/health")
+            response = await client.get(
+                "http://localhost:9001/api/v1/health", headers=headers
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -177,16 +183,22 @@ async def _start():
             # Wait a moment for startup
             await asyncio.sleep(3)
 
-            # Check if it started successfully
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get("http://localhost:9001/api/v1/health")
-                    if response.status_code == 200:
-                        success_message("API server started successfully!")
-                    else:
-                        warning_message("API server may not have started properly")
-            except Exception as e:
-                warning_message(f"Could not verify API server startup: {e}")
+        # Check if it started successfully
+        try:
+            from ..utils import get_api_headers
+
+            headers = get_api_headers()
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    "http://localhost:9001/api/v1/health", headers=headers
+                )
+                if response.status_code == 200:
+                    success_message("API server started successfully!")
+                else:
+                    warning_message("API server may not have started properly")
+        except Exception as e:
+            warning_message(f"Could not verify API server startup: {e}")
         else:
             info_message("API server is already running")
 
@@ -374,7 +386,7 @@ async def _monitor_system(refresh_interval: int, show_detailed: bool):
                 # Get metrics from API
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     response = await client.get(
-                        "http://localhost:9001/api/v1/cli/agents"
+                        "http://localhost:9001/api/v1/cli/agents", headers=headers
                     )
                     if response.status_code == 200:
                         data = response.json()
@@ -387,7 +399,7 @@ async def _monitor_system(refresh_interval: int, show_detailed: bool):
 
                     # Get tasks
                     response = await client.get(
-                        "http://localhost:9001/api/v1/cli/tasks"
+                        "http://localhost:9001/api/v1/cli/tasks", headers=headers
                     )
                     if response.status_code == 200:
                         data = response.json()

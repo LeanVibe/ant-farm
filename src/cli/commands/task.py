@@ -85,6 +85,9 @@ async def _list_tasks_filtered(
 ):
     """Internal async task listing with advanced filtering"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
         params = {}
         if status_filter:
             params["status"] = status_filter
@@ -93,7 +96,7 @@ async def _list_tasks_filtered(
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{API_BASE_URL}/api/v1/cli/tasks", params=params
+                f"{API_BASE_URL}/api/v1/cli/tasks", params=params, headers=headers
             )
 
             if response.status_code == 200:
@@ -324,6 +327,9 @@ async def _submit_task(
 ):
     """Internal async task submission"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
         task_data = {}
 
         # Load from file if specified
@@ -377,7 +383,7 @@ async def _submit_task(
         # Submit the task
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/cli/tasks", json=task_data
+                f"{API_BASE_URL}/api/v1/cli/tasks", json=task_data, headers=headers
             )
 
             if response.status_code == 200:
@@ -428,10 +434,14 @@ def logs(
 async def _show_task_logs(task_identifier: str, follow: bool):
     """Internal async task log viewing"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         # First, get task info
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{API_BASE_URL}/api/v1/tasks/{task_identifier}"
+                f"{API_BASE_URL}/api/v1/tasks/{task_identifier}", headers=headers
             )
 
             if response.status_code == 200:
@@ -502,6 +512,10 @@ def cancel(
 async def _cancel_task(task_identifier: str, force: bool):
     """Internal async task cancellation"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         # Confirm cancellation unless forced
         if not force:
             if not confirm_action(f"Cancel task {task_identifier}?"):
@@ -510,7 +524,7 @@ async def _cancel_task(task_identifier: str, force: bool):
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/tasks/{task_identifier}/cancel"
+                f"{API_BASE_URL}/api/v1/tasks/{task_identifier}/cancel", headers=headers
             )
 
             if response.status_code == 200:
@@ -548,6 +562,10 @@ def self_improvement(
 async def _submit_self_improvement(title: str, description: str):
     """Internal async self-improvement task submission"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         # Get title and description if not provided
         if not title:
             title = typer.prompt("Self-improvement task title")
@@ -559,6 +577,7 @@ async def _submit_self_improvement(title: str, description: str):
             response = await client.post(
                 f"{API_BASE_URL}/api/v1/tasks/self-improvement",
                 params={"title": title, "description": description},
+                headers=headers,
             )
 
             if response.status_code == 200:
@@ -602,9 +621,15 @@ def search(
 async def _search_tasks(query: str):
     """Internal async task search"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{API_BASE_URL}/api/v1/search/tasks", params={"q": query}
+                f"{API_BASE_URL}/api/v1/search/tasks",
+                params={"q": query},
+                headers=headers,
             )
 
             if response.status_code == 200:
@@ -790,8 +815,14 @@ async def _batch_submit_tasks(file: str, assign_round_robin: bool, dry_run: bool
         available_agents = []
         if assign_round_robin:
             try:
+                from ..utils import get_api_headers
+
+                headers = get_api_headers()
+
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.get(f"{API_BASE_URL}/api/v1/cli/agents")
+                    response = await client.get(
+                        f"{API_BASE_URL}/api/v1/cli/agents", headers=headers
+                    )
                     if response.status_code == 200:
                         data = response.json()
                         if data.get("success"):
@@ -855,7 +886,9 @@ async def _batch_submit_tasks(file: str, assign_round_robin: bool, dry_run: bool
 
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(
-                        f"{API_BASE_URL}/api/v1/cli/tasks", json=task_def
+                        f"{API_BASE_URL}/api/v1/cli/tasks",
+                        json=task_def,
+                        headers=headers,
                     )
 
                     if response.status_code == 200:
@@ -956,7 +989,7 @@ async def _batch_cancel_tasks(
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{API_BASE_URL}/api/v1/cli/tasks", params=params
+                f"{API_BASE_URL}/api/v1/cli/tasks", params=params, headers=headers
             )
 
             if response.status_code != 200:
@@ -1016,7 +1049,7 @@ async def _batch_cancel_tasks(
                     console.print(f"🛑 Cancelling: {task_title} ({task_id})")
 
                     response = await client.post(
-                        f"{API_BASE_URL}/api/v1/tasks/{task_id}/cancel"
+                        f"{API_BASE_URL}/api/v1/tasks/{task_id}/cancel", headers=headers
                     )
 
                     if response.status_code == 200:

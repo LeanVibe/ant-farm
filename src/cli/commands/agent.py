@@ -64,8 +64,14 @@ async def _list_agents_filtered(
 ):
     """Internal async agent listing with filtering"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{API_BASE_URL}/api/v1/cli/agents")
+            response = await client.get(
+                f"{API_BASE_URL}/api/v1/cli/agents", headers=headers
+            )
 
             if response.status_code == 200:
                 data = response.json()
@@ -199,9 +205,13 @@ def describe(
 async def _describe_agent(agent_identifier: str):
     """Internal async agent description"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{API_BASE_URL}/api/v1/cli/agents/{agent_identifier}"
+                f"{API_BASE_URL}/api/v1/cli/agents/{agent_identifier}", headers=headers
             )
 
             if response.status_code == 200:
@@ -266,13 +276,16 @@ def spawn(
 async def _spawn_agent(agent_type: str, name: str = None):
     """Internal async agent spawning"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
         params = {"agent_type": agent_type}
         if name:
             params["agent_name"] = name
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/cli/agents", params=params
+                f"{API_BASE_URL}/api/v1/cli/agents", params=params, headers=headers
             )
 
             if response.status_code == 200:
@@ -317,9 +330,14 @@ def stop(
 async def _stop_agent(agent_identifier: str):
     """Internal async agent stopping"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/cli/agents/{agent_identifier}/stop"
+                f"{API_BASE_URL}/api/v1/cli/agents/{agent_identifier}/stop",
+                headers=headers,
             )
 
             if response.status_code == 200:
@@ -358,9 +376,14 @@ def health(
 async def _check_agent_health(agent_identifier: str):
     """Internal async agent health check"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                f"{API_BASE_URL}/api/v1/cli/agents/{agent_identifier}/health"
+                f"{API_BASE_URL}/api/v1/cli/agents/{agent_identifier}/health",
+                headers=headers,
             )
 
             if response.status_code == 200:
@@ -396,9 +419,15 @@ def search(
 async def _search_agents(query: str):
     """Internal async agent search"""
     try:
+        from ..utils import get_api_headers
+
+        headers = get_api_headers()
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{API_BASE_URL}/api/v1/search/agents", params={"q": query}
+                f"{API_BASE_URL}/api/v1/search/agents",
+                params={"q": query},
+                headers=headers,
             )
 
             if response.status_code == 200:
