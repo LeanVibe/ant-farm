@@ -4,13 +4,14 @@ Component Contract Test Implementation
 Demonstrates proper component isolation and contract testing
 """
 
-import pytest
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, Any, List
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 # Test the enhanced message broker component in isolation

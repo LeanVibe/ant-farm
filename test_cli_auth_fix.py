@@ -25,10 +25,10 @@ def test_cli_auth_module():
             sys.path.insert(0, str(src_path))
 
         from src.cli.auth import (
+            clear_cli_auth_cache,
             get_authenticated_cli_user,
             get_cli_auth_token,
             is_cli_authenticated,
-            clear_cli_auth_cache,
         )
 
         print("✓ CLI auth module imported successfully")
@@ -98,7 +98,7 @@ def test_command_auth_integration():
             sys.path.insert(0, str(src_path))
 
         # Test that we can import command modules
-        from src.cli.commands import agent, task, system
+        from src.cli.commands import agent, system, task
 
         print("✓ All CLI command modules imported successfully")
 

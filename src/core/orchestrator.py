@@ -17,7 +17,7 @@ from .message_broker import message_broker
 from .models import Agent
 from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
-from .tmux_manager import get_tmux_manager, TmuxOperationResult
+from .tmux_manager import TmuxOperationResult, get_tmux_manager
 
 logger = structlog.get_logger()
 

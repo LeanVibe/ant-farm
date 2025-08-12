@@ -660,11 +660,11 @@ def monitor(
 async def _monitor_agents(refresh_interval: int, agent_filter: str = None):
     """Internal async agent monitoring"""
     try:
-        from rich.live import Live
+        from rich import box
         from rich.layout import Layout
+        from rich.live import Live
         from rich.panel import Panel
         from rich.table import Table
-        from rich import box
 
         console.clear()
         filter_desc = f" (filter: {agent_filter})" if agent_filter else ""
@@ -967,7 +967,7 @@ async def _start_agents_batch(
 
         if started_agents:
             console.print(
-                f"\n💡 [dim]Use 'hive agent list' to see all active agents[/dim]"
+                "\n💡 [dim]Use 'hive agent list' to see all active agents[/dim]"
             )
 
     except httpx.ConnectError:

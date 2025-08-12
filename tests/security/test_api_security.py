@@ -56,7 +56,7 @@ class SecurityTestSuite:
         if user_response.status_code == 200:
             self.regular_user_token = user_response.json()["data"]["access_token"]
 
-    def get_auth_header(self, token: str) -> Dict[str, str]:
+    def get_auth_header(self, token: str) -> dict[str, str]:
         """Get authorization header for requests."""
         return {"Authorization": f"Bearer {token}"}
 
@@ -425,7 +425,7 @@ class SecurityTestSuite:
 
         return results
 
-    def run_comprehensive_security_audit(self) -> Dict[str, Any]:
+    def run_comprehensive_security_audit(self) -> dict[str, Any]:
         """Run all security tests and return comprehensive report."""
         print("🔒 Starting Comprehensive Security Audit...")
 
@@ -477,7 +477,7 @@ class SecurityTestSuite:
 
         return audit_results
 
-    def _calculate_security_score(self, test_results: Dict) -> float:
+    def _calculate_security_score(self, test_results: dict) -> float:
         """Calculate overall security score based on test results."""
         category_weights = {
             "authentication": 30,  # Most critical
@@ -519,7 +519,7 @@ def main():
 
     # Print summary
     summary = results["summary"]
-    print(f"\n🔒 Security Audit Complete")
+    print("\n🔒 Security Audit Complete")
     print("=" * 50)
     print(f"📊 Total Tests: {summary['total_tests']}")
     print(f"✅ Passed: {summary['passed_tests']}")
@@ -528,7 +528,7 @@ def main():
     print(f"🛡️  Security Score: {summary['security_score']}/100")
 
     # Detailed results
-    print(f"\n📋 Detailed Results:")
+    print("\n📋 Detailed Results:")
     print("-" * 30)
 
     for category, tests in results["tests"].items():
@@ -556,7 +556,7 @@ def main():
     with open("security_test_report.json", "w") as f:
         json.dump(results, f, indent=2)
 
-    print(f"\n📝 Detailed report saved to: security_test_report.json")
+    print("\n📝 Detailed report saved to: security_test_report.json")
 
     # Return appropriate exit code
     return 0 if summary["security_score"] >= 80 else 1

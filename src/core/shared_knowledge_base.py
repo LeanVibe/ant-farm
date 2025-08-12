@@ -4,17 +4,17 @@ import asyncio
 import json
 import time
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
-from collections import defaultdict
 
 import structlog
 
-from .context_engine import ContextEngine
-from .enhanced_message_broker import EnhancedMessageBroker, ContextShareType
 from .communication_monitor import get_communication_monitor
+from .context_engine import ContextEngine
+from .enhanced_message_broker import ContextShareType, EnhancedMessageBroker
 
 logger = structlog.get_logger()
 
@@ -50,19 +50,19 @@ class KnowledgeItem:
     knowledge_type: KnowledgeType
     title: str
     description: str
-    content: Dict[str, Any]
+    content: dict[str, Any]
     author_agent: str
     created_at: float = field(default_factory=time.time)
     last_updated: float = field(default_factory=time.time)
     updated_by: str = ""
-    tags: Set[str] = field(default_factory=set)
+    tags: set[str] = field(default_factory=set)
     confidence_score: float = 1.0  # 0.0 to 1.0
     usage_count: int = 0
     success_rate: float = 0.0  # Based on application outcomes
-    validation_scores: Dict[str, float] = field(default_factory=dict)  # Agent -> score
-    related_items: Set[str] = field(default_factory=set)
-    context_conditions: Dict[str, Any] = field(default_factory=dict)
-    expiry_time: Optional[float] = None
+    validation_scores: dict[str, float] = field(default_factory=dict)  # Agent -> score
+    related_items: set[str] = field(default_factory=set)
+    context_conditions: dict[str, Any] = field(default_factory=dict)
+    expiry_time: float | None = None
 
 
 @dataclass
@@ -70,14 +70,14 @@ class LearningSession:
     """A learning session where agents share and acquire knowledge."""
 
     id: str
-    participants: Set[str] = field(default_factory=set)
+    participants: set[str] = field(default_factory=set)
     learning_mode: LearningMode = LearningMode.COLLABORATIVE
     topic: str = ""
-    knowledge_items_shared: List[str] = field(default_factory=list)
-    insights_generated: List[str] = field(default_factory=list)
+    knowledge_items_shared: list[str] = field(default_factory=list)
+    insights_generated: list[str] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
-    ended_at: Optional[float] = None
-    success_metrics: Dict[str, float] = field(default_factory=dict)
+    ended_at: float | None = None
+    success_metrics: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -85,9 +85,9 @@ class KnowledgeQuery:
     """Query for knowledge retrieval."""
 
     query_text: str
-    knowledge_types: List[KnowledgeType] = field(default_factory=list)
-    tags: Set[str] = field(default_factory=set)
-    context: Dict[str, Any] = field(default_factory=dict)
+    knowledge_types: list[KnowledgeType] = field(default_factory=list)
+    tags: set[str] = field(default_factory=set)
+    context: dict[str, Any] = field(default_factory=dict)
     min_confidence: float = 0.5
     max_results: int = 10
     require_validation: bool = False
@@ -101,13 +101,13 @@ class SharedKnowledgeBase:
     ):
         self.context_engine = context_engine
         self.message_broker = message_broker
-        self.knowledge_items: Dict[str, KnowledgeItem] = {}
-        self.learning_sessions: Dict[str, LearningSession] = {}
-        self.agent_knowledge_graphs: Dict[str, Dict[str, Set[str]]] = defaultdict(
+        self.knowledge_items: dict[str, KnowledgeItem] = {}
+        self.learning_sessions: dict[str, LearningSession] = {}
+        self.agent_knowledge_graphs: dict[str, dict[str, set[str]]] = defaultdict(
             lambda: defaultdict(set)
         )
-        self.knowledge_categories: Dict[str, Set[str]] = defaultdict(set)
-        self.usage_patterns: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        self.knowledge_categories: dict[str, set[str]] = defaultdict(set)
+        self.usage_patterns: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
         # Learning analytics
         self.learning_metrics = {
@@ -147,11 +147,11 @@ class SharedKnowledgeBase:
         knowledge_type: KnowledgeType,
         title: str,
         description: str,
-        content: Dict[str, Any],
+        content: dict[str, Any],
         author_agent: str,
-        tags: Set[str] = None,
+        tags: set[str] = None,
         confidence_score: float = 1.0,
-        context_conditions: Dict[str, Any] = None,
+        context_conditions: dict[str, Any] = None,
     ) -> str:
         """Add new knowledge to the shared knowledge base."""
 
@@ -234,7 +234,7 @@ class SharedKnowledgeBase:
 
     async def query_knowledge(
         self, query: KnowledgeQuery, requesting_agent: str
-    ) -> List[KnowledgeItem]:
+    ) -> list[KnowledgeItem]:
         """Query the knowledge base for relevant knowledge."""
 
         # Semantic search via context engine
@@ -385,7 +385,7 @@ class SharedKnowledgeBase:
         topic: str,
         initiator_agent: str,
         learning_mode: LearningMode = LearningMode.COLLABORATIVE,
-        initial_participants: Set[str] = None,
+        initial_participants: set[str] = None,
     ) -> str:
         """Start a collaborative learning session."""
 
@@ -472,7 +472,7 @@ class SharedKnowledgeBase:
         return True
 
     async def share_insight(
-        self, session_id: str, agent_name: str, insight: Dict[str, Any]
+        self, session_id: str, agent_name: str, insight: dict[str, Any]
     ) -> bool:
         """Share an insight during a learning session."""
 
@@ -517,9 +517,9 @@ class SharedKnowledgeBase:
     async def get_knowledge_recommendations(
         self,
         agent_name: str,
-        current_context: Dict[str, Any] = None,
+        current_context: dict[str, Any] = None,
         max_recommendations: int = 5,
-    ) -> List[KnowledgeItem]:
+    ) -> list[KnowledgeItem]:
         """Get personalized knowledge recommendations for an agent."""
 
         # Analyze agent's knowledge usage patterns
@@ -564,7 +564,7 @@ class SharedKnowledgeBase:
 
         return recommendations[:max_recommendations]
 
-    async def get_learning_analytics(self) -> Dict[str, Any]:
+    async def get_learning_analytics(self) -> dict[str, Any]:
         """Get learning analytics and metrics."""
 
         # Calculate dynamic metrics
@@ -613,7 +613,7 @@ class SharedKnowledgeBase:
             ),
         }
 
-    async def _semantic_search(self, query: KnowledgeQuery) -> List[str]:
+    async def _semantic_search(self, query: KnowledgeQuery) -> list[str]:
         """Perform semantic search using the context engine."""
 
         # Use context engine for semantic search
@@ -756,7 +756,7 @@ class SharedKnowledgeBase:
                 logger.error("Knowledge discovery error", error=str(e))
 
     def _context_matches(
-        self, query_context: Dict[str, Any], knowledge_context: Dict[str, Any]
+        self, query_context: dict[str, Any], knowledge_context: dict[str, Any]
     ) -> bool:
         """Check if query context matches knowledge context conditions."""
 
@@ -906,7 +906,7 @@ class SharedKnowledgeBase:
         self,
         metric_type: str,
         agent_name: str,
-        metric_data: Dict[str, Any],
+        metric_data: dict[str, Any],
     ) -> None:
         """Record knowledge base performance metrics."""
 
@@ -950,7 +950,7 @@ class SharedKnowledgeBase:
 
             communication_monitor.metrics_buffer.append(metric)
 
-    async def get_knowledge_performance_metrics(self) -> Dict[str, Any]:
+    async def get_knowledge_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics for knowledge base operations."""
 
         current_time = time.time()
@@ -1005,7 +1005,7 @@ class SharedKnowledgeBase:
         domain: str,
         confidence: float,
         created_by: str,
-        tags: List[str],
+        tags: list[str],
         context: str,
     ) -> bool:
         """Store knowledge (test compatibility method)."""
@@ -1039,7 +1039,7 @@ class SharedKnowledgeBase:
             return False
 
     async def subscribe_to_knowledge(
-        self, agent_id: str, subscription_filters: Dict[str, Any]
+        self, agent_id: str, subscription_filters: dict[str, Any]
     ) -> bool:
         """Subscribe to knowledge updates (test compatibility method)."""
         try:
@@ -1056,7 +1056,7 @@ class SharedKnowledgeBase:
             return False
 
     async def contribute_from_collaboration(
-        self, session_id: str, knowledge_data: Dict[str, Any]
+        self, session_id: str, knowledge_data: dict[str, Any]
     ) -> bool:
         """Contribute knowledge from collaboration session (test compatibility method)."""
         try:
@@ -1114,7 +1114,7 @@ class SharedKnowledgeBase:
         self,
         knowledge_id: str,
         broadcast_by: str,
-        target_domains: List[str],
+        target_domains: list[str],
         message: str,
     ) -> bool:
         """Broadcast knowledge to agents (test compatibility method)."""

@@ -12,9 +12,9 @@ class SecurityAuditor:
 
     def __init__(self, api_file: Path):
         self.api_file = api_file
-        self.unprotected_endpoints: List[Dict] = []
-        self.protected_endpoints: List[Dict] = []
-        self.public_endpoints: Set[str] = {
+        self.unprotected_endpoints: list[dict] = []
+        self.protected_endpoints: list[dict] = []
+        self.public_endpoints: set[str] = {
             "/health",
             "/api/v1/health",
             "/api/v1/test",
@@ -22,7 +22,7 @@ class SecurityAuditor:
             "/api/v1/auth/refresh",
         }
 
-    def audit_endpoints(self) -> Dict:
+    def audit_endpoints(self) -> dict:
         """Audit all endpoints and categorize by security status."""
         content = self.api_file.read_text()
 
@@ -126,7 +126,7 @@ class SecurityAuditor:
 
         return "LOW"
 
-    def _generate_summary(self) -> Dict:
+    def _generate_summary(self) -> dict:
         """Generate security audit summary."""
         severity_counts = {}
         for endpoint in self.unprotected_endpoints:
@@ -197,7 +197,7 @@ def main():
             f"{severity_emoji.get(endpoint['severity'], '?')} {endpoint['severity']}: {endpoint['method']} {endpoint['path']}"
         )
 
-    print(f"\n📝 Report saved to: security_audit_report.json")
+    print("\n📝 Report saved to: security_audit_report.json")
 
     # Save detailed report
     import json

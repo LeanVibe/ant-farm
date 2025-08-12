@@ -41,10 +41,10 @@ class MetricThreshold:
     """Threshold configuration for metrics."""
 
     metric_name: str
-    warning_above: Optional[float] = None
-    critical_above: Optional[float] = None
-    warning_below: Optional[float] = None
-    critical_below: Optional[float] = None
+    warning_above: float | None = None
+    critical_above: float | None = None
+    warning_below: float | None = None
+    critical_below: float | None = None
     time_window_seconds: int = 60
     min_samples: int = 3
 
@@ -54,12 +54,12 @@ class RealTimeMonitor:
 
     def __init__(self, performance_collector: PerformanceCollector):
         self.collector = performance_collector
-        self.active_alerts: Dict[str, PerformanceAlert] = {}
-        self.alert_history: List[PerformanceAlert] = []
-        self.websocket_connections: List[WebSocket] = []
-        self.metric_thresholds: Dict[str, MetricThreshold] = {}
+        self.active_alerts: dict[str, PerformanceAlert] = {}
+        self.alert_history: list[PerformanceAlert] = []
+        self.websocket_connections: list[WebSocket] = []
+        self.metric_thresholds: dict[str, MetricThreshold] = {}
         self.monitoring_active = False
-        self.monitoring_task: Optional[asyncio.Task] = None
+        self.monitoring_task: asyncio.Task | None = None
 
         # Setup default thresholds
         self._setup_default_thresholds()
@@ -143,7 +143,7 @@ class RealTimeMonitor:
         except Exception as e:
             logger.error("Failed to send current state to WebSocket", error=str(e))
 
-    async def broadcast_to_websockets(self, message: Dict[str, Any]):
+    async def broadcast_to_websockets(self, message: dict[str, Any]):
         """Broadcast a message to all connected WebSockets."""
         if not self.websocket_connections:
             return
@@ -204,8 +204,8 @@ class RealTimeMonitor:
     async def _check_resource_thresholds(
         self,
         resource: SystemResource,
-        new_alerts: List[PerformanceAlert],
-        resolved_alerts: List[str],
+        new_alerts: list[PerformanceAlert],
+        resolved_alerts: list[str],
     ):
         """Check system resource thresholds."""
         checks = [
@@ -259,7 +259,7 @@ class RealTimeMonitor:
                 resolved_alerts.append(alert_id)
 
     async def _check_api_thresholds(
-        self, new_alerts: List[PerformanceAlert], resolved_alerts: List[str]
+        self, new_alerts: list[PerformanceAlert], resolved_alerts: list[str]
     ):
         """Check API performance thresholds."""
         threshold = self.metric_thresholds.get("api_response_time")
@@ -307,7 +307,7 @@ class RealTimeMonitor:
                 resolved_alerts.append(alert_id)
 
     async def _check_custom_thresholds(
-        self, new_alerts: List[PerformanceAlert], resolved_alerts: List[str]
+        self, new_alerts: list[PerformanceAlert], resolved_alerts: list[str]
     ):
         """Check custom metric thresholds."""
         # Get recent metrics
@@ -493,7 +493,7 @@ class RealTimeMonitor:
             return True
         return False
 
-    def get_dashboard_data(self) -> Dict[str, Any]:
+    def get_dashboard_data(self) -> dict[str, Any]:
         """Get comprehensive dashboard data."""
         return {
             "monitoring_active": self.monitoring_active,

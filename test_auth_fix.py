@@ -68,7 +68,7 @@ def test_database_connection():
                 "hive_user",
                 "hive_pass",
             )
-            print(f"Debug: using default values")
+            print("Debug: using default values")
 
         if "db_part" in locals():
             print(f"Debug: db_part = {db_part}")

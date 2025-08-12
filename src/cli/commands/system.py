@@ -327,11 +327,11 @@ def monitor(
 async def _monitor_system(refresh_interval: int, show_detailed: bool):
     """Internal async system monitoring"""
     try:
-        from rich.live import Live
+        from rich import box
         from rich.layout import Layout
+        from rich.live import Live
         from rich.panel import Panel
         from rich.table import Table
-        from rich import box
 
         console.clear()
         info_message(

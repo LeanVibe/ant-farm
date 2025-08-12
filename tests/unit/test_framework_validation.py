@@ -1,13 +1,15 @@
 """Test the component isolation framework itself."""
 
 import asyncio
+
 import pytest
+
 from tests.unit.test_component_isolation_framework import (
     ComponentIsolationTestFramework,
     ComponentTestConfig,
-    MockRedisClient,
     MockAsyncSession,
     MockCLITools,
+    MockRedisClient,
 )
 
 
@@ -187,8 +189,9 @@ class TestComponentIsolationFramework:
         framework.assert_no_external_calls()  # Should not raise
 
         # Test failing assertion (has interactions)
-        from tests.unit.test_component_isolation_framework import MockInteraction
         import time
+
+        from tests.unit.test_component_isolation_framework import MockInteraction
 
         framework.interactions = [
             MockInteraction(

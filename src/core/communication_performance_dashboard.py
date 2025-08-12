@@ -9,9 +9,9 @@ Provides a unified view of performance metrics across all communication componen
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 import structlog
 
@@ -29,9 +29,9 @@ class SystemHealthStatus:
 
     status: str  # "healthy", "degraded", "critical"
     overall_score: float  # 0.0 to 1.0
-    component_scores: Dict[str, float] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
+    component_scores: dict[str, float] = field(default_factory=dict)
+    alerts: list[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
 
@@ -40,9 +40,9 @@ class CommunicationPerformanceDashboard:
 
     def __init__(
         self,
-        enhanced_broker: Optional[EnhancedMessageBroker] = None,
-        collaboration_sync: Optional[RealTimeCollaborationSync] = None,
-        knowledge_base: Optional[SharedKnowledgeBase] = None,
+        enhanced_broker: EnhancedMessageBroker | None = None,
+        collaboration_sync: RealTimeCollaborationSync | None = None,
+        knowledge_base: SharedKnowledgeBase | None = None,
     ):
         self.enhanced_broker = enhanced_broker
         self.collaboration_sync = collaboration_sync
@@ -69,7 +69,7 @@ class CommunicationPerformanceDashboard:
             "active_agents": [],
         }
 
-    async def get_comprehensive_metrics(self) -> Dict[str, Any]:
+    async def get_comprehensive_metrics(self) -> dict[str, Any]:
         """Get comprehensive metrics from all communication components."""
 
         start_time = time.time()
@@ -200,7 +200,7 @@ class CommunicationPerformanceDashboard:
             recommendations=recommendations,
         )
 
-    async def get_performance_trends(self, hours: int = 24) -> Dict[str, Any]:
+    async def get_performance_trends(self, hours: int = 24) -> dict[str, Any]:
         """Get performance trends over specified time period."""
 
         current_time = time.time()
@@ -235,7 +235,7 @@ class CommunicationPerformanceDashboard:
 
         return trends
 
-    async def get_agent_performance_breakdown(self) -> Dict[str, Any]:
+    async def get_agent_performance_breakdown(self) -> dict[str, Any]:
         """Get detailed performance breakdown by agent."""
 
         agent_metrics = {}
@@ -290,8 +290,8 @@ class CommunicationPerformanceDashboard:
         }
 
     async def _calculate_system_overview(
-        self, metrics: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, metrics: dict[str, Any]
+    ) -> dict[str, Any]:
         """Calculate high-level system overview metrics."""
 
         overview = {
@@ -331,7 +331,7 @@ class CommunicationPerformanceDashboard:
 
         return overview
 
-    async def _calculate_core_health_score(self, metrics: Dict[str, Any]) -> float:
+    async def _calculate_core_health_score(self, metrics: dict[str, Any]) -> float:
         """Calculate health score for core communication metrics."""
 
         score = 1.0
@@ -357,7 +357,7 @@ class CommunicationPerformanceDashboard:
 
         return max(0.0, score)
 
-    async def _calculate_broker_health_score(self, metrics: Dict[str, Any]) -> float:
+    async def _calculate_broker_health_score(self, metrics: dict[str, Any]) -> float:
         """Calculate health score for enhanced message broker."""
 
         score = 1.0
@@ -380,7 +380,7 @@ class CommunicationPerformanceDashboard:
         return max(0.0, score)
 
     async def _calculate_collaboration_health_score(
-        self, metrics: Dict[str, Any]
+        self, metrics: dict[str, Any]
     ) -> float:
         """Calculate health score for collaboration system."""
 
@@ -396,7 +396,7 @@ class CommunicationPerformanceDashboard:
         return max(0.0, score)
 
     async def _calculate_knowledge_base_health_score(
-        self, metrics: Dict[str, Any]
+        self, metrics: dict[str, Any]
     ) -> float:
         """Calculate health score for knowledge base."""
 
@@ -412,8 +412,8 @@ class CommunicationPerformanceDashboard:
         return max(0.0, score)
 
     def _identify_top_performing_agents(
-        self, agent_metrics: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, agent_metrics: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Identify top performing agents based on various metrics."""
 
         agent_scores = []
@@ -454,8 +454,8 @@ class CommunicationPerformanceDashboard:
         return agent_scores[:10]  # Return top 10
 
     def _calculate_agent_performance_summary(
-        self, agent_metrics: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, agent_metrics: dict[str, Any]
+    ) -> dict[str, Any]:
         """Calculate summary statistics for agent performance."""
 
         if not agent_metrics:
@@ -492,9 +492,9 @@ performance_dashboard = None
 
 
 def get_performance_dashboard(
-    enhanced_broker: Optional[EnhancedMessageBroker] = None,
-    collaboration_sync: Optional[RealTimeCollaborationSync] = None,
-    knowledge_base: Optional[SharedKnowledgeBase] = None,
+    enhanced_broker: EnhancedMessageBroker | None = None,
+    collaboration_sync: RealTimeCollaborationSync | None = None,
+    knowledge_base: SharedKnowledgeBase | None = None,
 ) -> CommunicationPerformanceDashboard:
     """Get performance dashboard instance."""
     global performance_dashboard

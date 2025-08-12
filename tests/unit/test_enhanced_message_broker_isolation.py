@@ -15,12 +15,12 @@ import pytest
 import structlog
 
 from src.core.enhanced_message_broker import (
+    AgentState,
     ContextShareType,
     EnhancedMessageBroker,
     MessagePriority,
     SharedContext,
     SyncMode,
-    AgentState,
 )
 from src.core.message_broker import MessageType
 from tests.unit.test_component_isolation_framework import (
@@ -463,7 +463,7 @@ class TestEnhancedMessageBrokerIsolation:
         loads = [0.2, 0.8, 0.5]  # Different load levels
         capacities = [10, 10, 10]
 
-        for agent, load, capacity in zip(agents, loads, capacities):
+        for agent, load, capacity in zip(agents, loads, capacities, strict=False):
             await broker.update_agent_load(agent, load, capacity)
 
         # Clear previous interactions

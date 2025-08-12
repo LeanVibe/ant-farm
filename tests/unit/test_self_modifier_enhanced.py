@@ -9,16 +9,16 @@ import pytest
 
 from src.core.self_modifier import (
     CodeChange,
+    GitManager,
     ModificationProposal,
     ModificationRecord,
-    ModificationType,
     ModificationStatus,
+    ModificationType,
+    SandboxTester,
+    SecurityScanner,
     SelfModifier,
     TestResult,
     ValidationResult,
-    GitManager,
-    SandboxTester,
-    SecurityScanner,
     get_self_modifier,
 )
 

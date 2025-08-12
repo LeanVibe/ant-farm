@@ -29,11 +29,11 @@ class TmuxSession:
 
     name: str
     status: TmuxSessionStatus
-    pid: Optional[int] = None
+    pid: int | None = None
     created_at: float = 0.0
     last_checked: float = 0.0
-    command: Optional[str] = None
-    working_directory: Optional[str] = None
+    command: str | None = None
+    working_directory: str | None = None
 
 
 @dataclass
@@ -41,10 +41,10 @@ class TmuxOperationResult:
     """Result of a tmux operation."""
 
     success: bool
-    session_name: Optional[str] = None
-    error_message: Optional[str] = None
-    stdout: Optional[str] = None
-    stderr: Optional[str] = None
+    session_name: str | None = None
+    error_message: str | None = None
+    stdout: str | None = None
+    stderr: str | None = None
     execution_time: float = 0.0
     retry_count: int = 0
 
@@ -153,7 +153,7 @@ class RetryableTmuxManager:
         command: list[str],
         timeout: float,
         operation_name: str,
-        cwd: Optional[Path] = None,
+        cwd: Path | None = None,
     ) -> TmuxOperationResult:
         """
         Run a tmux command with retry logic and timeout handling.
@@ -202,7 +202,7 @@ class RetryableTmuxManager:
                     stdout, stderr = await asyncio.wait_for(
                         process.communicate(), timeout=timeout
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Kill the process if it times out
                     try:
                         process.kill()
@@ -298,8 +298,8 @@ class RetryableTmuxManager:
         self,
         session_name: str,
         command: str,
-        working_directory: Optional[Path] = None,
-        environment: Optional[dict[str, str]] = None,
+        working_directory: Path | None = None,
+        environment: dict[str, str] | None = None,
     ) -> TmuxOperationResult:
         """
         Create a new tmux session with the given command.
@@ -598,7 +598,7 @@ class RetryableTmuxManager:
 
         return result.success
 
-    def get_session_info(self, session_name: str) -> Optional[TmuxSession]:
+    def get_session_info(self, session_name: str) -> TmuxSession | None:
         """Get information about a tracked session."""
         return self.sessions.get(session_name)
 
@@ -617,7 +617,7 @@ class RetryableTmuxManager:
 
 
 # Global instance
-_tmux_manager: Optional[RetryableTmuxManager] = None
+_tmux_manager: RetryableTmuxManager | None = None
 
 
 def get_tmux_manager() -> RetryableTmuxManager:

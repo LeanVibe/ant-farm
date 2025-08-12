@@ -4,20 +4,21 @@ import asyncio
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Callable
+from typing import Any, Dict, List, Optional, Set
 
 import structlog
 
-from .enhanced_message_broker import (
-    EnhancedMessageBroker,
-    ContextShareType,
-    SyncMode,
-    AgentState,
-)
 from .communication_monitor import get_communication_monitor
+from .enhanced_message_broker import (
+    AgentState,
+    ContextShareType,
+    EnhancedMessageBroker,
+    SyncMode,
+)
 
 logger = structlog.get_logger()
 
@@ -49,18 +50,18 @@ class CollaborativeSession:
 
     id: str
     title: str
-    participants: Set[str] = field(default_factory=set)
+    participants: set[str] = field(default_factory=set)
     coordinator: str = ""
     state: CollaborationState = CollaborationState.INITIALIZING
-    shared_resources: Dict[str, Any] = field(default_factory=dict)
-    version_history: List[Dict[str, Any]] = field(default_factory=list)
+    shared_resources: dict[str, Any] = field(default_factory=dict)
+    version_history: list[dict[str, Any]] = field(default_factory=list)
     current_version: int = 0
     conflict_resolution: ConflictResolutionStrategy = (
         ConflictResolutionStrategy.MERGE_AUTOMATIC
     )
     created_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -73,8 +74,8 @@ class SyncOperation:
     data: Any
     author: str
     timestamp: float
-    depends_on: List[str] = field(default_factory=list)
-    conflicts_with: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
+    conflicts_with: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -86,7 +87,7 @@ class ConflictResult:
     resolved_data: Any
     resolution_author: str
     resolution_timestamp: float
-    involved_operations: List[str]
+    involved_operations: list[str]
     manual_review_required: bool = False
 
 
@@ -95,12 +96,12 @@ class RealTimeCollaborationSync:
 
     def __init__(self, enhanced_broker: EnhancedMessageBroker):
         self.broker = enhanced_broker
-        self.active_sessions: Dict[str, CollaborativeSession] = {}
-        self.pending_operations: Dict[
-            str, List[SyncOperation]
+        self.active_sessions: dict[str, CollaborativeSession] = {}
+        self.pending_operations: dict[
+            str, list[SyncOperation]
         ] = {}  # session_id -> operations
-        self.operation_handlers: Dict[str, Callable] = {}
-        self.conflict_resolvers: Dict[ConflictResolutionStrategy, Callable] = {
+        self.operation_handlers: dict[str, Callable] = {}
+        self.conflict_resolvers: dict[ConflictResolutionStrategy, Callable] = {
             ConflictResolutionStrategy.LAST_WRITER_WINS: self._resolve_last_writer_wins,
             ConflictResolutionStrategy.MERGE_AUTOMATIC: self._resolve_merge_automatic,
             ConflictResolutionStrategy.VERSION_BRANCHING: self._resolve_version_branching,
@@ -136,8 +137,8 @@ class RealTimeCollaborationSync:
         self,
         title: str,
         coordinator: str,
-        initial_participants: Set[str] = None,
-        shared_resources: Dict[str, Any] = None,
+        initial_participants: set[str] = None,
+        shared_resources: dict[str, Any] = None,
         conflict_resolution: ConflictResolutionStrategy = ConflictResolutionStrategy.MERGE_AUTOMATIC,
     ) -> str:
         """Start a new collaborative session."""
@@ -266,7 +267,7 @@ class RealTimeCollaborationSync:
         resource_path: str,
         data: Any,
         author: str,
-        depends_on: List[str] = None,
+        depends_on: list[str] = None,
     ) -> str:
         """Submit an operation for synchronization."""
 
@@ -306,7 +307,7 @@ class RealTimeCollaborationSync:
 
     async def get_session_state(
         self, session_id: str, agent_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get current state of a collaboration session."""
 
         if session_id not in self.active_sessions:
@@ -506,8 +507,8 @@ class RealTimeCollaborationSync:
         self,
         session: CollaborativeSession,
         operation: SyncOperation,
-        processed_ops: List[SyncOperation],
-    ) -> List[SyncOperation]:
+        processed_ops: list[SyncOperation],
+    ) -> list[SyncOperation]:
         """Detect conflicts between operations."""
 
         conflicts = []
@@ -577,7 +578,7 @@ class RealTimeCollaborationSync:
             )
 
     async def _handle_conflicts(
-        self, session: CollaborativeSession, conflicts: List[SyncOperation]
+        self, session: CollaborativeSession, conflicts: list[SyncOperation]
     ) -> None:
         """Handle detected conflicts using the session's resolution strategy."""
 
@@ -789,7 +790,7 @@ class RealTimeCollaborationSync:
                 "Inactive collaboration session cleaned up", session_id=session_id
             )
 
-    async def get_sync_metrics(self) -> Dict[str, Any]:
+    async def get_sync_metrics(self) -> dict[str, Any]:
         """Get synchronization system metrics."""
 
         self.sync_metrics["sessions_active"] = len(self.active_sessions)
@@ -797,7 +798,7 @@ class RealTimeCollaborationSync:
         return self.sync_metrics.copy()
 
     # Message handlers for enhanced broker integration
-    async def _handle_start_collaboration(self, message) -> Dict[str, Any]:
+    async def _handle_start_collaboration(self, message) -> dict[str, Any]:
         """Handle start collaboration request."""
 
         payload = message.payload
@@ -814,7 +815,7 @@ class RealTimeCollaborationSync:
 
         return {"session_id": session_id, "status": "started"}
 
-    async def _handle_join_collaboration(self, message) -> Dict[str, Any]:
+    async def _handle_join_collaboration(self, message) -> dict[str, Any]:
         """Handle join collaboration request."""
 
         session_id = message.payload["session_id"]
@@ -822,7 +823,7 @@ class RealTimeCollaborationSync:
 
         return {"status": "joined" if success else "failed"}
 
-    async def _handle_sync_operation(self, message) -> Dict[str, Any]:
+    async def _handle_sync_operation(self, message) -> dict[str, Any]:
         """Handle sync operation submission."""
 
         payload = message.payload
@@ -838,13 +839,13 @@ class RealTimeCollaborationSync:
 
         return {"operation_id": operation_id, "status": "submitted"}
 
-    async def _handle_resolve_conflict(self, message) -> Dict[str, Any]:
+    async def _handle_resolve_conflict(self, message) -> dict[str, Any]:
         """Handle manual conflict resolution."""
 
         # Implementation for manual conflict resolution
         return {"status": "resolved"}
 
-    async def _handle_state_change(self, message) -> Dict[str, Any]:
+    async def _handle_state_change(self, message) -> dict[str, Any]:
         """Handle collaboration state change requests."""
 
         payload = message.payload
@@ -864,7 +865,7 @@ class RealTimeCollaborationSync:
         self,
         metric_type: str,
         agent_name: str,
-        metric_data: Dict[str, Any],
+        metric_data: dict[str, Any],
     ) -> None:
         """Record collaboration-specific performance metrics."""
 
@@ -906,7 +907,7 @@ class RealTimeCollaborationSync:
 
             communication_monitor.metrics_buffer.append(metric)
 
-    async def get_collaboration_performance_metrics(self) -> Dict[str, Any]:
+    async def get_collaboration_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics for collaboration features."""
 
         current_time = time.time()
@@ -949,8 +950,8 @@ class RealTimeCollaborationSync:
         workspace_id: str,
         session_type: str,
         initiated_by: str,
-        participants: List[str],
-    ) -> Dict[str, Any]:
+        participants: list[str],
+    ) -> dict[str, Any]:
         """Start a collaboration session (test compatibility method)."""
         session_id = await self.start_collaboration_session(
             title=f"{session_type} session in {workspace_id}",
@@ -1090,8 +1091,8 @@ class RealTimeCollaborationSync:
         name: str,
         workspace_type: str,
         created_by: str,
-        initial_participants: List[str],
-    ) -> Dict[str, Any]:
+        initial_participants: list[str],
+    ) -> dict[str, Any]:
         """Create a workspace (test compatibility method)."""
         workspace_id = str(uuid.uuid4())
         session_id = await self.start_collaboration_session(
@@ -1116,7 +1117,7 @@ class RealTimeCollaborationSync:
         self,
         session_id: str,
         update_type: str,
-        update_data: Dict[str, Any],
+        update_data: dict[str, Any],
         sent_by: str,
     ) -> bool:
         """Send a session update (test compatibility method)."""

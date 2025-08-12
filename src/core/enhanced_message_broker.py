@@ -11,10 +11,10 @@ from typing import Any, Dict, List, Optional, Set
 
 import structlog
 
-from .message_broker import MessageBroker, MessageType, Message
-from .context_engine import ContextEngine
 from .communication_monitor import get_communication_monitor
+from .context_engine import ContextEngine
 from .enums import TaskPriority
+from .message_broker import Message, MessageBroker, MessageType
 
 logger = structlog.get_logger()
 
@@ -43,7 +43,7 @@ class LoadBalancerConfig:
     """Configuration for load balancer."""
 
     strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN
-    weights: Dict[str, float] = field(default_factory=dict)
+    weights: dict[str, float] = field(default_factory=dict)
     enable_health_checks: bool = True
     health_check_interval: int = 30
 
@@ -53,11 +53,11 @@ class LoadBalancer:
 
     def __init__(self, strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN):
         self.strategy = strategy
-        self.agent_weights: Dict[str, float] = {}
-        self.agent_loads: Dict[str, float] = {}
+        self.agent_weights: dict[str, float] = {}
+        self.agent_loads: dict[str, float] = {}
         self.last_selected_index = 0
 
-    def select_agent(self, agents: List[Dict], topic: str = None) -> Optional[Dict]:
+    def select_agent(self, agents: list[dict], topic: str = None) -> dict | None:
         """Select an agent based on the configured strategy."""
         if not agents:
             return None
@@ -80,7 +80,7 @@ class LoadBalancer:
         else:
             return self._round_robin_select(active_agents)
 
-    def _round_robin_select(self, agents: List[Dict]) -> Optional[Dict]:
+    def _round_robin_select(self, agents: list[dict]) -> dict | None:
         """Select agent using round-robin strategy."""
         if not agents:
             return None
@@ -88,20 +88,20 @@ class LoadBalancer:
         self.last_selected_index += 1
         return selected
 
-    def _least_load_select(self, agents: List[Dict]) -> Optional[Dict]:
+    def _least_load_select(self, agents: list[dict]) -> dict | None:
         """Select agent with least load."""
         if not agents:
             return None
         return min(agents, key=lambda a: a.get("load", 0.0))
 
-    def _weighted_select(self, agents: List[Dict]) -> Optional[Dict]:
+    def _weighted_select(self, agents: list[dict]) -> dict | None:
         """Select agent based on weights."""
         if not agents:
             return None
         # Simple weighted selection - could be enhanced with more sophisticated algorithms
         return max(agents, key=lambda a: self.agent_weights.get(a.get("id", ""), 1.0))
 
-    def _hash_based_select(self, agents: List[Dict], topic: str) -> Optional[Dict]:
+    def _hash_based_select(self, agents: list[dict], topic: str) -> dict | None:
         """Select agent based on hash of topic."""
         if not agents or not topic:
             return self._round_robin_select(agents)
@@ -109,7 +109,7 @@ class LoadBalancer:
         hash_value = hash(topic) % len(agents)
         return agents[hash_value]
 
-    def _random_select(self, agents: List[Dict]) -> Optional[Dict]:
+    def _random_select(self, agents: list[dict]) -> dict | None:
         """Select agent randomly."""
         import random
 
@@ -145,14 +145,14 @@ class SharedContext:
     id: str
     type: ContextShareType
     owner_agent: str
-    participants: Set[str] = field(default_factory=set)
-    data: Dict[str, Any] = field(default_factory=dict)
+    participants: set[str] = field(default_factory=set)
+    data: dict[str, Any] = field(default_factory=dict)
     version: int = 0
     last_updated: float = field(default_factory=time.time)
     last_updated_by: str = ""
     sync_mode: SyncMode = SyncMode.REAL_TIME
-    ttl: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    ttl: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -161,12 +161,12 @@ class ContextUpdate:
 
     context_id: str
     update_type: str  # "create", "update", "delete", "merge"
-    changes: Dict[str, Any]
+    changes: dict[str, Any]
     previous_version: int
     new_version: int
     timestamp: float
     updated_by: str
-    conflict_resolution: Optional[Dict[str, Any]] = None
+    conflict_resolution: dict[str, Any] | None = None
 
 
 @dataclass
@@ -174,13 +174,13 @@ class AgentState:
     """Current state of an agent for synchronization."""
 
     agent_name: str
-    current_task: Optional[str] = None
+    current_task: str | None = None
     status: str = "idle"
-    capabilities: List[str] = field(default_factory=list)
-    performance_metrics: Dict[str, float] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=list)
+    performance_metrics: dict[str, float] = field(default_factory=dict)
     last_activity: float = field(default_factory=time.time)
-    shared_contexts: Set[str] = field(default_factory=set)
-    preferences: Dict[str, Any] = field(default_factory=dict)
+    shared_contexts: set[str] = field(default_factory=set)
+    preferences: dict[str, Any] = field(default_factory=dict)
 
 
 class EnhancedMessageBroker(MessageBroker):
@@ -189,12 +189,12 @@ class EnhancedMessageBroker(MessageBroker):
     def __init__(self, redis_url: str = None, context_engine: ContextEngine = None):
         super().__init__(redis_url)
         self.context_engine = context_engine
-        self.shared_contexts: Dict[str, SharedContext] = {}
-        self.agent_states: Dict[str, AgentState] = {}
-        self.context_subscribers: Dict[
-            str, Set[str]
+        self.shared_contexts: dict[str, SharedContext] = {}
+        self.agent_states: dict[str, AgentState] = {}
+        self.context_subscribers: dict[
+            str, set[str]
         ] = {}  # context_id -> set of agent names
-        self.sync_tasks: Dict[str, asyncio.Task] = {}
+        self.sync_tasks: dict[str, asyncio.Task] = {}
 
         # Enhanced key prefixes
         self.context_prefix = "hive:shared_context"
@@ -217,10 +217,10 @@ class EnhancedMessageBroker(MessageBroker):
         self,
         context_type: ContextShareType,
         owner_agent: str,
-        initial_data: Dict[str, Any] = None,
-        participants: Set[str] = None,
+        initial_data: dict[str, Any] = None,
+        participants: set[str] = None,
         sync_mode: SyncMode = SyncMode.REAL_TIME,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> str:
         """Create a new shared context."""
 
@@ -306,7 +306,7 @@ class EnhancedMessageBroker(MessageBroker):
         self,
         context_id: str,
         agent_name: str,
-        updates: Dict[str, Any],
+        updates: dict[str, Any],
         merge_strategy: str = "deep_merge",
     ) -> bool:
         """Update a shared context with conflict resolution."""
@@ -376,7 +376,7 @@ class EnhancedMessageBroker(MessageBroker):
 
     async def get_shared_context(
         self, context_id: str, agent_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get shared context data for an agent."""
 
         if context_id not in self.shared_contexts:
@@ -403,7 +403,7 @@ class EnhancedMessageBroker(MessageBroker):
         }
 
     async def update_agent_state(
-        self, agent_name: str, state_updates: Dict[str, Any]
+        self, agent_name: str, state_updates: dict[str, Any]
     ) -> None:
         """Update agent state for real-time coordination."""
 
@@ -429,7 +429,7 @@ class EnhancedMessageBroker(MessageBroker):
 
     async def get_agent_states(
         self, requesting_agent: str
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Get states of all agents for coordination."""
 
         states = {}
@@ -451,8 +451,8 @@ class EnhancedMessageBroker(MessageBroker):
         from_agent: str,
         to_agent: str,
         topic: str,
-        payload: Dict[str, Any],
-        context_ids: List[str] = None,
+        payload: dict[str, Any],
+        context_ids: list[str] = None,
         include_relevant_context: bool = True,
     ) -> bool:
         """Send a message with relevant context automatically included."""
@@ -519,8 +519,8 @@ class EnhancedMessageBroker(MessageBroker):
         self,
         from_agent: str,
         context_id: str,
-        update_data: Dict[str, Any],
-        target_participants: Set[str] = None,
+        update_data: dict[str, Any],
+        target_participants: set[str] = None,
     ) -> None:
         """Broadcast context update to relevant agents."""
 
@@ -612,7 +612,7 @@ class EnhancedMessageBroker(MessageBroker):
         else:
             await self.redis_client.expire(context_key, 86400)  # 24 hours default
 
-    async def _load_shared_context(self, context_id: str) -> Optional[SharedContext]:
+    async def _load_shared_context(self, context_id: str) -> SharedContext | None:
         """Load shared context from Redis."""
 
         context_key = f"{self.context_prefix}:{context_id}"
@@ -673,7 +673,7 @@ class EnhancedMessageBroker(MessageBroker):
                 )
 
     async def _notify_context_updated(
-        self, update: ContextUpdate, participants: Set[str]
+        self, update: ContextUpdate, participants: set[str]
     ) -> None:
         """Notify participants about context updates."""
 
@@ -743,8 +743,8 @@ class EnhancedMessageBroker(MessageBroker):
             logger.info("Agent marked as inactive", agent=agent_name)
 
     def _deep_merge(
-        self, base: Dict[str, Any], updates: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, base: dict[str, Any], updates: dict[str, Any]
+    ) -> dict[str, Any]:
         """Deep merge two dictionaries."""
 
         result = base.copy()
@@ -811,7 +811,7 @@ class EnhancedMessageBroker(MessageBroker):
 
             communication_monitor.metrics_buffer.append(reliability_metric)
 
-    async def get_communication_performance_metrics(self) -> Dict[str, Any]:
+    async def get_communication_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics for enhanced communication features."""
 
         communication_monitor = get_communication_monitor()
@@ -860,7 +860,7 @@ class EnhancedMessageBroker(MessageBroker):
         from_agent: str,
         to_agent: str,
         topic: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         priority: MessagePriority = MessagePriority.NORMAL,
         message_type: MessageType = MessageType.DIRECT,
     ) -> str:
@@ -919,7 +919,7 @@ class EnhancedMessageBroker(MessageBroker):
 
         return message_id
 
-    async def get_priority_messages(self, limit: int = 10) -> List[Dict]:
+    async def get_priority_messages(self, limit: int = 10) -> list[dict]:
         """Get messages from priority queues."""
         messages = []
 
@@ -962,7 +962,7 @@ class EnhancedMessageBroker(MessageBroker):
         await self.redis_client.hset(load_key, mapping=load_data)
         await self.redis_client.expire(load_key, 300)  # 5 minutes TTL
 
-    async def get_performance_metrics(self) -> Dict[str, Any]:
+    async def get_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics for message broker."""
         metrics_key = "hive:broker_metrics"
         metrics = await self.redis_client.hgetall(metrics_key)
@@ -980,7 +980,7 @@ class EnhancedMessageBroker(MessageBroker):
 
         return converted_metrics
 
-    async def send_message_batch(self, messages: List[Dict[str, Any]]) -> bool:
+    async def send_message_batch(self, messages: list[dict[str, Any]]) -> bool:
         """Send a batch of messages efficiently."""
         if not messages:
             return True
@@ -1010,8 +1010,8 @@ class EnhancedMessageBroker(MessageBroker):
     async def route_by_topic(
         self,
         topic: str,
-        available_agents: List[str],
-    ) -> Optional[str]:
+        available_agents: list[str],
+    ) -> str | None:
         """Route message based on topic specialization."""
         if not available_agents:
             return None
@@ -1025,7 +1025,7 @@ class EnhancedMessageBroker(MessageBroker):
         topic: str,
         message_priority: MessagePriority = MessagePriority.NORMAL,
         required_capacity: int = 1,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Route message to best available agent based on capacity and priority."""
         # Get available agents
         agent_keys = await self.redis_client.keys("hive:agent_load:*")

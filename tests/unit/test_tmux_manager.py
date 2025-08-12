@@ -1,19 +1,20 @@
 """Tests for the RetryableTmuxManager."""
 
 import asyncio
-import pytest
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from src.core.tmux_manager import (
     RetryableTmuxManager,
+    TmuxCommandTimeoutError,
+    TmuxError,
+    TmuxOperationResult,
+    TmuxRetryExhaustedError,
     TmuxSession,
     TmuxSessionStatus,
-    TmuxOperationResult,
-    TmuxError,
-    TmuxCommandTimeoutError,
-    TmuxRetryExhaustedError,
     get_tmux_manager,
 )
 
@@ -134,7 +135,7 @@ class TestRetryableTmuxManager:
         """Test command timeout handling."""
         # Mock process that times out
         mock_process = AsyncMock()
-        mock_process.communicate.side_effect = asyncio.TimeoutError()
+        mock_process.communicate.side_effect = TimeoutError()
         mock_process.kill = AsyncMock()
         mock_process.wait = AsyncMock()
         mock_subprocess.return_value = mock_process
@@ -355,7 +356,7 @@ class TestTmuxManagerIntegration:
         """Test various error recovery scenarios."""
         # Test timeout recovery
         mock_process_timeout = AsyncMock()
-        mock_process_timeout.communicate.side_effect = asyncio.TimeoutError()
+        mock_process_timeout.communicate.side_effect = TimeoutError()
         mock_process_timeout.kill = AsyncMock()
         mock_process_timeout.wait = AsyncMock()
 

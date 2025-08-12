@@ -6,11 +6,11 @@ Analyzes architecture, dependencies, and component health
 
 import ast
 import importlib.util
+import json
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Any
-import json
+from typing import Any
 
 
 class SystemAnalyzer:
@@ -23,7 +23,7 @@ class SystemAnalyzer:
         self.contracts = {}
         self.test_coverage = {}
 
-    def analyze_complete_system(self) -> Dict[str, Any]:
+    def analyze_complete_system(self) -> dict[str, Any]:
         """Perform comprehensive system analysis."""
         print("🔍 LeanVibe Agent Hive - System Architecture Analysis")
         print("=" * 60)
@@ -56,7 +56,7 @@ class SystemAnalyzer:
             "recommendations": self._generate_recommendations(),
         }
 
-    def _discover_components(self) -> Dict[str, Any]:
+    def _discover_components(self) -> dict[str, Any]:
         """Discover all system components and their types."""
         print("\n📊 Component Discovery")
         print("-" * 30)
@@ -75,7 +75,7 @@ class SystemAnalyzer:
                 continue
 
             try:
-                with open(py_file, "r", encoding="utf-8") as f:
+                with open(py_file, encoding="utf-8") as f:
                     content = f.read()
                     tree = ast.parse(content)
 
@@ -104,7 +104,7 @@ class SystemAnalyzer:
 
         return components
 
-    def _analyze_file_component(self, file_path: Path, tree: ast.AST) -> Dict[str, Any]:
+    def _analyze_file_component(self, file_path: Path, tree: ast.AST) -> dict[str, Any]:
         """Analyze a single Python file component."""
         classes = []
         functions = []
@@ -157,7 +157,7 @@ class SystemAnalyzer:
             "size_lines": len(open(file_path).readlines()) if file_path.exists() else 0,
         }
 
-    def _analyze_dependencies(self) -> Dict[str, Any]:
+    def _analyze_dependencies(self) -> dict[str, Any]:
         """Analyze component dependencies and identify cycles."""
         print("\n🔗 Dependency Analysis")
         print("-" * 30)
@@ -171,7 +171,7 @@ class SystemAnalyzer:
                 continue
 
             try:
-                with open(py_file, "r") as f:
+                with open(py_file) as f:
                     content = f.read()
                     tree = ast.parse(content)
 
@@ -207,7 +207,7 @@ class SystemAnalyzer:
             },
         }
 
-    def _find_dependency_cycles(self, deps: Dict[str, List[str]]) -> List[List[str]]:
+    def _find_dependency_cycles(self, deps: dict[str, list[str]]) -> list[list[str]]:
         """Find circular dependencies using DFS."""
         cycles = []
         visited = set()
@@ -239,20 +239,20 @@ class SystemAnalyzer:
         return cycles
 
     def _find_most_dependent_files(
-        self, deps: Dict[str, List[str]]
-    ) -> List[Tuple[str, int]]:
+        self, deps: dict[str, list[str]]
+    ) -> list[tuple[str, int]]:
         """Find files with most dependencies."""
         return sorted(
             [(f, len(d)) for f, d in deps.items()], key=lambda x: x[1], reverse=True
         )[:10]
 
     def _find_least_dependent_files(
-        self, deps: Dict[str, List[str]]
-    ) -> List[Tuple[str, int]]:
+        self, deps: dict[str, list[str]]
+    ) -> list[tuple[str, int]]:
         """Find files with least dependencies."""
         return sorted([(f, len(d)) for f, d in deps.items()], key=lambda x: x[1])[:10]
 
-    def _analyze_contracts(self) -> Dict[str, Any]:
+    def _analyze_contracts(self) -> dict[str, Any]:
         """Analyze system contracts (interfaces, APIs, protocols)."""
         print("\n📋 Contract Analysis")
         print("-" * 30)
@@ -266,14 +266,14 @@ class SystemAnalyzer:
 
         return contracts
 
-    def _analyze_agent_contracts(self) -> Dict[str, Any]:
+    def _analyze_agent_contracts(self) -> dict[str, Any]:
         """Analyze agent interface contracts."""
         agent_contracts = {}
 
         # Find BaseAgent contract
         base_agent_file = self.root_path / "agents" / "base_agent.py"
         if base_agent_file.exists():
-            with open(base_agent_file, "r") as f:
+            with open(base_agent_file) as f:
                 content = f.read()
                 tree = ast.parse(content)
 
@@ -303,13 +303,13 @@ class SystemAnalyzer:
 
         return agent_contracts
 
-    def _analyze_api_contracts(self) -> Dict[str, Any]:
+    def _analyze_api_contracts(self) -> dict[str, Any]:
         """Analyze API endpoint contracts."""
         api_contracts = {}
 
         main_api_file = self.root_path / "api" / "main.py"
         if main_api_file.exists():
-            with open(main_api_file, "r") as f:
+            with open(main_api_file) as f:
                 content = f.read()
 
             # Extract FastAPI routes (simplified)
@@ -352,7 +352,7 @@ class SystemAnalyzer:
 
         return api_contracts
 
-    def _analyze_message_contracts(self) -> Dict[str, Any]:
+    def _analyze_message_contracts(self) -> dict[str, Any]:
         """Analyze message passing contracts."""
         message_contracts = {}
 
@@ -371,13 +371,13 @@ class SystemAnalyzer:
 
         return message_contracts
 
-    def _analyze_database_contracts(self) -> Dict[str, Any]:
+    def _analyze_database_contracts(self) -> dict[str, Any]:
         """Analyze database schema contracts."""
         db_contracts = {}
 
         models_file = self.root_path / "core" / "models.py"
         if models_file.exists():
-            with open(models_file, "r") as f:
+            with open(models_file) as f:
                 content = f.read()
                 tree = ast.parse(content)
 
@@ -396,7 +396,7 @@ class SystemAnalyzer:
 
         return db_contracts
 
-    def _analyze_cli_interface(self) -> Dict[str, Any]:
+    def _analyze_cli_interface(self) -> dict[str, Any]:
         """Analyze CLI interface completeness for power users."""
         print("\n💻 CLI Interface Analysis")
         print("-" * 30)
@@ -409,7 +409,7 @@ class SystemAnalyzer:
                 if py_file.name == "__init__.py":
                     continue
 
-                with open(py_file, "r") as f:
+                with open(py_file) as f:
                     content = f.read()
 
                 # Extract Typer commands
@@ -443,7 +443,7 @@ class SystemAnalyzer:
 
         return cli_commands
 
-    def _analyze_test_coverage(self) -> Dict[str, Any]:
+    def _analyze_test_coverage(self) -> dict[str, Any]:
         """Analyze test coverage and quality."""
         print("\n🧪 Test Coverage Analysis")
         print("-" * 30)
@@ -472,7 +472,7 @@ class SystemAnalyzer:
 
         return test_analysis
 
-    def _analyze_critical_paths(self) -> Dict[str, Any]:
+    def _analyze_critical_paths(self) -> dict[str, Any]:
         """Analyze critical system execution paths."""
         print("\n🎯 Critical Path Analysis")
         print("-" * 30)
@@ -507,7 +507,7 @@ class SystemAnalyzer:
 
         return critical_paths
 
-    def _generate_recommendations(self) -> List[str]:
+    def _generate_recommendations(self) -> list[str]:
         """Generate recommendations for system improvement."""
         recommendations = [
             "1. Implement comprehensive unit tests for each component",
@@ -534,7 +534,7 @@ def main():
     with open("system_analysis_report.json", "w") as f:
         json.dump(analysis, f, indent=2, default=str)
 
-    print(f"\n📄 Analysis saved to: system_analysis_report.json")
+    print("\n📄 Analysis saved to: system_analysis_report.json")
     print(
         f"📊 Total components analyzed: {sum(len(cat) for cat in analysis['components'].values())}"
     )

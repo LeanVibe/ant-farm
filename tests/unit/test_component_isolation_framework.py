@@ -41,7 +41,7 @@ class MockInteraction:
     kwargs: dict
     result: Any
     duration: float = 0.0
-    exception: Optional[Exception] = None
+    exception: Exception | None = None
 
 
 @dataclass
@@ -63,15 +63,15 @@ class MockRedisClient:
     """Advanced Redis client mock with realistic behavior."""
 
     def __init__(self, record_interactions: bool = True):
-        self.data: Dict[str, Any] = {}
-        self.lists: Dict[str, List[str]] = defaultdict(list)
-        self.sets: Dict[str, Set[str]] = defaultdict(set)
-        self.hashes: Dict[str, Dict[str, str]] = defaultdict(dict)
-        self.sorted_sets: Dict[str, Dict[str, float]] = defaultdict(dict)
-        self.expirations: Dict[str, float] = {}
-        self.pubsub_channels: Dict[str, List[str]] = defaultdict(list)
-        self.pubsub_subscribers: Dict[str, List[AsyncMock]] = defaultdict(list)
-        self.interactions: List[MockInteraction] = []
+        self.data: dict[str, Any] = {}
+        self.lists: dict[str, list[str]] = defaultdict(list)
+        self.sets: dict[str, set[str]] = defaultdict(set)
+        self.hashes: dict[str, dict[str, str]] = defaultdict(dict)
+        self.sorted_sets: dict[str, dict[str, float]] = defaultdict(dict)
+        self.expirations: dict[str, float] = {}
+        self.pubsub_channels: dict[str, list[str]] = defaultdict(list)
+        self.pubsub_subscribers: dict[str, list[AsyncMock]] = defaultdict(list)
+        self.interactions: list[MockInteraction] = []
         self.record_interactions = record_interactions
         self.connection_pool = MagicMock()
         self.connection_pool.connection_kwargs = {"port": 6381}
@@ -101,7 +101,7 @@ class MockRedisClient:
         self._record_interaction("ping", (), {}, result, duration)
         return result
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Mock Redis GET operation."""
         start_time = time.time()
 
@@ -117,7 +117,7 @@ class MockRedisClient:
         self._record_interaction("get", (key,), {}, result, duration)
         return result
 
-    async def set(self, key: str, value: str, ex: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: str, ex: int | None = None) -> bool:
         """Mock Redis SET operation."""
         start_time = time.time()
 
@@ -178,7 +178,7 @@ class MockRedisClient:
         self._record_interaction("lpush", (key, *values), {}, result, duration)
         return result
 
-    async def rpop(self, key: str) -> Optional[str]:
+    async def rpop(self, key: str) -> str | None:
         """Mock Redis RPOP operation."""
         start_time = time.time()
 
@@ -191,7 +191,7 @@ class MockRedisClient:
         self._record_interaction("rpop", (key,), {}, result, duration)
         return result
 
-    async def brpop(self, key: str, timeout: int = 1) -> Optional[tuple]:
+    async def brpop(self, key: str, timeout: int = 1) -> tuple | None:
         """Mock Redis BRPOP operation."""
         start_time = time.time()
 
@@ -248,7 +248,7 @@ class MockRedisClient:
 
     async def zrange(
         self, key: str, start: int, stop: int, withscores: bool = False
-    ) -> List:
+    ) -> list:
         """Mock Redis ZRANGE operation."""
         start_time = time.time()
 
@@ -294,7 +294,7 @@ class MockRedisClient:
         self._record_interaction("expire", (key, seconds), {}, result, duration)
         return result
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Mock Redis KEYS operation."""
         start_time = time.time()
 
@@ -361,7 +361,7 @@ class MockPubSub:
 
     def __init__(self, redis_client: MockRedisClient):
         self.redis_client = redis_client
-        self.subscribed_channels: Set[str] = set()
+        self.subscribed_channels: set[str] = set()
         self.message_queue: asyncio.Queue = asyncio.Queue()
 
     async def subscribe(self, *channels: str) -> None:
@@ -389,7 +389,7 @@ class MockPubSub:
                 # Wait for message with timeout
                 message = await asyncio.wait_for(self.message_queue.get(), timeout=0.1)
                 yield message
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Yield control to allow other tasks to run
                 await asyncio.sleep(0.001)
                 continue
@@ -405,8 +405,8 @@ class MockAsyncSession:
     """Mock SQLAlchemy async session."""
 
     def __init__(self):
-        self.data: Dict[str, List[Dict]] = defaultdict(list)
-        self.interactions: List[MockInteraction] = []
+        self.data: dict[str, list[dict]] = defaultdict(list)
+        self.interactions: list[MockInteraction] = []
         self.transaction_active = False
 
     def _record_interaction(self, method: str, args: tuple, kwargs: dict, result: Any):
@@ -484,7 +484,7 @@ class MockCLITools:
     """Mock CLI tools for testing."""
 
     def __init__(self):
-        self.interactions: List[MockInteraction] = []
+        self.interactions: list[MockInteraction] = []
         self.available_tools = {
             "opencode": {"name": "OpenCode", "command": "opencode", "available": True},
             "claude": {"name": "Claude CLI", "command": "claude", "available": True},
@@ -529,11 +529,11 @@ class ComponentIsolationTestFramework:
 
     def __init__(self, config: ComponentTestConfig = None):
         self.config = config or ComponentTestConfig()
-        self.mock_redis_client: Optional[MockRedisClient] = None
-        self.mock_db_session: Optional[MockAsyncSession] = None
-        self.mock_cli_tools: Optional[MockCLITools] = None
-        self.patches: List[Any] = []
-        self.interactions: List[MockInteraction] = []
+        self.mock_redis_client: MockRedisClient | None = None
+        self.mock_db_session: MockAsyncSession | None = None
+        self.mock_cli_tools: MockCLITools | None = None
+        self.patches: list[Any] = []
+        self.interactions: list[MockInteraction] = []
 
     @asynccontextmanager
     async def isolate_component(self, component_class, **kwargs):
@@ -674,7 +674,7 @@ class ComponentIsolationTestFramework:
 
             pytest.fail(f"External calls detected: {call_summary}")
 
-    def assert_redis_interactions(self, expected_calls: List[Dict[str, Any]]):
+    def assert_redis_interactions(self, expected_calls: list[dict[str, Any]]):
         """Assert specific Redis interactions occurred."""
         redis_calls = [
             interaction
@@ -686,7 +686,7 @@ class ComponentIsolationTestFramework:
             f"Expected {len(expected_calls)} Redis calls, got {len(redis_calls)}"
         )
 
-        for i, (actual, expected) in enumerate(zip(redis_calls, expected_calls)):
+        for i, (actual, expected) in enumerate(zip(redis_calls, expected_calls, strict=False)):
             assert actual.method == expected["method"], (
                 f"Call {i}: expected method {expected['method']}, got {actual.method}"
             )
@@ -696,7 +696,7 @@ class ComponentIsolationTestFramework:
                     f"Call {i}: expected args {expected['args']}, got {actual.args}"
                 )
 
-    def assert_database_interactions(self, expected_calls: List[Dict[str, Any]]):
+    def assert_database_interactions(self, expected_calls: list[dict[str, Any]]):
         """Assert specific database interactions occurred."""
         db_calls = [
             interaction
@@ -708,12 +708,12 @@ class ComponentIsolationTestFramework:
             f"Expected {len(expected_calls)} database calls, got {len(db_calls)}"
         )
 
-        for i, (actual, expected) in enumerate(zip(db_calls, expected_calls)):
+        for i, (actual, expected) in enumerate(zip(db_calls, expected_calls, strict=False)):
             assert actual.method == expected["method"], (
                 f"Call {i}: expected method {expected['method']}, got {actual.method}"
             )
 
-    def get_performance_metrics(self) -> Dict[str, Any]:
+    def get_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics from recorded interactions."""
         metrics = {
             "total_interactions": len(self.interactions),

@@ -55,7 +55,7 @@ def test_command_imports():
             sys.path.insert(0, str(src_path))
 
         # Test that we can import command modules
-        from src.cli.commands import agent, task, system
+        from src.cli.commands import agent, system, task
 
         print("✓ All CLI command modules imported successfully")
 

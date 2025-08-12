@@ -2,14 +2,14 @@
 
 import asyncio
 import json
+import statistics
 import time
 import uuid
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
-from collections import defaultdict, deque
-import statistics
 
 import structlog
 
@@ -46,10 +46,10 @@ class CommunicationMetric:
     value: float
     timestamp: float
     agent_name: str
-    target_agent: Optional[str] = None
-    message_id: Optional[str] = None
-    topic: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    target_agent: str | None = None
+    message_id: str | None = None
+    topic: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -73,11 +73,11 @@ class PerformanceAlert:
     alert_type: str
     severity: AlertSeverity
     message: str
-    affected_agents: Set[str]
-    metric_values: List[float]
+    affected_agents: set[str]
+    metric_values: list[float]
     threshold: PerformanceThreshold
     triggered_at: float
-    resolved_at: Optional[float] = None
+    resolved_at: float | None = None
     acknowledged: bool = False
 
 
@@ -93,9 +93,9 @@ class AgentCommunicationProfile:
     success_rate: float = 1.0
     error_count: int = 0
     peak_queue_depth: int = 0
-    communication_partners: Set[str] = field(default_factory=set)
-    preferred_topics: Dict[str, int] = field(default_factory=dict)
-    activity_pattern: Dict[str, int] = field(
+    communication_partners: set[str] = field(default_factory=set)
+    preferred_topics: dict[str, int] = field(default_factory=dict)
+    activity_pattern: dict[str, int] = field(
         default_factory=dict
     )  # hour -> message_count
     last_activity: float = field(default_factory=time.time)
@@ -106,10 +106,10 @@ class CommunicationMonitor:
 
     def __init__(self):
         self.metrics_buffer: deque = deque(maxlen=10000)  # Ring buffer for metrics
-        self.agent_profiles: Dict[str, AgentCommunicationProfile] = {}
-        self.performance_thresholds: Dict[str, PerformanceThreshold] = {}
-        self.active_alerts: Dict[str, PerformanceAlert] = {}
-        self.alert_history: List[PerformanceAlert] = []
+        self.agent_profiles: dict[str, AgentCommunicationProfile] = {}
+        self.performance_thresholds: dict[str, PerformanceThreshold] = {}
+        self.active_alerts: dict[str, PerformanceAlert] = {}
+        self.alert_history: list[PerformanceAlert] = []
 
         # Real-time statistics
         self.current_stats = {
@@ -122,7 +122,7 @@ class CommunicationMonitor:
         }
 
         # Time series data for trending
-        self.time_series: Dict[str, deque] = {
+        self.time_series: dict[str, deque] = {
             "latency": deque(maxlen=1440),  # 24 hours of minute data
             "throughput": deque(maxlen=1440),
             "error_rate": deque(maxlen=1440),
@@ -130,10 +130,10 @@ class CommunicationMonitor:
         }
 
         # Communication topology
-        self.communication_graph: Dict[str, Dict[str, int]] = defaultdict(
+        self.communication_graph: dict[str, dict[str, int]] = defaultdict(
             lambda: defaultdict(int)
         )
-        self.topic_popularity: Dict[str, int] = defaultdict(int)
+        self.topic_popularity: dict[str, int] = defaultdict(int)
 
         # Performance baselines
         self.baselines = {
@@ -212,7 +212,7 @@ class CommunicationMonitor:
         self.communication_graph[from_agent][to_agent] += 1
         self.topic_popularity[topic] += 1
 
-    async def get_real_time_stats(self) -> Dict[str, Any]:
+    async def get_real_time_stats(self) -> dict[str, Any]:
         """Get current real-time statistics."""
 
         return {
@@ -230,7 +230,7 @@ class CommunicationMonitor:
             "timestamp": time.time(),
         }
 
-    async def get_agent_performance(self, agent_name: str) -> Optional[Dict[str, Any]]:
+    async def get_agent_performance(self, agent_name: str) -> dict[str, Any] | None:
         """Get performance metrics for a specific agent."""
 
         if agent_name not in self.agent_profiles:
@@ -268,7 +268,7 @@ class CommunicationMonitor:
             ),
         }
 
-    async def get_communication_topology(self) -> Dict[str, Any]:
+    async def get_communication_topology(self) -> dict[str, Any]:
         """Get communication topology and patterns."""
 
         # Calculate network metrics
@@ -431,7 +431,7 @@ class CommunicationMonitor:
                 logger.error("Performance analyzer error", error=str(e))
 
     async def _update_agent_profile(
-        self, agent_name: str, event_data: Dict[str, Any]
+        self, agent_name: str, event_data: dict[str, Any]
     ) -> None:
         """Update agent communication profile."""
 
@@ -457,7 +457,7 @@ class CommunicationMonitor:
 
     def _get_recent_metrics_for_agent(
         self, agent_name: str, window_seconds: int
-    ) -> List[CommunicationMetric]:
+    ) -> list[CommunicationMetric]:
         """Get recent metrics for a specific agent."""
 
         cutoff_time = time.time() - window_seconds

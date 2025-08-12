@@ -7,11 +7,11 @@ import asyncio
 import time
 from pathlib import Path
 
+from src.agents.architect_agent import ArchitectAgent
 from src.agents.developer_agent import DeveloperAgent
 from src.agents.qa_agent import QAAgent
-from src.agents.architect_agent import ArchitectAgent
+from src.core.enums import TaskPriority, TaskStatus
 from src.core.models import Task
-from src.core.enums import TaskStatus, TaskPriority
 
 
 async def test_complete_system():

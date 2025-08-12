@@ -3,7 +3,6 @@ Task management commands for the Hive CLI
 """
 
 import asyncio
-from pathlib import Path
 import json
 from pathlib import Path
 
@@ -725,7 +724,7 @@ async def _follow_task_logs(task_identifier: str):
 
         # Follow the log file
         try:
-            with open(log_file, "r") as f:
+            with open(log_file) as f:
                 # Seek to end of file
                 f.seek(0, 2)
 
@@ -946,7 +945,7 @@ async def _batch_submit_tasks(file: str, assign_round_robin: bool, dry_run: bool
                 console.print(f"  • {task['title']} - Error: {task['error']}")
 
         if submitted_tasks:
-            console.print(f"\n💡 [dim]Use 'hive task list' to see all tasks[/dim]")
+            console.print("\n💡 [dim]Use 'hive task list' to see all tasks[/dim]")
 
     except httpx.ConnectError:
         error_handler(
@@ -1026,7 +1025,7 @@ async def _batch_cancel_tasks(
 
             # Confirm unless forced
             if not force:
-                console.print(f"\n📋 Tasks to cancel:")
+                console.print("\n📋 Tasks to cancel:")
                 for task in cancelable_tasks:
                     console.print(
                         f"  • {task.get('title', 'untitled')} ({task.get('type', 'unknown')}) - {task.get('status', 'unknown')}"

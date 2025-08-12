@@ -1,21 +1,22 @@
 """Integration tests for agent usage of enhanced communication features."""
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from src.agents.base_agent import BaseAgent
+from src.core.config import settings
 from src.core.enhanced_message_broker import (
-    EnhancedMessageBroker,
-    get_enhanced_message_broker,
     ContextShareType,
+    EnhancedMessageBroker,
     MessagePriority,
+    get_enhanced_message_broker,
 )
 from src.core.realtime_collaboration import (
     RealTimeCollaborationSync,
     get_collaboration_sync,
 )
-from src.core.config import settings
 
 
 class TestAgent(BaseAgent):

@@ -44,8 +44,8 @@ class AgentLoad:
     avg_task_completion_time: float = 0.0
     success_rate: float = 1.0
     last_heartbeat: float = 0.0
-    capabilities: Set[str] = field(default_factory=set)
-    preferred_task_types: Set[str] = field(default_factory=set)
+    capabilities: set[str] = field(default_factory=set)
+    preferred_task_types: set[str] = field(default_factory=set)
 
     @property
     def load_factor(self) -> float:
@@ -83,21 +83,21 @@ class TaskRequirement:
     task_id: str
     task_type: str
     priority: TaskPriority
-    required_capabilities: Set[str] = field(default_factory=set)
+    required_capabilities: set[str] = field(default_factory=set)
     estimated_duration: float = 60.0  # seconds
-    resource_requirements: Dict[str, float] = field(default_factory=dict)
-    preferred_agents: Set[str] = field(default_factory=set)
-    excluded_agents: Set[str] = field(default_factory=set)
+    resource_requirements: dict[str, float] = field(default_factory=dict)
+    preferred_agents: set[str] = field(default_factory=set)
+    excluded_agents: set[str] = field(default_factory=set)
 
 
 class IntelligentLoadBalancer:
     """Intelligent load balancer for agent task assignment."""
 
     def __init__(self):
-        self.agent_loads: Dict[str, AgentLoad] = {}
+        self.agent_loads: dict[str, AgentLoad] = {}
         self.task_history: deque = deque(maxlen=1000)
         self.assignment_history: deque = deque(maxlen=500)
-        self.performance_metrics: Dict[str, deque] = defaultdict(
+        self.performance_metrics: dict[str, deque] = defaultdict(
             lambda: deque(maxlen=100)
         )
         self.strategy = LoadBalancingStrategy.HYBRID_INTELLIGENT
@@ -218,7 +218,7 @@ class IntelligentLoadBalancer:
                 "Failed to update resource usage", agent_id=agent_id, error=str(e)
             )
 
-    async def assign_task(self, task: Task) -> Optional[str]:
+    async def assign_task(self, task: Task) -> str | None:
         """Assign a task to the best available agent."""
         await self.update_agent_metrics()
 
@@ -259,7 +259,7 @@ class IntelligentLoadBalancer:
 
         return best_agent_id
 
-    def _extract_required_capabilities(self, task: Task) -> Set[str]:
+    def _extract_required_capabilities(self, task: Task) -> set[str]:
         """Extract required capabilities from task."""
         capabilities = set()
 
@@ -311,7 +311,7 @@ class IntelligentLoadBalancer:
 
         return base_duration * multiplier
 
-    async def _find_best_agent(self, requirement: TaskRequirement) -> Optional[str]:
+    async def _find_best_agent(self, requirement: TaskRequirement) -> str | None:
         """Find the best agent for a task requirement."""
         available_agents = [
             (agent_id, load)
@@ -343,7 +343,7 @@ class IntelligentLoadBalancer:
             return self._least_loaded_assignment(available_agents)
 
     def _round_robin_assignment(
-        self, available_agents: List[Tuple[str, AgentLoad]]
+        self, available_agents: list[tuple[str, AgentLoad]]
     ) -> str:
         """Simple round-robin assignment."""
         if not hasattr(self, "_round_robin_index"):
@@ -355,14 +355,14 @@ class IntelligentLoadBalancer:
         return agent_id
 
     def _least_loaded_assignment(
-        self, available_agents: List[Tuple[str, AgentLoad]]
+        self, available_agents: list[tuple[str, AgentLoad]]
     ) -> str:
         """Assign to the least loaded agent."""
         return min(available_agents, key=lambda x: x[1].load_factor)[0]
 
     def _capability_based_assignment(
         self,
-        available_agents: List[Tuple[str, AgentLoad]],
+        available_agents: list[tuple[str, AgentLoad]],
         requirement: TaskRequirement,
     ) -> str:
         """Assign based on capability matching."""
@@ -393,7 +393,7 @@ class IntelligentLoadBalancer:
 
     def _performance_weighted_assignment(
         self,
-        available_agents: List[Tuple[str, AgentLoad]],
+        available_agents: list[tuple[str, AgentLoad]],
         requirement: TaskRequirement,
     ) -> str:
         """Assign based on performance metrics."""
@@ -414,7 +414,7 @@ class IntelligentLoadBalancer:
 
     def _hybrid_intelligent_assignment(
         self,
-        available_agents: List[Tuple[str, AgentLoad]],
+        available_agents: list[tuple[str, AgentLoad]],
         requirement: TaskRequirement,
     ) -> str:
         """Intelligent assignment using weighted scoring."""
@@ -513,7 +513,7 @@ class IntelligentLoadBalancer:
             }
         )
 
-    def get_load_balancing_stats(self) -> Dict[str, Any]:
+    def get_load_balancing_stats(self) -> dict[str, Any]:
         """Get load balancing statistics and metrics."""
         return {
             "strategy": self.strategy.value,
@@ -536,7 +536,7 @@ class IntelligentLoadBalancer:
             "timestamp": time.time(),
         }
 
-    def _calculate_performance_summary(self) -> Dict[str, float]:
+    def _calculate_performance_summary(self) -> dict[str, float]:
         """Calculate overall load balancing performance summary."""
         if not self.task_history:
             return {}
@@ -582,7 +582,7 @@ class IntelligentLoadBalancer:
 intelligent_load_balancer = IntelligentLoadBalancer()
 
 
-async def assign_task_intelligently(task: Task) -> Optional[str]:
+async def assign_task_intelligently(task: Task) -> str | None:
     """Assign a task using the intelligent load balancer."""
     return await intelligent_load_balancer.assign_task(task)
 

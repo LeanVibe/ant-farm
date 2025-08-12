@@ -68,9 +68,9 @@ class ContractValidationResult:
     contract_id: str
     contract_type: ContractType
     valid: bool
-    violations: List[ContractViolation] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    violations: list[ContractViolation] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Message Format Contracts
@@ -84,11 +84,11 @@ class MessageContract(BaseModel):
     to_agent: str
     topic: str
     message_type: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     timestamp: float
-    expires_at: Optional[float] = None
-    reply_to: Optional[str] = None
-    correlation_id: Optional[str] = None
+    expires_at: float | None = None
+    reply_to: str | None = None
+    correlation_id: str | None = None
     priority: int = 5
     delivery_count: int = 0
     max_retries: int = 3
@@ -134,14 +134,14 @@ class SharedContextContract(BaseModel):
     id: str
     type: str
     owner_agent: str
-    participants: List[str]
-    data: Dict[str, Any]
+    participants: list[str]
+    data: dict[str, Any]
     version: int
     last_updated: float
     last_updated_by: str
     sync_mode: str
-    ttl: Optional[float] = None
-    metadata: Dict[str, Any] = {}
+    ttl: float | None = None
+    metadata: dict[str, Any] = {}
 
     @validator("type")
     def validate_context_type(cls, v):
@@ -180,15 +180,15 @@ class TaskContract(BaseModel):
     title: str
     description: str
     task_type: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     priority: int
     status: str = "pending"
-    assigned_agent: Optional[str] = None
-    created_at: Optional[float] = None
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    assigned_agent: str | None = None
+    created_at: float | None = None
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
 
     @validator("priority")
     def validate_priority(cls, v):
@@ -224,8 +224,8 @@ class APIResponseContract(BaseModel):
     """Contract for API response format validation."""
 
     success: bool
-    data: Optional[Any] = None
-    error: Optional[str] = None
+    data: Any | None = None
+    error: str | None = None
     timestamp: str
     request_id: str
 
@@ -250,10 +250,10 @@ class AgentStatusContract(BaseModel):
     name: str
     agent_type: str
     status: str
-    capabilities: List[str]
-    current_task: Optional[str] = None
+    capabilities: list[str]
+    current_task: str | None = None
     last_activity: float
-    performance_metrics: Dict[str, float] = {}
+    performance_metrics: dict[str, float] = {}
 
     @validator("status")
     def validate_status(cls, v):
@@ -276,7 +276,7 @@ class DatabaseContract:
     """Base class for database schema contracts."""
 
     @staticmethod
-    def validate_agent_table_schema(columns: Dict[str, str]) -> List[ContractViolation]:
+    def validate_agent_table_schema(columns: dict[str, str]) -> list[ContractViolation]:
         """Validate agent table schema."""
         violations = []
 
@@ -319,7 +319,7 @@ class DatabaseContract:
         return violations
 
     @staticmethod
-    def validate_task_table_schema(columns: Dict[str, str]) -> List[ContractViolation]:
+    def validate_task_table_schema(columns: dict[str, str]) -> list[ContractViolation]:
         """Validate task table schema."""
         violations = []
 
@@ -356,8 +356,8 @@ class ContractTestFramework:
     """Framework for validating system contracts."""
 
     def __init__(self):
-        self.contracts: Dict[str, Any] = {}
-        self.validation_results: List[ContractValidationResult] = []
+        self.contracts: dict[str, Any] = {}
+        self.validation_results: list[ContractValidationResult] = []
 
     def register_contract(
         self, contract_id: str, contract_type: ContractType, contract_spec: Any
@@ -372,7 +372,7 @@ class ContractTestFramework:
         logger.info(f"Contract registered: {contract_id} ({contract_type.value})")
 
     def validate_message_format(
-        self, message_data: Dict[str, Any], contract_id: str = "default_message"
+        self, message_data: dict[str, Any], contract_id: str = "default_message"
     ) -> ContractValidationResult:
         """Validate message against message format contract."""
         violations = []
@@ -432,7 +432,7 @@ class ContractTestFramework:
         return result
 
     def validate_shared_context_format(
-        self, context_data: Dict[str, Any], contract_id: str = "default_context"
+        self, context_data: dict[str, Any], contract_id: str = "default_context"
     ) -> ContractValidationResult:
         """Validate shared context against format contract."""
         violations = []
@@ -491,7 +491,7 @@ class ContractTestFramework:
         return result
 
     def validate_task_format(
-        self, task_data: Dict[str, Any], contract_id: str = "default_task"
+        self, task_data: dict[str, Any], contract_id: str = "default_task"
     ) -> ContractValidationResult:
         """Validate task against format contract."""
         violations = []
@@ -538,7 +538,7 @@ class ContractTestFramework:
         return result
 
     def validate_api_response_format(
-        self, response_data: Dict[str, Any], contract_id: str = "default_api"
+        self, response_data: dict[str, Any], contract_id: str = "default_api"
     ) -> ContractValidationResult:
         """Validate API response against format contract."""
         violations = []
@@ -605,7 +605,7 @@ class ContractTestFramework:
         return result
 
     def validate_agent_status_format(
-        self, status_data: Dict[str, Any], contract_id: str = "default_agent_status"
+        self, status_data: dict[str, Any], contract_id: str = "default_agent_status"
     ) -> ContractValidationResult:
         """Validate agent status against format contract."""
         violations = []
@@ -651,7 +651,7 @@ class ContractTestFramework:
         return result
 
     def validate_database_schema(
-        self, table_name: str, columns: Dict[str, str], contract_id: str = None
+        self, table_name: str, columns: dict[str, str], contract_id: str = None
     ) -> ContractValidationResult:
         """Validate database table schema against contract."""
         if not contract_id:
@@ -691,8 +691,8 @@ class ContractTestFramework:
         return result
 
     def validate_batch(
-        self, validations: List[tuple]
-    ) -> List[ContractValidationResult]:
+        self, validations: list[tuple]
+    ) -> list[ContractValidationResult]:
         """Validate multiple contracts in batch."""
         results = []
 
@@ -715,7 +715,7 @@ class ContractTestFramework:
 
         return results
 
-    def get_violation_summary(self) -> Dict[str, Any]:
+    def get_violation_summary(self) -> dict[str, Any]:
         """Get summary of all contract violations."""
         total_validations = len(self.validation_results)
         successful_validations = sum(1 for r in self.validation_results if r.valid)
@@ -769,11 +769,11 @@ class ContractTestFramework:
                 f"{v.contract_id}: {v.message}" for v in critical_violations
             ]
             pytest.fail(
-                f"Critical contract violations found:\n" + "\n".join(violation_messages)
+                "Critical contract violations found:\n" + "\n".join(violation_messages)
             )
 
     def assert_contract_compatibility(
-        self, old_contract: Dict[str, Any], new_contract: Dict[str, Any]
+        self, old_contract: dict[str, Any], new_contract: dict[str, Any]
     ):
         """Assert that contract changes maintain backward compatibility."""
         # This is a simplified compatibility check
@@ -792,7 +792,7 @@ class ContractTestFramework:
 
 
 # Example usage and test helpers
-def create_valid_message() -> Dict[str, Any]:
+def create_valid_message() -> dict[str, Any]:
     """Create a valid message for testing."""
     return {
         "id": str(uuid.uuid4()),
@@ -806,7 +806,7 @@ def create_valid_message() -> Dict[str, Any]:
     }
 
 
-def create_valid_shared_context() -> Dict[str, Any]:
+def create_valid_shared_context() -> dict[str, Any]:
     """Create a valid shared context for testing."""
     return {
         "id": str(uuid.uuid4()),
@@ -821,7 +821,7 @@ def create_valid_shared_context() -> Dict[str, Any]:
     }
 
 
-def create_valid_task() -> Dict[str, Any]:
+def create_valid_task() -> dict[str, Any]:
     """Create a valid task for testing."""
     return {
         "id": str(uuid.uuid4()),
@@ -834,7 +834,7 @@ def create_valid_task() -> Dict[str, Any]:
     }
 
 
-def create_valid_api_response() -> Dict[str, Any]:
+def create_valid_api_response() -> dict[str, Any]:
     """Create a valid API response for testing."""
     return {
         "success": True,

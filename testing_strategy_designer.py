@@ -5,8 +5,8 @@ Designs comprehensive testing approach for system components
 """
 
 import json
-from typing import Dict, List, Any, Tuple
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 
 class TestingStrategyDesigner:
@@ -17,7 +17,7 @@ class TestingStrategyDesigner:
         self.contracts = {}
         self.test_strategy = {}
 
-    def design_testing_strategy(self) -> Dict[str, Any]:
+    def design_testing_strategy(self) -> dict[str, Any]:
         """Design complete testing strategy."""
         print("🧪 LeanVibe Testing Strategy Design")
         print("=" * 50)
@@ -45,7 +45,7 @@ class TestingStrategyDesigner:
             "implementation_plan": implementation,
         }
 
-    def _design_component_isolation(self) -> Dict[str, Any]:
+    def _design_component_isolation(self) -> dict[str, Any]:
         """Design component isolation testing strategy."""
         print("\n🔬 Component Isolation Strategy")
         print("-" * 35)
@@ -213,7 +213,7 @@ class TestingStrategyDesigner:
 
         return components
 
-    def _design_contract_testing(self) -> Dict[str, Any]:
+    def _design_contract_testing(self) -> dict[str, Any]:
         """Design contract testing strategy."""
         print("\n📋 Contract Testing Strategy")
         print("-" * 35)
@@ -343,7 +343,7 @@ class TestingStrategyDesigner:
 
         return contracts
 
-    def _design_integration_testing(self) -> Dict[str, Any]:
+    def _design_integration_testing(self) -> dict[str, Any]:
         """Design integration testing strategy."""
         print("\n🔗 Integration Testing Strategy")
         print("-" * 35)
@@ -436,7 +436,7 @@ class TestingStrategyDesigner:
 
         return integration_tests
 
-    def _design_test_infrastructure(self) -> Dict[str, Any]:
+    def _design_test_infrastructure(self) -> dict[str, Any]:
         """Design test infrastructure and tooling."""
         print("\n🏗️ Test Infrastructure Design")
         print("-" * 35)
@@ -516,7 +516,7 @@ class TestingStrategyDesigner:
 
         return infrastructure
 
-    def _create_implementation_plan(self) -> Dict[str, Any]:
+    def _create_implementation_plan(self) -> dict[str, Any]:
         """Create implementation plan for testing strategy."""
         print("\n📅 Implementation Plan")
         print("-" * 25)
@@ -613,18 +613,18 @@ def main():
     with open("testing_strategy.json", "w") as f:
         json.dump(strategy, f, indent=2, default=str)
 
-    print(f"\n📄 Complete testing strategy saved to: testing_strategy.json")
+    print("\n📄 Complete testing strategy saved to: testing_strategy.json")
 
     # Print summary
-    print(f"\n📊 Strategy Summary:")
-    print(f"   Component isolation tests: Comprehensive framework designed")
+    print("\n📊 Strategy Summary:")
+    print("   Component isolation tests: Comprehensive framework designed")
     print(f"   Contract tests: {len(strategy['contract_testing'])} categories defined")
-    print(f"   Integration tests: Multi-level approach designed")
+    print("   Integration tests: Multi-level approach designed")
     print(
         f"   Implementation timeline: {strategy['implementation_plan']['total_duration']}"
     )
 
-    print(f"\n🎯 Next Steps:")
+    print("\n🎯 Next Steps:")
     phase1 = strategy["implementation_plan"]["phases"]["phase_1_foundation"]
     print(f"   1. {phase1['description']} ({phase1['duration']})")
     for deliverable in phase1["deliverables"][:3]:

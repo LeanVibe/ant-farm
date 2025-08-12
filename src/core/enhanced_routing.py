@@ -4,15 +4,16 @@ import asyncio
 import json
 import time
 import uuid
+from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Callable, Tuple
-from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import structlog
 
-from .message_broker import Message, MessageType, MessageBroker
+from .message_broker import Message, MessageBroker, MessageType
 
 logger = structlog.get_logger()
 
@@ -59,7 +60,7 @@ class DeliveryReceipt:
     status: MessageStatus
     timestamp: float
     retry_count: int = 0
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 @dataclass
@@ -68,8 +69,8 @@ class RouteEntry:
 
     destination_pattern: str  # Agent name pattern or capability
     route_strategy: RouteStrategy
-    target_agents: List[str]
-    load_weights: Dict[str, float] = field(default_factory=dict)
+    target_agents: list[str]
+    load_weights: dict[str, float] = field(default_factory=dict)
     priority: int = 5
     enabled: bool = True
 
@@ -85,7 +86,7 @@ class QueuedMessage:
     next_retry_time: float = 0
     delivery_timeout: float = 0
     route_strategy: RouteStrategy = RouteStrategy.DIRECT
-    target_agents: List[str] = field(default_factory=list)
+    target_agents: list[str] = field(default_factory=list)
 
 
 class EnhancedMessageRouter:
@@ -93,16 +94,16 @@ class EnhancedMessageRouter:
 
     def __init__(self, message_broker: MessageBroker):
         self.broker = message_broker
-        self.routing_table: Dict[str, RouteEntry] = {}
-        self.delivery_queues: Dict[str, List[QueuedMessage]] = defaultdict(
+        self.routing_table: dict[str, RouteEntry] = {}
+        self.delivery_queues: dict[str, list[QueuedMessage]] = defaultdict(
             list
         )  # agent -> messages
-        self.pending_acks: Dict[str, QueuedMessage] = {}  # message_id -> queued_message
-        self.delivery_receipts: Dict[str, List[DeliveryReceipt]] = defaultdict(list)
-        self.agent_load_metrics: Dict[str, float] = defaultdict(float)
-        self.agent_capabilities: Dict[str, List[str]] = {}
-        self.message_sequence: Dict[str, int] = defaultdict(int)  # For ordered delivery
-        self.duplicate_detector: Set[str] = set()  # For exactly-once delivery
+        self.pending_acks: dict[str, QueuedMessage] = {}  # message_id -> queued_message
+        self.delivery_receipts: dict[str, list[DeliveryReceipt]] = defaultdict(list)
+        self.agent_load_metrics: dict[str, float] = defaultdict(float)
+        self.agent_capabilities: dict[str, list[str]] = {}
+        self.message_sequence: dict[str, int] = defaultdict(int)  # For ordered delivery
+        self.duplicate_detector: set[str] = set()  # For exactly-once delivery
 
         # Configuration
         self.max_retry_attempts = 3
@@ -134,9 +135,9 @@ class EnhancedMessageRouter:
         self,
         destination_pattern: str,
         route_strategy: RouteStrategy,
-        target_agents: List[str],
+        target_agents: list[str],
         priority: int = 5,
-        load_weights: Dict[str, float] = None,
+        load_weights: dict[str, float] = None,
     ) -> None:
         """Add a routing rule."""
 
@@ -172,7 +173,7 @@ class EnhancedMessageRouter:
         from_agent: str,
         to_agent: str,
         topic: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         delivery_guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_LEAST_ONCE,
         route_strategy: RouteStrategy = RouteStrategy.DIRECT,
         priority: int = 5,
@@ -263,7 +264,7 @@ class EnhancedMessageRouter:
 
         return True
 
-    async def get_delivery_status(self, message_id: str) -> Optional[Dict[str, Any]]:
+    async def get_delivery_status(self, message_id: str) -> dict[str, Any] | None:
         """Get delivery status for a message."""
 
         receipts = self.delivery_receipts.get(message_id, [])
@@ -299,7 +300,7 @@ class EnhancedMessageRouter:
         logger.debug("Agent load updated", agent=agent_name, load=load_metric)
 
     async def update_agent_capabilities(
-        self, agent_name: str, capabilities: List[str]
+        self, agent_name: str, capabilities: list[str]
     ) -> None:
         """Update agent capabilities for capability-based routing."""
 
@@ -309,7 +310,7 @@ class EnhancedMessageRouter:
             "Agent capabilities updated", agent=agent_name, capabilities=capabilities
         )
 
-    async def get_routing_metrics(self) -> Dict[str, Any]:
+    async def get_routing_metrics(self) -> dict[str, Any]:
         """Get routing system metrics."""
 
         return {
@@ -324,7 +325,7 @@ class EnhancedMessageRouter:
 
     async def _resolve_target_agents(
         self, to_agent: str, route_strategy: RouteStrategy
-    ) -> List[str]:
+    ) -> list[str]:
         """Resolve target agents based on routing strategy."""
 
         # Check routing table for pattern match

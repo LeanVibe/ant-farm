@@ -29,8 +29,8 @@ class QueryAnalysis:
     cost: float
     rows: int
     planning_time_ms: float
-    execution_plan: Dict
-    recommendations: List[str]
+    execution_plan: dict
+    recommendations: list[str]
     severity: str  # 'critical', 'warning', 'info'
 
 
@@ -39,7 +39,7 @@ class IndexRecommendation:
     """Recommendation for a database index."""
 
     table: str
-    columns: List[str]
+    columns: list[str]
     index_type: str
     estimated_benefit: str
     sql: str
@@ -50,7 +50,7 @@ class DatabasePerformanceAnalyzer:
 
     def __init__(self, database_url: str):
         self.database_url = database_url
-        self.connection: Optional[asyncpg.Connection] = None
+        self.connection: asyncpg.Connection | None = None
 
     async def connect(self):
         """Connect to the database."""
@@ -114,7 +114,7 @@ class DatabasePerformanceAnalyzer:
                 severity="critical",
             )
 
-    def _generate_recommendations(self, plan_data: Dict, query: str) -> List[str]:
+    def _generate_recommendations(self, plan_data: dict, query: str) -> list[str]:
         """Generate optimization recommendations based on execution plan."""
         recommendations = []
         plan = plan_data.get("Plan", {})
@@ -152,7 +152,7 @@ class DatabasePerformanceAnalyzer:
 
         return recommendations or ["No optimization recommendations"]
 
-    def _has_sequential_scan(self, plan: Dict) -> bool:
+    def _has_sequential_scan(self, plan: dict) -> bool:
         """Check if plan contains sequential scans."""
         if plan.get("Node Type") == "Seq Scan":
             return True
@@ -161,7 +161,7 @@ class DatabasePerformanceAnalyzer:
                 return True
         return False
 
-    def _has_expensive_nested_loops(self, plan: Dict) -> bool:
+    def _has_expensive_nested_loops(self, plan: dict) -> bool:
         """Check for expensive nested loop joins."""
         if plan.get("Node Type") == "Nested Loop" and plan.get("Actual Rows", 0) > 1000:
             return True
@@ -170,7 +170,7 @@ class DatabasePerformanceAnalyzer:
                 return True
         return False
 
-    def _has_expensive_sorts(self, plan: Dict) -> bool:
+    def _has_expensive_sorts(self, plan: dict) -> bool:
         """Check for expensive sort operations."""
         if plan.get("Node Type") == "Sort" and plan.get("Total Cost", 0) > 100:
             return True
@@ -188,7 +188,7 @@ class DatabasePerformanceAnalyzer:
         else:
             return "info"
 
-    async def analyze_common_queries(self) -> List[QueryAnalysis]:
+    async def analyze_common_queries(self) -> list[QueryAnalysis]:
         """Analyze common application queries."""
         common_queries = [
             # Agent queries
@@ -220,7 +220,7 @@ class DatabasePerformanceAnalyzer:
 
         return results
 
-    async def identify_missing_indexes(self) -> List[IndexRecommendation]:
+    async def identify_missing_indexes(self) -> list[IndexRecommendation]:
         """Identify missing indexes based on query patterns."""
         recommendations = []
 
@@ -303,7 +303,7 @@ class DatabasePerformanceAnalyzer:
         result = await self.connection.fetchval(query, index_name)
         return result
 
-    async def get_slow_queries(self, min_duration_ms: float = 100) -> List[Dict]:
+    async def get_slow_queries(self, min_duration_ms: float = 100) -> list[dict]:
         """Get slow queries from pg_stat_statements if available."""
         try:
             query = """
@@ -327,7 +327,7 @@ class DatabasePerformanceAnalyzer:
             logger.warning("pg_stat_statements not available", error=str(e))
             return []
 
-    async def generate_report(self) -> Dict:
+    async def generate_report(self) -> dict:
         """Generate comprehensive performance analysis report."""
         logger.info("Generating database performance report...")
 
@@ -454,7 +454,7 @@ async def main():
         with open("database_performance_report.json", "w") as f:
             json.dump(report, f, indent=2, default=str)
 
-        print(f"📝 Detailed report saved to: database_performance_report.json")
+        print("📝 Detailed report saved to: database_performance_report.json")
 
         # Return exit code based on critical issues
         return 1 if summary["critical_issues"] > 0 else 0

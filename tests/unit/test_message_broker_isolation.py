@@ -146,7 +146,7 @@ class TestMessageBrokerIsolation:
         # Setup a mock handler for the target agent
         handler = MessageHandler("target_agent")
 
-        async def request_handler(message: Message) -> Dict[str, Any]:
+        async def request_handler(message: Message) -> dict[str, Any]:
             return {
                 "status": "processed",
                 "data": f"Handled: {message.payload.get('request')}",
@@ -173,7 +173,7 @@ class TestMessageBrokerIsolation:
                 ),
                 timeout=0.2,
             )
-        except (asyncio.TimeoutError, TimeoutError):
+        except TimeoutError:
             # Expected in isolation since no real message delivery
             pass
 
@@ -542,7 +542,7 @@ class TestMessageHandlerIsolation:
         # Register a test handler
         responses = []
 
-        async def test_handler(message: Message) -> Dict[str, Any]:
+        async def test_handler(message: Message) -> dict[str, Any]:
             responses.append(message.payload)
             return {"status": "processed", "data": message.payload.get("data")}
 
@@ -580,7 +580,7 @@ class TestMessageHandlerIsolation:
         handler = MessageHandler("error_agent")
 
         # Register handler that raises exception
-        async def failing_handler(message: Message) -> Dict[str, Any]:
+        async def failing_handler(message: Message) -> dict[str, Any]:
             raise ValueError("Simulated handler error")
 
         handler.register_handler("error_topic", failing_handler)
