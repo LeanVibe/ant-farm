@@ -9,15 +9,15 @@ import os
 from typing import Optional
 
 from ..core.auth import get_cli_user, get_current_user
-from ..core.security import User
 from ..core.config import get_settings
+from ..core.security import User
 
 # Global CLI user instance
-_cli_user: Optional[User] = None
-_auth_token: Optional[str] = None
+_cli_user: User | None = None
+_auth_token: str | None = None
 
 
-def get_cli_auth_token() -> Optional[str]:
+def get_cli_auth_token() -> str | None:
     """
     Get authentication token from environment or config.
 
@@ -134,7 +134,7 @@ def is_cli_authenticated() -> bool:
     return _cli_user.id != "cli-anonymous"
 
 
-def get_current_auth_token() -> Optional[str]:
+def get_current_auth_token() -> str | None:
     """
     Get the current authentication token being used.
 

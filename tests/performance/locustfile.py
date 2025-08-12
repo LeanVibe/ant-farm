@@ -1,8 +1,9 @@
 """Locust performance test file for LeanVibe Agent Hive API."""
 
-from locust import HttpUser, task, between, events
 import random
 import string
+
+from locust import HttpUser, between, events, task
 
 
 class LeanVibeUser(HttpUser):
@@ -16,16 +17,16 @@ class LeanVibeUser(HttpUser):
         self.agent_name = f"test_agent_{random.randint(1000, 9999)}"
         self.task_counter = 0
 
-@task(3)
+    @task(3)
     def health_check(self):
         """Check API health endpoint."""
         self.client.get("/health")
-        
+
     @task(2)
     def get_agents(self):
         """Get list of agents."""
         self.client.get("/api/v1/cli/agents")
-        
+
     @task(1)
     def create_task(self):
         """Create a new task."""
@@ -34,10 +35,10 @@ class LeanVibeUser(HttpUser):
             "title": f"Performance Test Task {self.task_counter}",
             "description": f"Task created during performance testing by {self.agent_name}",
             "type": "performance_test",
-            "priority": random.choice(["low", "normal", "high", "critical"])
+            "priority": random.choice(["low", "normal", "high", "critical"]),
         }
         self.client.post("/api/v1/cli/tasks", json=task_data)
-        
+
     @task(1)
     def get_tasks(self):
         """Get list of tasks."""

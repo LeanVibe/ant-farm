@@ -7,7 +7,7 @@ on a real code review workflow.
 
 import asyncio
 import time
-from typing import Dict, Any
+from typing import Any
 
 from src.agents.base_agent import BaseAgent, TaskResult
 from src.core.enhanced_message_broker import get_enhanced_message_broker
@@ -26,7 +26,7 @@ class DeveloperAgent(BaseAgent):
 
     async def create_code_module(
         self, module_name: str, content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a new code module."""
 
         # Create shared work session for the code review
@@ -82,7 +82,7 @@ class QAAgent(BaseAgent):
         """QA agent main loop - simplified for demo."""
         await asyncio.sleep(0.1)  # Minimal run loop for demo
 
-    async def join_code_review(self, session_id: str) -> Dict[str, Any]:
+    async def join_code_review(self, session_id: str) -> dict[str, Any]:
         """Join a code review session and provide feedback."""
 
         # Join the collaboration session
@@ -365,10 +365,10 @@ class AuthenticationModule:
         # Show final collaboration summary
         print("\n📊 Collaboration Summary")
         print("=" * 40)
-        print(f"👥 Participants: Developer, QA, Architect")
-        print(f"🎯 Objective: Authentication module review")
-        print(f"📈 Status: Collaborative review completed")
-        print(f"🔄 Next Steps: Address feedback and iterate")
+        print("👥 Participants: Developer, QA, Architect")
+        print("🎯 Objective: Authentication module review")
+        print("📈 Status: Collaborative review completed")
+        print("🔄 Next Steps: Address feedback and iterate")
 
         # Show enhanced communication metrics if available
         if developer.enhanced_broker:
