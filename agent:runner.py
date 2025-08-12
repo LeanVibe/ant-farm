@@ -18,6 +18,26 @@ import redis
 import typer
 from psycopg2.extras import RealDictCursor
 
+# Add src to path for imports
+src_path = Path(__file__).parent / "src"
+if src_path.exists():
+    import sys
+
+    sys.path.insert(0, str(src_path))
+
+# Import configuration
+try:
+    from src.core.config import get_settings
+
+    settings = get_settings()
+except ImportError:
+    # Fallback configuration if imports fail
+    class MockSettings:
+        database_url = "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive"
+        redis_url = "redis://localhost:6381"
+
+    settings = MockSettings()
+
 app = typer.Typer()
 
 
@@ -33,56 +53,170 @@ class AgentRunner:
         self.running = True
 
     def connect(self):
-        """Connect to Docker services."""
-        # Redis on localhost (exposed from Docker)
-        self.redis_client = redis.Redis(
-            host="localhost", port=6379, decode_responses=True
-        )
+        """Connect to Docker services using proper configuration."""
+        try:
+            # Parse Redis configuration
+            redis_url = getattr(settings, "redis_url", "redis://localhost:6381")
+            redis_host, redis_port = self._parse_redis_url(redis_url)
 
-        # PostgreSQL on localhost (exposed from Docker)
-        self.db_conn = psycopg2.connect(
-            host="localhost",
-            port=5432,
-            database="leanvibe_hive",
-            user="hive_user",
-            password="hive_pass",
-            cursor_factory=RealDictCursor,
-        )
+            # Redis on localhost (exposed from Docker)
+            self.redis_client = redis.Redis(
+                host=redis_host, port=redis_port, decode_responses=True
+            )
 
-        print(f"[{self.agent_name}] Connected to services")
+            # Parse database configuration
+            database_url = getattr(
+                settings,
+                "database_url",
+                "postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive",
+            )
+            db_host, db_port, db_name, db_user, db_pass = self._parse_database_url(
+                database_url
+            )
+
+            # PostgreSQL on localhost (exposed from Docker)
+            self.db_conn = psycopg2.connect(
+                host=db_host,
+                port=db_port,
+                database=db_name,
+                user=db_user,
+                password=db_pass,
+                cursor_factory=RealDictCursor,
+            )
+
+            print(
+                f"[{self.agent_name}] Connected to services (Redis: {redis_host}:{redis_port}, DB: {db_host}:{db_port}/{db_name})"
+            )
+        except Exception as e:
+            print(f"[{self.agent_name}] Failed to connect to services: {e}")
+            raise
+
+    def _parse_database_url(self, database_url: str) -> tuple:
+        """Parse database URL into connection parameters."""
+        # Handle different URL formats
+        if database_url.startswith("postgresql://") or database_url.startswith(
+            "postgres://"
+        ):
+            # Remove protocol
+            if database_url.startswith("postgresql://"):
+                db_part = database_url[13:]
+            else:
+                db_part = database_url[11:]
+
+            # Parse user:pass@host:port/dbname
+            if "@" in db_part:
+                user_pass, host_db = db_part.split("@", 1)
+                if ":" in user_pass:
+                    db_user, db_pass = user_pass.split(":", 1)
+                else:
+                    db_user, db_pass = user_pass, ""
+            else:
+                db_user, db_pass = "hive_user", "hive_pass"
+                host_db = db_part
+
+            # Parse host:port/dbname
+            if ":" in host_db:
+                host_port, db_name = (
+                    host_db.split("/", 1)
+                    if "/" in host_db
+                    else (host_db, "leanvibe_hive")
+                )
+                host_parts = host_port.split(":")
+                if len(host_parts) == 2:
+                    db_host, db_port_str = host_parts
+                    try:
+                        db_port = int(db_port_str)
+                    except ValueError:
+                        db_port = 5433
+                else:
+                    db_host = host_parts[0]
+                    db_port = 5433
+            else:
+                host_db_parts = (
+                    host_db.split("/", 1)
+                    if "/" in host_db
+                    else [host_db, "leanvibe_hive"]
+                )
+                db_host = host_db_parts[0]
+                db_name = host_db_parts[1]
+                db_port = 5433
+
+            return db_host, db_port, db_name, db_user, db_pass
+        else:
+            # Default fallback
+            return "localhost", 5433, "leanvibe_hive", "hive_user", "hive_pass"
+
+    def _parse_redis_url(self, redis_url: str) -> tuple:
+        """Parse Redis URL into connection parameters."""
+        if redis_url.startswith("redis://"):
+            redis_part = redis_url[8:]  # Remove 'redis://'
+            if "/" in redis_part:
+                host_port = redis_part.split("/")[0]
+            else:
+                host_port = redis_part
+
+            if ":" in host_port:
+                host, port_str = host_port.split(":", 1)
+                try:
+                    port = int(port_str)
+                except ValueError:
+                    port = 6381
+            else:
+                host, port = host_port, 6381
+
+            return host, port
+        else:
+            return "localhost", 6381
 
     def update_status(self, status: str):
         """Update agent status in database."""
-        with self.db_conn.cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE agents
-                SET status = %s, last_heartbeat = NOW()
-                WHERE name = %s
-            """,
-                (status, self.agent_name),
-            )
-            self.db_conn.commit()
+        try:
+            with self.db_conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE agents
+                    SET status = %s, last_heartbeat = NOW()
+                    WHERE name = %s
+                """,
+                    (status, self.agent_name),
+                )
+                self.db_conn.commit()
+        except Exception as e:
+            print(f"[{self.agent_name}] Failed to update status: {e}")
+            # Try to reconnect
+            try:
+                self.connect()
+            except:
+                pass
 
     def get_next_task(self) -> dict[str, Any] | None:
         """Get next task from Redis queue."""
-        # Check priority queues in order
-        for priority in ["critical", "high", "normal", "low", "background"]:
-            queue_key = f"task_queue:{priority}"
+        try:
+            # Check priority queues in order
+            for priority in ["critical", "high", "normal", "low", "background"]:
+                queue_key = f"task_queue:{priority}"
 
-            # Try to pop task (non-blocking)
-            task_json = self.redis_client.rpop(queue_key)
-            if task_json:
-                try:
-                    task = json.loads(task_json)
-                    print(
-                        f"[{self.agent_name}] Got task: {task.get('title', 'Untitled')}"
-                    )
-                    return task
-                except json.JSONDecodeError:
-                    print(f"[{self.agent_name}] Invalid task JSON: {task_json}")
+                # Try to pop task (non-blocking)
+                task_json = self.redis_client.rpop(queue_key)
+                if task_json:
+                    try:
+                        task = json.loads(task_json)
+                        print(
+                            f"[{self.agent_name}] Got task: {task.get('title', 'Untitled')}"
+                        )
+                        return task
+                    except json.JSONDecodeError:
+                        print(f"[{self.agent_name}] Invalid task JSON: {task_json}")
 
-        return None
+            return None
+        except Exception as e:
+            print(f"[{self.agent_name}] Failed to get task from Redis: {e}")
+            # Try to reconnect to Redis
+            try:
+                self.connect()
+            except:
+                pass
+            return None
 
     def execute_claude_code(self, prompt: str) -> dict[str, Any]:
         """Execute Claude Code CLI command."""
@@ -155,26 +289,34 @@ class AgentRunner:
         )
 
         # Store in database for persistence
-        with self.db_conn.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO tasks (id, title, type, status, assigned_agent_id, result, completed_at)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                ON CONFLICT (id) DO UPDATE
-                SET status = EXCLUDED.status,
-                    result = EXCLUDED.result,
-                    completed_at = EXCLUDED.completed_at
-            """,
-                (
-                    task_id,
-                    task.get("title", ""),
-                    task.get("type", "general"),
-                    "completed" if result["success"] else "failed",
-                    self.agent_name,
-                    json.dumps(result),
-                ),
-            )
-            self.db_conn.commit()
+        try:
+            with self.db_conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO tasks (id, title, type, status, assigned_agent_id, result, completed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (id) DO UPDATE
+                    SET status = EXCLUDED.status,
+                        result = EXCLUDED.result,
+                        completed_at = EXCLUDED.completed_at
+                """,
+                    (
+                        task_id,
+                        task.get("title", ""),
+                        task.get("type", "general"),
+                        "completed" if result["success"] else "failed",
+                        self.agent_name,
+                        json.dumps(result),
+                    ),
+                )
+                self.db_conn.commit()
+        except Exception as e:
+            print(f"[{self.agent_name}] Failed to store task result in database: {e}")
+            # Try to reconnect
+            try:
+                self.connect()
+            except:
+                pass
 
         print(
             f"[{self.agent_name}] Task {task_id} {'completed' if result['success'] else 'failed'}"
@@ -242,21 +384,33 @@ Use pytest for testing and aim for >90% coverage.
         self.connect()
 
         # Register agent
-        with self.db_conn.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO agents (name, type, status, capabilities)
-                VALUES (%s, %s, 'active', %s)
-                ON CONFLICT (name) DO UPDATE
-                SET status = 'active', last_heartbeat = NOW()
-            """,
-                (self.agent_name, self.agent_type, json.dumps(self.get_capabilities())),
-            )
-            self.db_conn.commit()
+        try:
+            with self.db_conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO agents (name, type, status, capabilities)
+                    VALUES (%s, %s, 'active', %s)
+                    ON CONFLICT (name) DO UPDATE
+                    SET status = 'active', last_heartbeat = NOW()
+                """,
+                    (
+                        self.agent_name,
+                        self.agent_type,
+                        json.dumps(self.get_capabilities()),
+                    ),
+                )
+                self.db_conn.commit()
+                print(f"[{self.agent_name}] Agent registered successfully")
+        except Exception as e:
+            print(f"[{self.agent_name}] Failed to register agent: {e}")
+            # Continue running even if registration fails
 
         print(f"[{self.agent_name}] Agent registered and ready")
 
         # Main processing loop
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+
         while self.running:
             try:
                 # Update heartbeat
@@ -269,15 +423,40 @@ Use pytest for testing and aim for >90% coverage.
                     self.update_status("busy")
                     self.process_task(task)
                     self.update_status("active")
+                    consecutive_errors = 0  # Reset error counter on success
                 else:
                     # No tasks, wait a bit
                     time.sleep(5)
+
+                consecutive_errors = (
+                    0  # Reset error counter on successful loop iteration
+                )
 
             except KeyboardInterrupt:
                 print(f"[{self.agent_name}] Shutting down...")
                 self.running = False
             except Exception as e:
-                print(f"[{self.agent_name}] Error: {e}")
+                consecutive_errors += 1
+                print(
+                    f"[{self.agent_name}] Error (attempt {consecutive_errors}/{max_consecutive_errors}): {e}"
+                )
+
+                # If we have too many consecutive errors, try to reconnect
+                if consecutive_errors >= max_consecutive_errors:
+                    print(
+                        f"[{self.agent_name}] Too many consecutive errors, attempting to reconnect..."
+                    )
+                    try:
+                        self.connect()
+                        consecutive_errors = 0  # Reset on successful reconnect
+                        print(f"[{self.agent_name}] Reconnected successfully")
+                    except Exception as reconnect_error:
+                        print(
+                            f"[{self.agent_name}] Reconnect failed: {reconnect_error}"
+                        )
+                        time.sleep(30)  # Wait longer before retrying if reconnect fails
+                        continue
+
                 time.sleep(10)  # Wait before retrying
 
         # Clean shutdown
@@ -297,10 +476,18 @@ Use pytest for testing and aim for >90% coverage.
 
     def cleanup(self):
         """Clean up resources."""
-        if self.db_conn:
-            self.db_conn.close()
-        if self.redis_client:
-            self.redis_client.close()
+        try:
+            if self.db_conn:
+                self.db_conn.close()
+        except Exception as e:
+            print(f"[{self.agent_name}] Error closing database connection: {e}")
+
+        try:
+            if self.redis_client:
+                self.redis_client.close()
+        except Exception as e:
+            print(f"[{self.agent_name}] Error closing Redis connection: {e}")
+
         print(f"[{self.agent_name}] Shutdown complete")
 
 
