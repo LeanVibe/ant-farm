@@ -4,8 +4,8 @@ CLI Functionality Audit - Power User Requirements Analysis
 Identifies gaps in CLI functionality for advanced users
 """
 
-from typing import Dict, List, Any
 import json
+from typing import Any
 
 
 class CLIAuditor:
@@ -16,7 +16,7 @@ class CLIAuditor:
         self.power_user_requirements = {}
         self.gaps = []
 
-    def audit_cli_completeness(self) -> Dict[str, Any]:
+    def audit_cli_completeness(self) -> dict[str, Any]:
         """Audit CLI completeness against power user needs."""
         print("💻 CLI Power User Audit")
         print("=" * 40)
@@ -44,7 +44,7 @@ class CLIAuditor:
             "improvement_plan": improvements,
         }
 
-    def _define_power_user_requirements(self) -> Dict[str, List[str]]:
+    def _define_power_user_requirements(self) -> dict[str, list[str]]:
         """Define what power users need from the CLI."""
         return {
             "system_management": [
@@ -141,7 +141,7 @@ class CLIAuditor:
             ],
         }
 
-    def _map_current_cli_commands(self) -> Dict[str, List[str]]:
+    def _map_current_cli_commands(self) -> dict[str, list[str]]:
         """Map currently available CLI commands."""
         return {
             "system_management": [
@@ -191,8 +191,8 @@ class CLIAuditor:
         }
 
     def _identify_functionality_gaps(
-        self, current: Dict, requirements: Dict
-    ) -> List[Dict[str, Any]]:
+        self, current: dict, requirements: dict
+    ) -> list[dict[str, Any]]:
         """Identify gaps between current functionality and requirements."""
         gaps = []
 
@@ -234,7 +234,7 @@ class CLIAuditor:
 
         return gaps
 
-    def _analyze_usability_issues(self) -> List[str]:
+    def _analyze_usability_issues(self) -> list[str]:
         """Analyze usability issues with current CLI."""
         return [
             "Authentication required for agent operations (blocking)",
@@ -255,8 +255,8 @@ class CLIAuditor:
         ]
 
     def _generate_improvement_plan(
-        self, gaps: List[Dict], usability: List[str]
-    ) -> Dict[str, Any]:
+        self, gaps: list[dict], usability: list[str]
+    ) -> dict[str, Any]:
         """Generate improvement plan for CLI."""
 
         # Calculate priority scores
@@ -312,17 +312,17 @@ def main():
     audit_results = auditor.audit_cli_completeness()
 
     # Print summary
-    print(f"\n📊 CLI Audit Summary:")
+    print("\n📊 CLI Audit Summary:")
     print(f"   Total requirement categories: {len(audit_results['requirements'])}")
     print(f"   Categories with gaps: {len(audit_results['gaps'])}")
     print(f"   Usability issues identified: {len(audit_results['usability_issues'])}")
 
-    print(f"\n🎯 Top Priority Gaps:")
+    print("\n🎯 Top Priority Gaps:")
     for i, gap in enumerate(audit_results["gaps"][:3], 1):
         print(f"   {i}. {gap['category']}: {gap['completion_percentage']}% complete")
         print(f"      Missing: {len(gap['missing_features'])} features")
 
-    print(f"\n⚡ Immediate Actions:")
+    print("\n⚡ Immediate Actions:")
     for action in audit_results["improvement_plan"]["immediate_priorities"]:
         print(f"   • {action}")
 
@@ -330,7 +330,7 @@ def main():
     with open("cli_audit_report.json", "w") as f:
         json.dump(audit_results, f, indent=2)
 
-    print(f"\n📄 Detailed report saved to: cli_audit_report.json")
+    print("\n📄 Detailed report saved to: cli_audit_report.json")
 
     return audit_results
 
