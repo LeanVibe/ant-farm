@@ -462,6 +462,8 @@ class AutonomyScoreCalculator:
                 + score.efficiency_component * self.component_weights["efficiency"]
                 + score.learning_component * self.component_weights["learning"]
             ) * 100  # Scale to 0-100
+            # Clamp to valid range
+            score.overall_score = max(0.0, min(100.0, score.overall_score))
 
             self.score_history.append(score)
 
@@ -490,13 +492,17 @@ class AutonomyScoreCalculator:
         self, test_coverage: float, quality_metric: float, quality_gate_failures: int
     ) -> float:
         """Calculate quality score."""
+        # Normalize inputs to 0-1 range
+        coverage_norm = test_coverage / 100.0 if test_coverage > 1 else test_coverage
+        quality_norm = max(0.0, min(1.0, quality_metric))
+
         # Base score from coverage and quality metrics
-        base_score = (test_coverage + quality_metric) / 2
+        base_score = (coverage_norm + quality_norm) / 2
 
         # Penalty for quality gate failures
         failure_penalty = min(0.5, quality_gate_failures * 0.1)
 
-        return max(0.0, base_score - failure_penalty)
+        return max(0.0, min(1.0, base_score - failure_penalty))
 
     def _calculate_velocity_score(
         self, velocity: VelocityMetrics, completion_rate: float
