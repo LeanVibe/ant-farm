@@ -244,7 +244,7 @@ class SecurityManager:
         except jwt.ExpiredSignatureError:
             logger.warning("Token expired")
             return None
-        except jwt.JWTError as e:
+        except Exception as e:
             logger.warning("Invalid token", error=str(e))
             return None
 

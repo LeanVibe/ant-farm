@@ -59,6 +59,7 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from fastapi.security import OAuth2PasswordRequestForm
 
 
 # WebSocket connection manager
@@ -706,6 +707,55 @@ async def login(request: Request, login_request: LoginRequest):
     except Exception as e:
         logger.error("Login failed", error=str(e))
         raise HTTPException(status_code=500, detail="Login failed") from e
+
+
+@app.post(
+    "/api/v1/auth/token",
+    response_model=APIResponse,
+    tags=["Authentication"],
+    summary="OAuth2 Token",
+)
+@rate_limit(10)
+async def oauth2_token(
+    request: Request, form_data: OAuth2PasswordRequestForm = Depends()
+):
+    """Issue OAuth2 password grant token with scopes.
+
+    Accepts application/x-www-form-urlencoded as per RFC.
+    """
+    try:
+        # Authenticate user
+        user = security_manager.authenticate_user(form_data.username, form_data.password)
+        if not user:
+            raise AuthenticationError("Invalid username or password")
+
+        # Validate requested scopes against user permissions (restrict to intersection)
+        requested_scopes = set(form_data.scopes)
+        granted_scopes = sorted(list(requested_scopes.intersection(set(user.permissions)))) if requested_scopes else user.permissions
+
+        # Create access token (token embeds full permissions; scope enforcement checks user perms)
+        access_token = security_manager.create_access_token(user)
+
+        return APIResponse(
+            success=True,
+            data={
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": security_manager.config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                "scope": " ".join(granted_scopes),
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "is_admin": user.is_admin,
+                },
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("OAuth2 token issuance failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Token issuance failed") from e
 
 
 @app.post("/api/v1/auth/refresh", response_model=APIResponse)
