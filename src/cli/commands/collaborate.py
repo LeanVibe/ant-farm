@@ -4,7 +4,7 @@ CLI commands for enhanced AI pair programming and collaboration.
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 import typer
 from rich.console import Console
@@ -468,7 +468,7 @@ Total Edits: {metrics["edit_count"]}"""
 
                 # Update footer
                 layout["footer"].update(
-                    Panel(f"Last update: {datetime.now().strftime('%H:%M:%S')}")
+                    Panel(f"Last update: {datetime.now(UTC).strftime('%H:%M:%S')}")
                 )
 
                 await asyncio.sleep(Intervals.AUTONOMOUS_DASHBOARD_DEFAULT)

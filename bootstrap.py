@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -43,8 +43,9 @@ class BootstrapAgent:
         """Connect to Docker services."""
         # Connect to Redis (in Docker, exposed on localhost)
         try:
+            # Use non-standard port 6381 to match project configuration
             self.redis_client = redis.Redis(
-                host="localhost", port=6380, decode_responses=True
+                host="localhost", port=6381, decode_responses=True
             )
             self.redis_client.ping()
             console.print("[green]✓[/green] Redis connected")
@@ -278,7 +279,7 @@ class BootstrapAgent:
             "task": task,
             "tool_used": tool_name,
             "status": "executing",
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         self.redis_client.hset(f"task:{task_id}", mapping=task_data)
@@ -433,7 +434,7 @@ class BootstrapAgent:
                     "type": "analyze_and_improve",
                     "title": "Analyze system and propose improvements",
                     "assigned_to": "meta-agent-001",
-                    "created_at": datetime.now().isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
                 }
             ),
         )

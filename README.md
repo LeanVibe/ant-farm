@@ -315,6 +315,9 @@ curl -X POST http://localhost:9001/api/v1/system/optimize
 
 ## 📚 Documentation
 
+- [docs/SYSTEM_HANDBOOK.md](docs/SYSTEM_HANDBOOK.md) — Single source-of-truth
+- [docs/INDEX.md](docs/INDEX.md) — Navigable index (human-oriented)
+- [docs/index.json](docs/index.json) — Index (machine/agent-oriented)
 - [docs/ADW_IMPLEMENTATION_SUMMARY.md](docs/ADW_IMPLEMENTATION_SUMMARY.md) - Complete ADW system documentation
 - [docs/PLAN.md](docs/PLAN.md) - Development roadmap and completed milestones
 - [AGENTS.md](AGENTS.md) - CLI tool integration and configuration
@@ -360,23 +363,9 @@ curl -X POST http://localhost:9001/api/v1/system/optimize
 
 ## 📊 Current System Status
 
-**🟢 CORE INFRASTRUCTURE: OPERATIONAL**
-- ✅ Multi-agent coordination system working
-- ✅ Database layer (PostgreSQL + async operations)
-- ✅ Message broker (Redis-based communication)
-- ✅ API server and CLI interface functional
-- ✅ Agent spawning and task management working
-- ✅ Configuration management operational
-
-**🟡 TEST INFRASTRUCTURE: NEEDS IMPROVEMENT**
-- ⚠️ Test coverage: 2.94% (Target: 90%)
-- ⚠️ Integration tests need async mock fixes
-- ⚠️ E2E workflows require validation
-
-**📋 DEVELOPMENT READINESS**
-- **Ready for**: Bug fixes, configuration improvements, documentation updates
-- **Requires test improvements before**: Major new features, production deployment
-- **See**: [SYSTEM_READINESS_ASSESSMENT.md](SYSTEM_READINESS_ASSESSMENT.md) for detailed analysis
+For up-to-date readiness, metrics, and technical debt status, see:
+- [SYSTEM_READINESS_ASSESSMENT.md](SYSTEM_READINESS_ASSESSMENT.md)
+- [TECHNICAL_DEBT_CONSOLIDATED.md](TECHNICAL_DEBT_CONSOLIDATED.md)
 
 ## 🤝 Contributing
 

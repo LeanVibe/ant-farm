@@ -5,7 +5,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -132,7 +132,7 @@ class ArchitectAgent(BaseAgent):
                     "testing",
                     "deployment",
                 ],
-                deadline=datetime.now() + timedelta(hours=2),
+                deadline=datetime.now(UTC) + timedelta(hours=2),
                 priority=4,
                 metadata={
                     "review_type": "architecture",

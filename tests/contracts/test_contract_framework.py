@@ -16,7 +16,7 @@ Key Features:
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Union
 
@@ -366,7 +366,7 @@ class ContractTestFramework:
         self.contracts[contract_id] = {
             "type": contract_type,
             "spec": contract_spec,
-            "registered_at": datetime.now(),
+            "registered_at": datetime.now(UTC),
         }
 
         logger.info(f"Contract registered: {contract_id} ({contract_type.value})")

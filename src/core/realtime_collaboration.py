@@ -64,6 +64,11 @@ class CollaborativeSession:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+# Backward-compatibility alias for tests expecting CollaborationSession
+class CollaborationSession(CollaborativeSession):
+    pass
+
+
 @dataclass
 class SyncOperation:
     """An operation to be synchronized across agents."""

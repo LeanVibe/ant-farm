@@ -65,6 +65,11 @@ class KnowledgeItem:
     expiry_time: float | None = None
 
 
+# Backward-compatibility alias for tests expecting KnowledgeEntry
+class KnowledgeEntry(KnowledgeItem):
+    pass
+
+
 @dataclass
 class LearningSession:
     """A learning session where agents share and acquire knowledge."""

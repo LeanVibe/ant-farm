@@ -1,0 +1,48 @@
+{
+  "core": [
+    "README.md",
+    "docs/README.md",
+    "docs/QUICKSTART.md",
+    "docs/API.md",
+    "docs/system-architecture.md",
+    "AGENTS.md",
+    "TECHNICAL_DEBT_CONSOLIDATED.md",
+    "SYSTEM_READINESS_ASSESSMENT.md"
+  ],
+  "prd": [
+    "docs/product-requirements.md",
+    "docs/agent-orchestrator-prd.md",
+    "docs/PRD-context-engine.md",
+    "docs/PRD-sleep-wake-manager.md",
+    "docs/PRD-mobile-pwa-dashboard.md",
+    "docs/prompt-optimization-system-prd.md",
+    "docs/self-modification-engine-prd.md",
+    "docs/communication-prd.md",
+    "docs/observability-prd.md",
+    "docs/observability-system-prd.md",
+    "docs/github-integration-prd.md"
+  ],
+  "operational": [
+    "docs/DEPLOYMENT.md",
+    "docs/BACKLOG.md",
+    "docs/ADW_IMPLEMENTATION_SUMMARY.md"
+  ],
+  "reports": [
+    "docs/PLAN.md",
+    "PHASE_1_IMPLEMENTATION_PLAN.md",
+    "DOCUMENTATION_CONSOLIDATION_REPORT.md",
+    "SYSTEM_EVALUATION_REPORT.md",
+    "CURRENT_SYSTEM_STATUS.md",
+    "ENHANCED_COMMUNICATION_SUMMARY.md",
+    "PRIORITY_TASKS.md"
+  ],
+  "tests": [
+    "tests/"
+  ],
+  "src": [
+    "src/core/",
+    "src/agents/",
+    "src/api/",
+    "src/web/"
+  ]
+}

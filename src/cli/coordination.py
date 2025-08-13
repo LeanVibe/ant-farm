@@ -1,7 +1,7 @@
 """CLI commands for agent coordination system."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import typer
 from rich.console import Console
@@ -45,7 +45,7 @@ def start_collaboration(
             ]
 
             # Calculate deadline
-            deadline = datetime.now() + timedelta(hours=deadline_hours)
+            deadline = datetime.now(UTC) + timedelta(hours=deadline_hours)
 
             # Initialize coordination system
             await coordination_system.initialize()
@@ -290,7 +290,7 @@ def demo():
                     "testing",
                     "deployment",
                 ],
-                deadline=datetime.now() + timedelta(hours=1),
+                deadline=datetime.now(UTC) + timedelta(hours=1),
                 priority=3,
                 metadata={"demo": True, "purpose": "demonstration"},
             )

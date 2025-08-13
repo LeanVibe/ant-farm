@@ -9,7 +9,7 @@ import json
 import subprocess
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -240,7 +240,7 @@ class AgentRunner:
                 "stdout": result.stdout,
                 "stderr": result.stderr,
                 "elapsed_seconds": elapsed,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except subprocess.TimeoutExpired:
@@ -248,14 +248,14 @@ class AgentRunner:
                 "success": False,
                 "error": "Claude Code timeout after 5 minutes",
                 "elapsed_seconds": 300,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
                 "elapsed_seconds": time.time() - start_time,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     def process_task(self, task: dict[str, Any]):

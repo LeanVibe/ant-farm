@@ -4,7 +4,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -289,7 +289,7 @@ class SleepWakeManager:
 
     async def _should_enter_sleep(self) -> bool:
         """Determine if the system should enter sleep mode."""
-        current_time = datetime.now()
+        current_time = datetime.now(UTC)
 
         # Check scheduled sleep time
         sleep_time = current_time.replace(
@@ -842,8 +842,14 @@ class SleepWakeManager:
         }
 
     def _get_next_sleep_time(self) -> float:
-        """Calculate next scheduled sleep time."""
-        current_time = datetime.now()
+        """Calculate next scheduled sleep time based on current schedule.
+
+        Returns
+        -------
+        float
+            POSIX timestamp (seconds since epoch) for the next scheduled sleep.
+        """
+        current_time = datetime.now(UTC)
         next_sleep = current_time.replace(
             hour=self.schedule.sleep_hour,
             minute=self.schedule.sleep_minute,
