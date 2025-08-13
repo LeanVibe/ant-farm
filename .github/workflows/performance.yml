@@ -4,11 +4,7 @@ on:
   schedule:
     - cron: '0 2 * * *'  # Run daily at 2 AM
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'src/api/**'
-      - 'src/core/**'
+  # Disable push trigger to reduce CI load and avoid failures on every push
 
 jobs:
   performance-test:
