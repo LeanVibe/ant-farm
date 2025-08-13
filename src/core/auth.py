@@ -1,8 +1,17 @@
-"""Authentication and authorization middleware for FastAPI."""
+"""Authentication and authorization utilities for FastAPI.
+
+Adds OAuth2 password flow with scopes while maintaining existing
+HTTP Bearer support for backward compatibility.
+"""
 
 import structlog
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request, Security, status
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordBearer,
+    SecurityScopes,
+)
 
 from .security import Permission, User, security_manager
 
@@ -10,6 +19,36 @@ logger = structlog.get_logger()
 
 # HTTP Bearer token scheme
 security_scheme = HTTPBearer(auto_error=False)
+
+# OAuth2 Password flow with scopes (scopes mirror our Permission constants)
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/token",
+    scopes={
+        Permission.SYSTEM_READ: "Read system information",
+        Permission.SYSTEM_WRITE: "Modify system settings",
+        Permission.SYSTEM_ADMIN: "Administrative privileges",
+        Permission.AGENT_READ: "Read agents",
+        Permission.AGENT_WRITE: "Modify agents",
+        Permission.AGENT_SPAWN: "Spawn agents",
+        Permission.AGENT_TERMINATE: "Terminate agents",
+        Permission.TASK_READ: "Read tasks",
+        Permission.TASK_WRITE: "Modify tasks",
+        Permission.TASK_CREATE: "Create tasks",
+        Permission.TASK_CANCEL: "Cancel tasks",
+        Permission.MESSAGE_READ: "Read messages",
+        Permission.MESSAGE_SEND: "Send messages",
+        Permission.MESSAGE_BROADCAST: "Broadcast messages",
+        Permission.METRICS_READ: "Read system metrics",
+        Permission.METRICS_WRITE: "Modify metrics settings",
+        Permission.CONTEXT_READ: "Read context/memory",
+        Permission.CONTEXT_WRITE: "Modify context/memory",
+        Permission.MODIFICATION_READ: "Read self-modification state",
+        Permission.MODIFICATION_PROPOSE: "Propose modifications",
+        Permission.MODIFICATION_APPROVE: "Approve modifications",
+        Permission.MODIFICATION_APPLY: "Apply modifications",
+    },
+    auto_error=False,
+)
 
 
 class AuthenticationError(HTTPException):
@@ -90,6 +129,42 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_scoped(
+    security_scopes: SecurityScopes, token: str | None = Depends(oauth2_scheme)
+) -> User:
+    """Get current user using OAuth2 token and enforce scopes.
+
+    Falls back to raising AuthenticationError if token missing/invalid.
+    """
+    if not token:
+        # Mirror OAuth2 error format
+        raise AuthenticationError(
+            "Not authenticated. Provide Bearer token to access this resource."
+        )
+
+    payload = security_manager.verify_token(token)
+    if not payload:
+        raise AuthenticationError("Invalid or expired token")
+
+    user_id = payload.get("sub")
+    if not user_id or user_id not in security_manager.users:
+        raise AuthenticationError("User not found")
+
+    user = security_manager.users[user_id]
+    if not user.is_active:
+        raise AuthenticationError("User account is disabled")
+
+    # Enforce requested scopes
+    required_scopes = set(security_scopes.scopes or [])
+    if required_scopes and not required_scopes.issubset(set(user.permissions)):
+        missing = sorted(list(required_scopes.difference(set(user.permissions))))
+        raise AuthorizationError(
+            f"Missing required scopes: {', '.join(missing)}"
+        )
+
+    return user
+
+
 async def get_optional_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
@@ -135,13 +210,22 @@ async def get_cli_user(
 
 
 def require_permissions(*permissions: str):
-    """Decorator to require specific permissions for an endpoint."""
+    """Decorator to require specific permissions/scopes for an endpoint.
+
+    Uses OAuth2 scopes enforcement when Bearer token provided via OAuth2 scheme.
+    Falls back to user permission check for backward compatibility.
+    """
 
     def decorator(func):
         async def wrapper(
-            *args, current_user: User = Depends(get_current_user), **kwargs
+            *args,
+            # Enforce scopes via OAuth2 when available
+            current_user: User = Security(
+                get_current_user_scoped, scopes=list(permissions)
+            ),
+            **kwargs,
         ):
-            # Check permissions
+            # Backward-compatible explicit permission check (in case of non-OAuth tokens)
             if not security_manager.require_permissions(
                 current_user, list(permissions)
             ):
@@ -170,7 +254,11 @@ def require_admin():
 
     def decorator(func):
         async def wrapper(
-            *args, current_user: User = Depends(get_current_user), **kwargs
+            *args,
+            current_user: User = Security(
+                get_current_user_scoped, scopes=[Permission.SYSTEM_ADMIN]
+            ),
+            **kwargs,
         ):
             if not current_user.is_admin:
                 logger.warning("Admin access denied", user_id=current_user.id)
@@ -184,19 +272,40 @@ def require_admin():
 
 
 def rate_limit(limit: int = 100):
-    """Rate limiting decorator."""
+    """Rate limiting decorator compatible with FastAPI dependency injection.
+
+    Preserves the original function signature to avoid FastAPI interpreting
+    *args/**kwargs as request parameters.
+    """
+
+    import inspect
+    from functools import wraps
 
     def decorator(func):
-        async def wrapper(request: Request, *args, **kwargs):
-            client_ip = get_client_ip(request)
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Try to locate Request from args/kwargs
+            request: Request | None = None
+            for value in list(kwargs.values()) + list(args):
+                if isinstance(value, Request):
+                    request = value
+                    break
 
+            if request is None:
+                raise RuntimeError(
+                    "Rate limiter requires a fastapi.Request parameter in the endpoint."
+                )
+
+            client_ip = get_client_ip(request)
             if not security_manager.check_rate_limit(client_ip, limit):
                 raise RateLimitError(
                     f"Rate limit exceeded: {limit} requests per minute"
                 )
 
-            return await func(request, *args, **kwargs)
+            return await func(*args, **kwargs)
 
+        # Ensure FastAPI sees the original signature
+        wrapper.__signature__ = inspect.signature(func)
         return wrapper
 
     return decorator
