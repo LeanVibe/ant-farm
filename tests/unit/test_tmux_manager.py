@@ -376,6 +376,33 @@ class TestTmuxManagerIntegration:
             assert result.retry_count == 1
 
 
+    @pytest.mark.asyncio
+    async def test_termination_idempotency_and_tracking(self, tmux_manager):
+        """Terminate twice when session doesn't exist; ensure idempotent and tracked as STOPPED."""
+        # First termination: session not found -> success and mark STOPPED
+        with patch.object(tmux_manager, "_session_exists", return_value=False):
+            res1 = await tmux_manager.terminate_session("idem-test")
+        assert res1.success
+        assert tmux_manager.get_session_info("idem-test").status == TmuxSessionStatus.STOPPED
+
+        # Second termination: still not found -> success, status remains STOPPED
+        with patch.object(tmux_manager, "_session_exists", return_value=False):
+            res2 = await tmux_manager.terminate_session("idem-test")
+        assert res2.success
+        assert tmux_manager.get_session_info("idem-test").status == TmuxSessionStatus.STOPPED
+
+    @pytest.mark.asyncio
+    async def test_optimistic_tracking_stopped_fast_path(self, tmux_manager):
+        """When tracked as STOPPED, get_session_status should not perform external check."""
+        tmux_manager.sessions["fast-test"] = TmuxSession(
+            name="fast-test", status=TmuxSessionStatus.STOPPED
+        )
+        # If _session_exists is called, raise to fail test
+        with patch.object(tmux_manager, "_session_exists", side_effect=AssertionError("should not be called")):
+            status = await tmux_manager.get_session_status("fast-test")
+        assert status == TmuxSessionStatus.STOPPED
+
+
 class TestTmuxManagerSingleton:
     """Test the singleton pattern for tmux manager."""
 

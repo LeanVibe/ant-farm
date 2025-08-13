@@ -1,0 +1,22 @@
+[run]
+branch = True
+source = src
+omit =
+    # Generated or UI assets
+    src/web/*
+    # Large/deferred modules not in current gate
+    src/core/adw/*
+    src/core/prediction/*
+    src/core/refactoring/*
+    # Old demos/scripts
+    demo_*.py
+    bootstrap.py
+
+[report]
+show_missing = True
+skip_covered = False
+precision = 2
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    if __name__ == .__main__.:

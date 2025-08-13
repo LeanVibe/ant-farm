@@ -1455,20 +1455,37 @@ class SharedKnowledgeBase:
     ) -> bool:
         """Broadcast knowledge to agents (test compatibility method)."""
         try:
-            # Send knowledge broadcast via message broker
-            await self.message_broker.send_priority_message(
-                from_agent=broadcast_by,
-                to_agent="broadcast",
-                topic="knowledge_broadcast",
-                payload={
-                    "knowledge_id": knowledge_id,
-                    "target_domains": target_domains,
-                    "message": message,
-                },
-                priority="normal",
-                message_type="broadcast",
-            )
-            return True
+            # Prefer Redis publish path for tests
+            if self.redis is not None:
+                await self.redis.publish(
+                    "knowledge:broadcasts",
+                    json.dumps(
+                        {
+                            "knowledge_id": knowledge_id,
+                            "by": broadcast_by,
+                            "domains": target_domains,
+                            "message": message,
+                        }
+                    ),
+                )
+                return True
+
+            # Fallback to message broker if available
+            if self.message_broker is not None:
+                await self.message_broker.send_priority_message(
+                    from_agent=broadcast_by,
+                    to_agent="broadcast",
+                    topic="knowledge_broadcast",
+                    payload={
+                        "knowledge_id": knowledge_id,
+                        "target_domains": target_domains,
+                        "message": message,
+                    },
+                    priority="normal",
+                    message_type="broadcast",
+                )
+                return True
+            return False
         except Exception:
             return False
 

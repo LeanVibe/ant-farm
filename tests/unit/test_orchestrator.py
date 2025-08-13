@@ -333,7 +333,12 @@ class TestAgentSpawner:
     @pytest.mark.asyncio
     async def test_spawn_agent_success(self, agent_spawner):
         """Test successful agent spawning."""
-        with patch("subprocess.run") as mock_run:
+        with patch("subprocess.run") as mock_run, patch(
+            "src.core.orchestrator.select_default_tmux_backend"
+        ) as sel:
+            from src.core.tmux_backend import SubprocessTmuxBackend
+            sel.return_value = SubprocessTmuxBackend(Path("/test/project"))
+            agent_spawner = AgentSpawner(Path("/test/project"))
             # Mock successful tmux commands
             mock_run.side_effect = [
                 MagicMock(returncode=0),  # tmux new-session
@@ -373,7 +378,12 @@ class TestAgentSpawner:
     @pytest.mark.asyncio
     async def test_terminate_agent_success(self, agent_spawner):
         """Test successful agent termination."""
-        with patch("subprocess.run") as mock_run:
+        with patch("subprocess.run") as mock_run, patch(
+            "src.core.orchestrator.select_default_tmux_backend"
+        ) as sel:
+            from src.core.tmux_backend import SubprocessTmuxBackend
+            sel.return_value = SubprocessTmuxBackend(Path("/test/project"))
+            agent_spawner = AgentSpawner(Path("/test/project"))
             # Mock successful tmux commands
             mock_run.return_value = MagicMock(returncode=0)
 
@@ -387,7 +397,12 @@ class TestAgentSpawner:
     @pytest.mark.asyncio
     async def test_terminate_agent_failure(self, agent_spawner):
         """Test agent termination failure."""
-        with patch("subprocess.run") as mock_run:
+        with patch("subprocess.run") as mock_run, patch(
+            "src.core.orchestrator.select_default_tmux_backend"
+        ) as sel:
+            from src.core.tmux_backend import SubprocessTmuxBackend
+            sel.return_value = SubprocessTmuxBackend(Path("/test/project"))
+            agent_spawner = AgentSpawner(Path("/test/project"))
             # Mock failed tmux command
             mock_run.side_effect = subprocess.CalledProcessError(1, "tmux")
 
@@ -694,6 +709,41 @@ class TestAgentOrchestrator:
 
         unknown_caps = orchestrator._get_default_capabilities("unknown")
         assert unknown_caps == ["general"]
+
+    @pytest.mark.asyncio
+    async def test_orphan_cleanup_disabled_flag(self, orchestrator, monkeypatch):
+        """When feature flag is disabled, cleanup should not call tmux manager."""
+        monkeypatch.setenv("HIVE_CLEANUP_ORPHANS", "0")
+        orchestrator.spawner.tmux_manager.cleanup_orphaned_sessions = AsyncMock()
+
+        await orchestrator._cleanup_orphaned_sessions()
+
+        orchestrator.spawner.tmux_manager.cleanup_orphaned_sessions.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_orphan_cleanup_enabled_and_filtered(self, orchestrator, monkeypatch):
+        """When enabled, cleanup should call tmux manager and filter out active agent sessions."""
+        monkeypatch.setenv("HIVE_CLEANUP_ORPHANS", "1")
+        # Active agent with a session that should be preserved
+        orchestrator.registry.agents["agent-a"] = MagicMock(tmux_session="hive-keep")
+        # Mock tmux manager returning both an active and orphaned session
+        orchestrator.spawner.tmux_manager.cleanup_orphaned_sessions = AsyncMock(
+            return_value=["hive-keep", "hive-orphan1"]
+        )
+
+        with patch("src.core.orchestrator.logger") as mock_logger:
+            await orchestrator._cleanup_orphaned_sessions()
+
+            orchestrator.spawner.tmux_manager.cleanup_orphaned_sessions.assert_called_once_with(
+                prefix="hive-"
+            )
+
+            # Verify log includes only truly orphaned session
+            info_calls = [call for call in mock_logger.info.call_args_list if call.args and call.args[0] == "Cleaned up orphaned tmux sessions"]
+            assert any(
+                call.kwargs.get("orphaned_count") == 1 and call.kwargs.get("orphaned_sessions") == ["hive-orphan1"]
+                for call in info_calls
+            )
 
 
 class TestSystemHealth:

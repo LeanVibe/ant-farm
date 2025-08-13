@@ -17,6 +17,12 @@ from .models import Agent
 from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
 from .tmux_manager import TmuxOperationResult, get_tmux_manager
+from .tmux_backend import (
+    TmuxBackendProtocol,
+    SubprocessTmuxBackend,
+    TmuxManagerBackend,
+    select_default_tmux_backend,
+)
 
 logger = structlog.get_logger()
 
@@ -278,9 +284,11 @@ class AgentRegistry:
 class AgentSpawner:
     """Handles spawning new agent instances using resilient tmux management."""
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, backend: TmuxBackendProtocol | None = None):
         self.project_root = project_root
         self.tmux_manager = get_tmux_manager()
+        # Backend injection seam; default selected by env flag for production/test alignment
+        self.backend: TmuxBackendProtocol = backend or select_default_tmux_backend(self.project_root)
 
     async def spawn_agent(
         self, agent_type: str, agent_name: str, capabilities: list[str] = None
@@ -302,26 +310,9 @@ class AgentSpawner:
             # Build command to run in tmux session
             command = f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}"
 
-            # Create session
-            subprocess.run(
-                [
-                    "tmux",
-                    "new-session",
-                    "-d",
-                    "-s",
-                    session_name,
-                    "-c",
-                    str(self.project_root),
-                    command,
-                ],
-                check=True,
-            )
-
-            # Verify session exists
-            check = subprocess.run(
-                ["tmux", "has-session", "-t", session_name], capture_output=True
-            )
-            if check.returncode == 0:
+            # Use injected backend
+            created = await self.backend.create_session(session_name=session_name, command=command)
+            if created:
                 await asyncio.sleep(Intervals.ORCHESTRATOR_STARTUP_DELAY)
                 return session_name
             return None
@@ -337,17 +328,8 @@ class AgentSpawner:
                 session_name=session_name,
             )
 
-            # Graceful stop (Ctrl+C)
-            subprocess.run(
-                ["tmux", "send-keys", "-t", session_name, "C-c", "Enter"],
-                check=False,
-            )
-            await asyncio.sleep(0.1)
-            # Force kill session
-            result = subprocess.run(
-                ["tmux", "kill-session", "-t", session_name], capture_output=True
-            )
-            return result.returncode == 0
+            result = await self.backend.terminate_session(session_name)
+            return result
         except subprocess.CalledProcessError:
             return False
 
@@ -767,6 +749,10 @@ class AgentOrchestrator:
     async def _cleanup_orphaned_sessions(self) -> None:
         """Clean up tmux sessions that don't have corresponding agents using resilient tmux manager."""
         try:
+            import os
+            if os.getenv("HIVE_CLEANUP_ORPHANS", "0") != "1":
+                logger.debug("Orphan cleanup disabled by feature flag")
+                return
             logger.debug("Starting orphaned session cleanup")
 
             # Get all tracked agent sessions

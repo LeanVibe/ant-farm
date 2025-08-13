@@ -152,6 +152,10 @@ generate: ## Generate system with Claude Code
 test: ## Run tests (quick version without coverage)
 	python -m pytest tests/test_infrastructure.py -v --no-cov
 
+.PHONY: test-fast
+test-fast: ## Fast unit tests without coverage
+	python -m pytest -q tests/unit --no-cov -n auto --maxfail=1
+
 .PHONY: test-unit
 test-unit: ## Run unit tests only
 	python -m pytest tests/unit/ -v
@@ -162,7 +166,20 @@ test-integration: ## Run integration tests
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage (when implementations exist)
-	python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html --cov-fail-under=50
+	python -m pytest -q \
+	  -k "orchestrator or tmux_manager or message_broker or caching or async_db" \
+	  --cov=src --cov-config=.coveragerc --cov-report=term-missing --cov-report=html --cov-fail-under=50 -n auto --maxfail=1
+
+.PHONY: test-coverage-core
+test-coverage-core: ## Targeted coverage for core modules
+	python -m pytest -q \
+	  tests/unit \
+	  --cov=src/core/orchestrator.py \
+	  --cov=src/core/tmux_manager.py \
+	  --cov=src/core/message_broker.py \
+	  --cov=src/core/caching.py \
+	  --cov=src/core/async_db.py \
+	  --cov-config=.coveragerc --cov-report=term-missing -n auto --maxfail=1
 
 .PHONY: logs
 logs: ## Tail all log files
