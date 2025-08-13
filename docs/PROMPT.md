@@ -21,27 +21,31 @@ You are taking over development of LeanVibe Agent Hive 2.0, a self-improving aut
 
 ---
 
-## Your next priorities (choose a path)
+## Your next priorities (execution plan)
 
-OPTION A: Coverage & CI Hardening (Phase 5)
-- Establish coverage roadmap for high-signal modules (`orchestrator`, `tmux_manager`, `message_broker`, `caching`, `async_db`)
-- Add smoke tests to lift coverage floor on legacy modules
-- Introduce `.coveragerc` and split CI jobs (fast vs nightly coverage)
-- Document local guidance for focused runs
+You are taking over an in-flight CI and hardening effort. Continue with ruthless prioritization (Pareto 80/20) and TDD.
 
-OPTION B: Stabilize Tmux Bridge for Prod (Phase 4.1.1)
-- Add `TmuxBackendProtocol`; make `AgentSpawner` backend-injectable
-- Default to resilient manager; tests supply subprocess backend
-- Expand `RetryableTmuxManager` tests: timeouts, optimistic tracking, termination idempotency
-- Feature-flag orphaned-session cleanup (`HIVE_CLEANUP_ORPHANS=1`)
+Phase 4.1.1 - Tmux Bridge Injection (stability)
+- Ensure `AgentSpawner` uses `TmuxBackendProtocol` with default selection:
+  - Production: `TmuxManagerBackend` (resilient)
+  - Tests: `SubprocessTmuxBackend`
+- Extend `RetryableTmuxManager` tests to cover
+  - Timeout kill-await
+  - Optimistic validation and idempotent termination
+- Keep orphan cleanup behind `HIVE_CLEANUP_ORPHANS=1`
 
-OPTION C: Test‑Shim Consolidation (Phase 6)
-- Introduce `CollaborationSyncService` and `KnowledgeBaseService` interfaces
-- Refactor tests to depend on interfaces; production binds full impls
-- Remove direct references to test helpers from prod paths
+Phase 5 - Coverage & CI Hardening (incremental)
+- CI is split:
+  - Fast PR job runs green suites only: orchestrator, tmux, collaboration, knowledge base
+  - Nightly/scheduled coverage job targets `src/core/{orchestrator,tmux_manager,tmux_backend}`; performance workflow is schedule-only
+- Next actions:
+  - Add minimal smoke tests to lift coverage for `message_broker`, `caching`, `async_db`
+  - Document local guidance for focused runs
 
-See `docs/PLAN.md` (Phase 4/5/6) for details and acceptance criteria.
-
+Phase 6 - Test‑Shim Consolidation
+- Create `CollaborationSyncService` and `KnowledgeBaseService` interfaces
+- Tests bind lightweight adapters; production binds full implementations
+See `docs/PLAN.md` for full detail and acceptance criteria.
 Key suites to keep green as you iterate:
 - `tests/unit/test_orchestrator.py`
 - `tests/unit/test_tmux_manager.py`
@@ -98,32 +102,32 @@ pytest -q tests/unit/test_realtime_collaboration.py tests/unit/test_shared_knowl
 
 Choose your path
 
-Path A - Coverage & CI
+CI hardening quick loop
 ```bash
-# Inspect near-term plan excerpt
+# Inspect plan tasks
 sed -n '660,760p' docs/PLAN.md
-# Run focused coverage locally as you add tests
+# Run focused coverage while adding smoke tests
 pytest --cov=src/core --cov-report=term-missing -k "orchestrator or tmux_manager"
 ```
 
-Path B - Tmux Bridge Injection
+Tmux bridge quick checks
 ```bash
 # Green suites while iterating
 pytest -q tests/unit/test_tmux_manager.py tests/unit/test_orchestrator.py --no-cov
-# After adding backend protocol
+# After backend protocol changes
 pytest -q tests/unit/test_tmux_manager.py -q
 ```
 
-Path C - Shim Consolidation
+Shim consolidation quick grep
 ```bash
 # Find direct references to test helpers
 rg "RealTimeCollaborationManager|SharedKnowledgeBase" -n src | sed -n '1,200p'
 ```
 
-Current CI constraints & solutions
-- Coverage gate <50% is blocking; many legacy modules at 0%
-- Workaround: run focused suites with `--no-cov` locally while adding coverage
-- Next: introduce `.coveragerc` and split CI jobs (fast vs nightly)
+Current CI state & solutions
+- Coverage gate blocks repo-wide runs due to legacy modules. Fast job runs green suites only.
+- Nightly coverage is scoped to orchestrator/tmux; performance workflow is schedule-only.
+- Continue adding smoke tests to raise global coverage ≥50%.
 
 ---
 
