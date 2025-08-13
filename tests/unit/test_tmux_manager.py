@@ -402,6 +402,48 @@ class TestTmuxManagerIntegration:
             status = await tmux_manager.get_session_status("fast-test")
         assert status == TmuxSessionStatus.STOPPED
 
+    @pytest.mark.asyncio
+    async def test_terminate_timeout_then_force_success(self, tmux_manager):
+        """If graceful terminate fails, force kill should succeed and mark STOPPED."""
+        # Ensure path goes into termination (session exists)
+        with patch.object(tmux_manager, "_session_exists", return_value=True):
+            # First call (graceful) fails; second (force) succeeds
+            failure = TmuxOperationResult(success=False, error_message="timeout")
+            success = TmuxOperationResult(success=True)
+
+            with patch.object(
+                tmux_manager, "_run_command_with_retry", side_effect=[failure, success]
+            ) as _:
+                result = await tmux_manager.terminate_session("force-test", force=False)
+
+        assert result.success
+        assert tmux_manager.sessions["force-test"].status == TmuxSessionStatus.STOPPED
+
+    @pytest.mark.asyncio
+    async def test_cleanup_orphaned_sessions_filters_and_terminates(self, tmux_manager):
+        """Only untracked prefixed sessions are terminated and returned."""
+        # Prepare sessions: hive-a (tracked), hive-b (untracked), other (ignored)
+        tmux_manager.sessions["hive-a"] = TmuxSession(name="hive-a", status=TmuxSessionStatus.ACTIVE)
+
+        listed = [
+            TmuxSession(name="hive-a", status=TmuxSessionStatus.ACTIVE),
+            TmuxSession(name="hive-b", status=TmuxSessionStatus.ACTIVE),
+            TmuxSession(name="misc", status=TmuxSessionStatus.ACTIVE),
+        ]
+
+        with (
+            patch.object(tmux_manager, "list_sessions", return_value=listed),
+            patch.object(
+                tmux_manager,
+                "terminate_session",
+                new=AsyncMock(return_value=TmuxOperationResult(success=True)),
+            ) as term,
+        ):
+            cleaned = await tmux_manager.cleanup_orphaned_sessions(prefix="hive-")
+
+        assert cleaned == ["hive-b"]
+        term.assert_awaited_once()
+
 
 class TestTmuxManagerSingleton:
     """Test the singleton pattern for tmux manager."""
