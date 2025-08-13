@@ -470,12 +470,18 @@ class EnhancedMessageBroker(MessageBroker):
                 if context_data:
                     enhanced_payload["shared_contexts"][context_id] = context_data
 
-        # Add agent state if relevant
+        # Add agent state; include sensible defaults when unknown
         if from_agent in self.agent_states:
             enhanced_payload["sender_state"] = {
                 "current_task": self.agent_states[from_agent].current_task,
                 "status": self.agent_states[from_agent].status,
                 "capabilities": self.agent_states[from_agent].capabilities,
+            }
+        else:
+            enhanced_payload["sender_state"] = {
+                "current_task": None,
+                "status": "idle",
+                "capabilities": [],
             }
 
         # Calculate message size for monitoring
