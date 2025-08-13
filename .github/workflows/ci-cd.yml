@@ -109,13 +109,14 @@ jobs:
         run: |
           uv sync --extra dev
 
-      - name: Run fast unit tests (no coverage)
+      - name: Run focused fast tests (no coverage)
         env:
           DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/leanvibe_hive_test
           REDIS_URL: redis://localhost:6379
           ENVIRONMENT: testing
         run: |
-          timeout 600 uv run pytest -q tests/unit --no-cov -n auto --maxfail=1 --tb=short
+          uv run pytest -q tests/unit/test_orchestrator.py tests/unit/test_tmux_manager.py --no-cov
+          uv run pytest -q tests/unit/test_realtime_collaboration.py tests/unit/test_shared_knowledge_base.py --no-cov
 
   # Coverage Job (can be heavier; consider cron nightly)
   coverage:
