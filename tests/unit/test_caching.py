@@ -50,9 +50,10 @@ def cache_config():
 @pytest.fixture
 async def cache_manager(mock_redis):
     """Cache manager instance for testing."""
-    manager = CacheManager("redis://localhost:6379")
-    await manager.initialize()
-    return manager
+    with patch("src.core.caching.redis.from_url", return_value=mock_redis):
+        manager = CacheManager("redis://localhost:6379")
+        await manager.initialize()
+        return manager
 
 
 @pytest.fixture

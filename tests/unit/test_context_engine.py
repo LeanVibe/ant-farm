@@ -284,7 +284,7 @@ class TestContextEngine:
 
         # Update importance
         success = await context_engine.update_context_importance(
-            context_id=context_id, importance_score=0.9
+            context_id=context_id, new_importance=0.9
         )
 
         assert success
