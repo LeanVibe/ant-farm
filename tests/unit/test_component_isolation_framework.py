@@ -166,6 +166,18 @@ class MockRedisClient:
         self._record_interaction("hgetall", (key,), {}, result, duration)
         return result
 
+    async def hincrby(self, key: str, field: str, amount: int = 1) -> int:
+        """Mock Redis HINCRBY operation for counters."""
+        start_time = time.time()
+        if key not in self.hashes:
+            self.hashes[key] = {}
+        current = int(self.hashes[key].get(field, "0"))
+        current += int(amount)
+        self.hashes[key][field] = str(current)
+        duration = time.time() - start_time
+        self._record_interaction("hincrby", (key, field, amount), {}, current, duration)
+        return current
+
     async def lpush(self, key: str, *values: str) -> int:
         """Mock Redis LPUSH operation."""
         start_time = time.time()
@@ -548,7 +560,11 @@ class ComponentIsolationTestFramework:
                 kwargs["redis_url"] = "redis://mock:6379"
 
             # Inject mocked dependencies into constructor if needed
-            component = component_class(**kwargs)
+            try:
+                component = component_class(**kwargs)
+            except TypeError:
+                # Fallback for callables without matching kwargs
+                component = component_class()
 
             # Replace component dependencies with mocks
             await self._inject_mocks(component)
@@ -568,17 +584,21 @@ class ComponentIsolationTestFramework:
         if self.config.mock_redis:
             self.mock_redis_client = MockRedisClient(self.config.record_interactions)
 
-            # Patch redis module
-            redis_patch = patch("redis.asyncio.Redis.from_url")
-            mock_redis_from_url = redis_patch.start()
-            mock_redis_from_url.return_value = self.mock_redis_client
-            self.patches.append(redis_patch)
-
-            # Patch redis imports in various modules
-            message_broker_patch = patch("src.core.message_broker.redis.from_url")
-            mock_mb_redis = message_broker_patch.start()
-            mock_mb_redis.return_value = self.mock_redis_client
-            self.patches.append(message_broker_patch)
+            # Patch redis module common entry point
+            patch_points = [
+                "redis.asyncio.from_url",
+                "src.core.message_broker.redis.from_url",
+                # enhanced broker inherits the client from message_broker; not all modules import redis directly
+                "src.core.caching.redis.from_url",
+            ]
+            for target in patch_points:
+                try:
+                    p = patch(target)
+                    started = p.start()
+                    started.return_value = self.mock_redis_client
+                    self.patches.append(p)
+                except (AttributeError, ModuleNotFoundError):
+                    continue
 
         if self.config.mock_database:
             self.mock_db_session = MockAsyncSession()
@@ -676,11 +696,13 @@ class ComponentIsolationTestFramework:
 
     def assert_redis_interactions(self, expected_calls: list[dict[str, Any]]):
         """Assert specific Redis interactions occurred."""
-        redis_calls = [
-            interaction
-            for interaction in self.interactions
-            if interaction.component == "redis"
-        ]
+        # Prefer live interactions from mock client to allow assertions inside context manager
+        source = (
+            self.mock_redis_client.interactions
+            if self.mock_redis_client and self.mock_redis_client.interactions
+            else self.interactions
+        )
+        redis_calls = [interaction for interaction in source if interaction.component == "redis"]
 
         assert len(redis_calls) == len(expected_calls), (
             f"Expected {len(expected_calls)} Redis calls, got {len(redis_calls)}"
@@ -790,7 +812,7 @@ async def create_isolated_message_broker():
     framework = ComponentIsolationTestFramework()
 
     async with framework.isolate_component(
-        lambda: None,  # We'll manually create the broker
+        lambda **_kwargs: None,  # We'll manually create the broker
         redis_url="redis://mock:6379",
     ) as _:
         from src.core.message_broker import MessageBroker
@@ -808,7 +830,7 @@ async def create_isolated_enhanced_message_broker():
     framework = ComponentIsolationTestFramework()
 
     async with framework.isolate_component(
-        lambda: None,  # We'll manually create the broker
+        lambda **_kwargs: None,  # We'll manually create the broker
         redis_url="redis://mock:6379",
     ) as _:
         from src.core.enhanced_message_broker import EnhancedMessageBroker

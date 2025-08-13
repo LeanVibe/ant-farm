@@ -1206,11 +1206,16 @@ class BaseAgent(ABC):
 
     def _get_capabilities(self) -> dict[str, Any]:
         """Get agent capabilities."""
+        # Normalize preferred_tool to string for tests where enum may be stubbed as str
+        preferred_tool = (
+            self.cli_tools.preferred_tool.value
+            if getattr(self.cli_tools.preferred_tool, "value", None) is not None
+            else self.cli_tools.preferred_tool
+        )
+
         capabilities = {
             "cli_tools": list(self.cli_tools.available_tools.keys()),
-            "preferred_tool": self.cli_tools.preferred_tool.value
-            if self.cli_tools.preferred_tool
-            else None,
+            "preferred_tool": preferred_tool,
             "supports_context": True,
             "supports_messaging": True,
             "supports_persistent_sessions": True,
