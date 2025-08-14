@@ -1,0 +1,35 @@
+version: 1
+plan_id: epic5-runner
+goal: "Runner v2 with deps + hive CLI"
+
+batches:
+  - name: schema-deps
+    tasks:
+      - type: command
+        run: echo "update schema with depends_on/env"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_plan_schema.py --no-cov"
+    commit:
+      message: "feat(plan): add depends_on/env to plan schema"
+
+  - name: runner-multi
+    depends_on: ["schema-deps"]
+    env:
+      PLAN_TEST: ok
+    tasks:
+      - type: command
+        run: echo "enhance runner: deps/env"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_plan_runner.py --no-cov"
+    commit:
+      message: "feat(plan): multi-batch run with dependency ordering"
+
+  - name: cli-wrapper
+    depends_on: ["runner-multi"]
+    tasks:
+      - type: command
+        run: echo "add hive plan CLI"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_hive_plan_cli.py --no-cov"
+    commit:
+      message: "feat(cli): add hive plan command"

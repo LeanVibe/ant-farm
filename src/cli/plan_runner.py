@@ -10,6 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
+import os
 
 import yaml
 
@@ -70,7 +71,24 @@ def run_plan(plan_path: Path, execute: bool, resume: bool, only_batch: Optional[
     # Locate batch
     batch = next(b for b in plan.batches if b.name == next_batch_name)
 
+    # Check dependencies
+    completed = set()
+    if resume and cp.last_completed_batch:
+        # naive: treat everything up to last_completed as completed
+        names = [b.name for b in plan.batches]
+        try:
+            idx = names.index(cp.last_completed_batch)
+            completed = set(names[: idx + 1])
+        except ValueError:
+            completed = set()
+    unmet = [d for d in getattr(batch, "depends_on", []) if d not in completed]
+    if unmet:
+        raise RunnerError(f"dependencies not met for {batch.name}: {unmet}")
+
     # 1) Apply
+    # Inject env for this batch
+    for k, v in getattr(batch, "env", {}).items():
+        os.environ[str(k)] = str(v)
     if execute:
         _apply_tasks_execute(plan_path, batch.name)
     else:

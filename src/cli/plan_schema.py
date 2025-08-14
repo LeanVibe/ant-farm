@@ -55,6 +55,8 @@ class Batch(BaseModel):
     tasks: List[Task] = Field(default_factory=list)
     verify: List[VerifyStep] = Field(default_factory=list)
     commit: Optional[Commit] = None
+    depends_on: List[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
 
 
 class Plan(BaseModel):
