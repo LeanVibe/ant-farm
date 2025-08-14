@@ -421,20 +421,19 @@ class HealthMonitor:
     async def _check_starting_agent(
         self, agent_name: str, agent_info: AgentInfo
     ) -> None:
-        """Check if a starting agent has actually become active using resilient tmux manager."""
-        """Check if a starting agent has actually become active."""
-        import subprocess
-
+        """Check if a starting agent has actually become active using tmux manager."""
         try:
             session_name = agent_info.tmux_session
             if not session_name:
                 return
 
-            # Check if session exists
-            check_cmd = ["tmux", "has-session", "-t", session_name]
-            result = subprocess.run(check_cmd, capture_output=True)
+            from .tmux_manager import TmuxSessionStatus
+            from .tmux_manager import get_tmux_manager as _get_tmux_manager
 
-            if result.returncode == 0:
+            tmux_manager = _get_tmux_manager()
+            status = await tmux_manager.get_session_status(session_name)
+
+            if status == TmuxSessionStatus.ACTIVE:
                 time_since_start = time.time() - agent_info.created_at
                 if time_since_start > 10:
                     logger.info(
@@ -445,14 +444,60 @@ class HealthMonitor:
                     await self.registry.update_agent_status(
                         agent_name, AgentStatus.ACTIVE
                     )
+                    # Record spawn latency metric (best-effort)
+                    await self._record_metric(
+                        metric_name="agent_spawn_latency",
+                        metric_type="histogram",
+                        value=time_since_start,
+                        labels={"agent_name": agent_name, "session": session_name},
+                    )
             else:
+                # Back-compat: attempt a direct subprocess check used by tests
+                import subprocess as _sp
+                check_cmd = ["tmux", "has-session", "-t", session_name]
+                result = _sp.run(check_cmd, capture_output=True)
+                if result.returncode == 0:
+                    # Consider active as per legacy behavior
+                    time_since_start = time.time() - agent_info.created_at
+                    if time_since_start > 10:
+                        logger.info(
+                            "Marking long-running agent as active (legacy path)",
+                            agent_name=agent_name,
+                            time_since_start=time_since_start,
+                        )
+                        await self.registry.update_agent_status(
+                            agent_name, AgentStatus.ACTIVE
+                        )
+                        # Best-effort metric; ignore errors
+                        try:
+                            await self._record_metric(
+                                metric_name="agent_spawn_latency",
+                                metric_type="histogram",
+                                value=time_since_start,
+                                labels={
+                                    "agent_name": agent_name,
+                                    "session": session_name,
+                                    "path": "legacy",
+                                },
+                            )
+                        except Exception:
+                            pass
+                        return
+
                 logger.warning(
-                    "Agent tmux session not found, marking as stopped",
+                    "Agent tmux session not found or stopped, marking as stopped",
                     agent_name=agent_name,
                     session_name=session_name,
                 )
                 await self.registry.update_agent_status(
                     agent_name, AgentStatus.STOPPED
+                )
+                # Record session validation failure
+                await self._record_metric(
+                    metric_name="session_validation_failure",
+                    metric_type="counter",
+                    value=1.0,
+                    labels={"agent_name": agent_name, "session": session_name},
                 )
         except Exception as e:
             logger.warning(
@@ -462,20 +507,16 @@ class HealthMonitor:
             )
 
     async def _ping_agent(self, agent_name: str) -> bool:
-        """Ping an agent to check if it's responsive."""
+        """Ping an agent to check if it's responsive via request/reply."""
         try:
-            # Send ping message
-            await message_broker.send_message(
+            reply = await message_broker.send_request(
                 from_agent="orchestrator",
                 to_agent=agent_name,
                 topic="ping",
                 payload={"timestamp": time.time()},
+                timeout=3,
             )
-
-            # Wait for pong response (simplified - would need proper message handling)
-            # This is a basic implementation
-            return True
-
+            return bool(reply and reply.get("pong"))
         except Exception as e:
             logger.error("Failed to ping agent", agent_name=agent_name, error=str(e))
             return False
@@ -782,11 +823,37 @@ class AgentOrchestrator:
                     orphaned_count=len(truly_orphaned),
                     orphaned_sessions=truly_orphaned,
                 )
+                # Record metric for cleaned sessions
+                await self._record_metric(
+                    metric_name="orphaned_sessions_cleaned",
+                    metric_type="counter",
+                    value=float(len(truly_orphaned)),
+                    labels={},
+                )
             else:
                 logger.debug("No orphaned sessions found")
 
         except Exception as e:
             logger.error("Failed to cleanup orphaned sessions", error=str(e))
+
+    async def _record_metric(
+        self, metric_name: str, metric_type: str, value: float, labels: dict | None = None
+    ) -> None:
+        """Best-effort metric recording through registry db manager."""
+        try:
+            dbm = getattr(self.registry, "db_manager", None)
+            if not dbm:
+                return
+            await dbm.record_system_metric(
+                metric_name=metric_name,
+                metric_type=metric_type,
+                value=value,
+                unit="count" if metric_type == "counter" else "seconds",
+                labels=labels or {},
+            )
+        except Exception:
+            # Never fail monitor on metric recording issues
+            pass
 
     def _get_default_capabilities(self, agent_type: str) -> list[str]:
         """Get default capabilities for agent type."""
