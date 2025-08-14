@@ -13,6 +13,20 @@ import redis.asyncio as redis
 import structlog
 
 logger = structlog.get_logger()
+try:
+    from .contracts import BrokerSendResult, BrokerSendReason
+except Exception:
+    # Soft import for tests if contracts not available
+    class BrokerSendReason:
+        OK = "ok"
+        IDEMPOTENT_DUPLICATE = "idempotent_duplicate"
+        PUBLISH_ERROR = "publish_error"
+        INVALID = "invalid"
+
+    class BrokerSendResult(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
 
 
 class MessageType(Enum):
@@ -280,6 +294,69 @@ class MessageBroker:
             except Exception:
                 pass
             return False
+
+    async def send_message_with_result(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        payload: dict[str, Any],
+        message_type: MessageType = MessageType.DIRECT,
+        priority: int = 5,
+        expires_in: int | None = None,
+        correlation_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> BrokerSendResult:
+        """Structured send API with explicit result semantics."""
+        try:
+            # Idempotency check
+            if idempotency_key:
+                idem_key = f"{self.message_prefix}:idem:{idempotency_key}"
+                try:
+                    ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
+                    if not ok:
+                        return BrokerSendResult(success=True, reason=BrokerSendReason.IDEMPOTENT_DUPLICATE, message_id=None)
+                except Exception:
+                    pass
+
+            message = Message(
+                id=str(uuid.uuid4()),
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                message_type=message_type,
+                payload=payload,
+                timestamp=time.time(),
+                expires_at=time.time() + expires_in if expires_in else None,
+                priority=priority,
+                correlation_id=correlation_id,
+                idempotency_key=idempotency_key,
+            )
+
+            await self._persist_message(message)
+            channel = "broadcast" if to_agent == "broadcast" else f"agent:{to_agent}"
+            await self.redis_client.publish(channel, json.dumps(self._serialize_message_for_storage(message)))
+            return BrokerSendResult(success=True, reason=BrokerSendReason.OK, message_id=message.id)
+        except Exception as e:
+            try:
+                await self._move_to_dlq(
+                    Message(
+                        id=str(uuid.uuid4()),
+                        from_agent=from_agent,
+                        to_agent=to_agent,
+                        topic=topic,
+                        message_type=MessageType.DIRECT,
+                        payload=payload,
+                        timestamp=time.time(),
+                        priority=priority,
+                        correlation_id=correlation_id,
+                        idempotency_key=idempotency_key,
+                    ),
+                    reason="publish_error",
+                )
+            except Exception:
+                pass
+            return BrokerSendResult(success=False, reason=BrokerSendReason.PUBLISH_ERROR, message_id=None, details=str(e))
 
     async def send_request(
         self,
