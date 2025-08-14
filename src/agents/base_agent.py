@@ -88,6 +88,11 @@ class CLIToolManager:
         self.available_tools = self._detect_available_tools()
         self.preferred_tool = self._select_preferred_tool()
         self.tool_configs = self._get_tool_configs()
+        # Counters and budgets
+        self._counters: dict[str, dict[str, Any]] = {}
+        self._tool_window_start: dict[str, float] = {}
+        self._tool_attempts_in_window: dict[str, int] = {}
+        self.per_tool_budget_per_minute: int = 30
 
     def _detect_available_tools(self) -> dict[str, dict[str, Any]]:
         """Detect available CLI tools."""
@@ -208,6 +213,26 @@ class CLIToolManager:
 
         tool_config = self.available_tools[tool_to_use]
 
+        # Budget enforcement per tool (rolling 60s window)
+        tool_key = tool_to_use.value
+        now = time.time()
+        window_start = self._tool_window_start.get(tool_key, now)
+        if now - window_start >= 60:
+            self._tool_window_start[tool_key] = now
+            self._tool_attempts_in_window[tool_key] = 0
+        attempts = self._tool_attempts_in_window.get(tool_key, 0)
+        if attempts >= self.per_tool_budget_per_minute:
+            self._increment_counters(tool_key, success=False, category=ErrorCategory.RATE_LIMIT.value)
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Per-minute budget exceeded for {tool_key}",
+                execution_time=time.time() - start_time,
+                error_category=ErrorCategory.RATE_LIMIT.value,
+            )
+        # Count attempted call in window
+        self._tool_attempts_in_window[tool_key] = attempts + 1
+
         # Try primary tool once, with a single timed backoff retry on timeout/rate limit
         for attempt in range(2):
             try:
@@ -220,6 +245,7 @@ class CLIToolManager:
                         tool=tool_to_use.value,
                         execution_time=result.execution_time,
                     )
+                    self._increment_counters(tool_key, success=True)
                     return result
                 # If timeout or rate limit, optionally backoff once
                 if (
@@ -235,11 +261,13 @@ class CLIToolManager:
                     )
                     await asyncio.sleep(delay)
                     continue
+                self._increment_counters(tool_key, success=False, category=result.error_category)
                 break
             except Exception as e:
                 logger.error(
                     "CLI tool execution error", tool=tool_to_use.value, error=str(e)
                 )
+                self._increment_counters(tool_key, success=False, category=ErrorCategory.OTHER.value)
                 break
 
         # Try fallback tools
@@ -259,6 +287,7 @@ class CLIToolManager:
                         tool=fallback_tool.value,
                         execution_time=result.execution_time,
                     )
+                    self._increment_counters(fallback_tool.value, success=True)
                     return result
 
             except Exception as e:
@@ -267,6 +296,7 @@ class CLIToolManager:
                     tool=fallback_tool.value,
                     error=str(e),
                 )
+                self._increment_counters(fallback_tool.value, success=False, category=ErrorCategory.OTHER.value)
 
         # All tools failed
         return ToolResult(
@@ -276,6 +306,22 @@ class CLIToolManager:
             execution_time=time.time() - start_time,
             error_category=ErrorCategory.OTHER.value,
         )
+
+    def _increment_counters(self, tool_key: str, success: bool, category: str | None = None) -> None:
+        """Increment per-tool counters with minimal overhead."""
+        c = self._counters.setdefault(tool_key, {"calls": 0, "success": 0, "failure": 0, "by_category": {}})
+        c["calls"] += 1
+        if success:
+            c["success"] += 1
+        else:
+            c["failure"] += 1
+            if category:
+                c["by_category"][category] = c["by_category"].get(category, 0) + 1
+
+    def get_counters(self) -> dict[str, dict[str, Any]]:
+        """Return a snapshot of CLI counters per tool."""
+        # Return a shallow copy to avoid external mutation
+        return {k: {**v, "by_category": dict(v.get("by_category", {}))} for k, v in self._counters.items()}
 
     async def _opencode_execute(self, prompt: str) -> ToolResult:
         """Execute prompt using opencode."""
