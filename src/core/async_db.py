@@ -305,6 +305,38 @@ class AsyncDatabaseManager:
                 )
                 raise DatabaseOperationError(f"Failed to record metric: {e}")
 
+    async def record_metrics_bulk(self, metrics: list[dict[str, Any]]) -> int:
+        """Record multiple system metrics efficiently.
+
+        Each metric dict should contain keys compatible with SystemMetric constructor.
+        Returns number of successfully recorded metrics.
+        """
+        if not metrics:
+            return 0
+        async with self.async_session_maker() as session:
+            try:
+                created = 0
+                for m in metrics:
+                    metric = SystemMetric(
+                        metric_name=m.get("metric_name"),
+                        metric_type=m.get("metric_type"),
+                        value=m.get("value", 0.0),
+                        unit=m.get("unit"),
+                        agent_id=uuid.UUID(m["agent_id"]) if m.get("agent_id") else None,
+                        task_id=uuid.UUID(m["task_id"]) if m.get("task_id") else None,
+                        session_id=uuid.UUID(m["session_id"]) if m.get("session_id") else None,
+                        labels=m.get("labels", {}),
+                        timestamp=datetime.now(UTC),
+                    )
+                    session.add(metric)
+                    created += 1
+                await session.commit()
+                return created
+            except Exception as e:
+                await session.rollback()
+                logger.error("Failed bulk metrics write", error=str(e))
+                raise DatabaseOperationError(f"Failed to record metrics bulk: {e}")
+
     async def get_active_agents(self) -> list[AgentModel]:
         """Get all active agents."""
         async with self.async_session_maker() as session:
