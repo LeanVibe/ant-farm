@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+import random
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,15 @@ class ToolResult:
     error: str | None = None
     tool_used: str | None = None
     execution_time: float = 0.0
+    error_category: str | None = None
+
+
+class ErrorCategory(str, Enum):
+    TIMEOUT = "timeout"
+    RATE_LIMIT = "rate_limit"
+    AUTH = "auth"
+    OOM = "oom"
+    OTHER = "other"
 
 
 @dataclass
@@ -179,30 +189,39 @@ class CLIToolManager:
 
         tool_config = self.available_tools[tool_to_use]
 
-        try:
-            # Execute with selected tool
-            result = await tool_config["execute_pattern"](prompt)
-            result.tool_used = tool_to_use.value
-            result.execution_time = time.time() - start_time
-
-            if result.success:
-                logger.info(
-                    "CLI tool execution successful",
-                    tool=tool_to_use.value,
-                    execution_time=result.execution_time,
+        # Try primary tool once, with a single timed backoff retry on timeout/rate limit
+        for attempt in range(2):
+            try:
+                result = await tool_config["execute_pattern"](prompt)
+                result.tool_used = tool_to_use.value
+                result.execution_time = time.time() - start_time
+                if result.success:
+                    logger.info(
+                        "CLI tool execution successful",
+                        tool=tool_to_use.value,
+                        execution_time=result.execution_time,
+                    )
+                    return result
+                # If timeout or rate limit, optionally backoff once
+                if (
+                    attempt == 0
+                    and result.error_category in {ErrorCategory.TIMEOUT.value, ErrorCategory.RATE_LIMIT.value}
+                ):
+                    delay = min(1.0 * (2 ** attempt), 3.0) + random.uniform(0, 0.2)
+                    logger.warning(
+                        "Primary tool transient failure; backing off",
+                        tool=tool_to_use.value,
+                        category=result.error_category,
+                        delay=delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                break
+            except Exception as e:
+                logger.error(
+                    "CLI tool execution error", tool=tool_to_use.value, error=str(e)
                 )
-                return result
-            else:
-                logger.warning(
-                    "CLI tool execution failed, trying fallback",
-                    tool=tool_to_use.value,
-                    error=result.error,
-                )
-
-        except Exception as e:
-            logger.error(
-                "CLI tool execution error", tool=tool_to_use.value, error=str(e)
-            )
+                break
 
         # Try fallback tools
         for fallback_tool in self.available_tools:
@@ -236,6 +255,7 @@ class CLIToolManager:
             output="",
             error="All CLI tools failed",
             execution_time=time.time() - start_time,
+            error_category=ErrorCategory.OTHER.value,
         )
 
     async def _opencode_execute(self, prompt: str) -> ToolResult:
@@ -263,7 +283,10 @@ class CLIToolManager:
 
         except TimeoutError:
             return ToolResult(
-                success=False, output="", error="opencode execution timed out"
+                success=False,
+                output="",
+                error="opencode execution timed out",
+                error_category=ErrorCategory.TIMEOUT.value,
             )
 
     async def _claude_execute(self, prompt: str) -> ToolResult:
@@ -290,7 +313,10 @@ class CLIToolManager:
 
         except TimeoutError:
             return ToolResult(
-                success=False, output="", error="Claude CLI execution timed out"
+                success=False,
+                output="",
+                error="Claude CLI execution timed out",
+                error_category=ErrorCategory.TIMEOUT.value,
             )
 
     async def _gemini_execute(self, prompt: str) -> ToolResult:
@@ -317,7 +343,10 @@ class CLIToolManager:
 
         except TimeoutError:
             return ToolResult(
-                success=False, output="", error="Gemini CLI execution timed out"
+                success=False,
+                output="",
+                error="Gemini CLI execution timed out",
+                error_category=ErrorCategory.TIMEOUT.value,
             )
 
 
