@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+from src.agents.base_agent import CLIToolManager
+
 import pytest
 
 # Import the classes we'll be testing (when they exist)
@@ -98,6 +100,23 @@ class TestCLIToolDetection:
         mock_subprocess.side_effect = FileNotFoundError()
         # Test fallback behavior
         pass
+
+
+class TestErrorClassification:
+    def test_classify_timeout(self):
+        assert CLIToolManager.classify_error_text("Request timed out after 30s") == "timeout"
+
+    def test_classify_rate_limit(self):
+        assert CLIToolManager.classify_error_text("429 Too Many Requests: rate limit exceeded") == "rate_limit"
+
+    def test_classify_auth(self):
+        assert CLIToolManager.classify_error_text("401 Unauthorized: invalid API key") == "auth"
+
+    def test_classify_oom(self):
+        assert CLIToolManager.classify_error_text("Process killed: OOM") == "oom"
+
+    def test_classify_other(self):
+        assert CLIToolManager.classify_error_text("unexpected error") == "other"
 
 
 class TestAgentExecution:
