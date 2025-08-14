@@ -15,6 +15,10 @@ from .communication_monitor import get_communication_monitor
 from .context_engine import ContextEngine
 from .enums import TaskPriority
 from .message_broker import Message, MessageBroker, MessageType
+try:
+    from .contracts import BrokerSendResult
+except Exception:  # pragma: no cover - fallback type for tests
+    BrokerSendResult = dict  # type: ignore
 
 logger = structlog.get_logger()
 
@@ -860,6 +864,31 @@ class EnhancedMessageBroker(MessageBroker):
             **base_stats,
             "enhanced_features": enhanced_stats,
         }
+
+    async def send_message_with_result(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        payload: dict[str, Any],
+        message_type: MessageType = MessageType.DIRECT,
+        priority: int = 5,
+        expires_in: int | None = None,
+        correlation_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> BrokerSendResult:
+        """Structured send API preserving base semantics."""
+        return await super().send_message_with_result(
+            from_agent=from_agent,
+            to_agent=to_agent,
+            topic=topic,
+            payload=payload,
+            message_type=message_type,
+            priority=priority,
+            expires_in=expires_in,
+            correlation_id=correlation_id,
+            idempotency_key=idempotency_key,
+        )
 
     async def send_priority_message(
         self,
