@@ -16,13 +16,13 @@ from .message_broker import message_broker
 from .models import Agent
 from .short_id import ShortIDGenerator
 from .task_queue import Task, task_queue
-from .tmux_manager import TmuxOperationResult, get_tmux_manager
 from .tmux_backend import (
-    TmuxBackendProtocol,
     SubprocessTmuxBackend,
+    TmuxBackendProtocol,
     TmuxManagerBackend,
     select_default_tmux_backend,
 )
+from .tmux_manager import TmuxOperationResult, get_tmux_manager
 
 logger = structlog.get_logger()
 
@@ -176,7 +176,7 @@ class AgentRegistry:
                 else:
                     session.close()
                     try:
-                        setattr(session, "_close_called", True)
+                        session._close_called = True
                     except Exception:
                         pass
             except Exception:
@@ -288,7 +288,9 @@ class AgentSpawner:
         self.project_root = project_root
         self.tmux_manager = get_tmux_manager()
         # Backend injection seam; default selected by env flag for production/test alignment
-        self.backend: TmuxBackendProtocol = backend or select_default_tmux_backend(self.project_root)
+        self.backend: TmuxBackendProtocol = backend or select_default_tmux_backend(
+            self.project_root
+        )
 
     async def spawn_agent(
         self, agent_type: str, agent_name: str, capabilities: list[str] = None
@@ -311,7 +313,9 @@ class AgentSpawner:
             command = f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}"
 
             # Use injected backend
-            created = await self.backend.create_session(session_name=session_name, command=command)
+            created = await self.backend.create_session(
+                session_name=session_name, command=command
+            )
             if created:
                 await asyncio.sleep(Intervals.ORCHESTRATOR_STARTUP_DELAY)
                 return session_name
@@ -454,6 +458,7 @@ class HealthMonitor:
             else:
                 # Back-compat: attempt a direct subprocess check used by tests
                 import subprocess as _sp
+
                 check_cmd = ["tmux", "has-session", "-t", session_name]
                 result = _sp.run(check_cmd, capture_output=True)
                 if result.returncode == 0:
@@ -489,9 +494,7 @@ class HealthMonitor:
                     agent_name=agent_name,
                     session_name=session_name,
                 )
-                await self.registry.update_agent_status(
-                    agent_name, AgentStatus.STOPPED
-                )
+                await self.registry.update_agent_status(agent_name, AgentStatus.STOPPED)
                 # Record session validation failure
                 await self._record_metric(
                     metric_name="session_validation_failure",
@@ -569,6 +572,7 @@ class AgentOrchestrator:
 
         self.running = False
         self.task_assignment_running = False
+        self._background_tasks: list[asyncio.Task] = []
 
     async def start(self) -> None:
         """Start the orchestrator."""
@@ -582,9 +586,11 @@ class AgentOrchestrator:
         await task_queue.initialize()
 
         # Start background tasks as fire-and-forget
-        asyncio.create_task(self.health_monitor.start_monitoring())
-        asyncio.create_task(self._task_assignment_loop())
-        asyncio.create_task(self._cleanup_loop())
+        self._background_tasks.append(
+            asyncio.create_task(self.health_monitor.start_monitoring())
+        )
+        self._background_tasks.append(asyncio.create_task(self._task_assignment_loop()))
+        self._background_tasks.append(asyncio.create_task(self._cleanup_loop()))
 
         logger.info("Agent orchestrator background tasks started")
 
@@ -593,8 +599,15 @@ class AgentOrchestrator:
         self.running = False
         self.task_assignment_running = False
         await self.health_monitor.stop_monitoring()
-        # Give background tasks a brief moment to exit cleanly
-        await asyncio.sleep(0)
+        # Cancel and await background tasks gracefully
+        for t in self._background_tasks:
+            t.cancel()
+        if self._background_tasks:
+            try:
+                await asyncio.wait(self._background_tasks, timeout=1.0)
+            except Exception:
+                pass
+        self._background_tasks.clear()
         logger.info("Agent orchestrator stopped")
 
     async def spawn_agent(
@@ -793,6 +806,7 @@ class AgentOrchestrator:
         """Clean up tmux sessions that don't have corresponding agents using resilient tmux manager."""
         try:
             import os
+
             if os.getenv("HIVE_CLEANUP_ORPHANS", "0") != "1":
                 logger.debug("Orphan cleanup disabled by feature flag")
                 return
@@ -839,7 +853,11 @@ class AgentOrchestrator:
             logger.error("Failed to cleanup orphaned sessions", error=str(e))
 
     async def _record_metric(
-        self, metric_name: str, metric_type: str, value: float, labels: dict | None = None
+        self,
+        metric_name: str,
+        metric_type: str,
+        value: float,
+        labels: dict | None = None,
     ) -> None:
         """Best-effort metric recording through registry db manager."""
         try:
