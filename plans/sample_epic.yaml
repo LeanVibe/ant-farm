@@ -1,0 +1,15 @@
+version: 1
+plan_id: epic1-plan-runner
+goal: "YAML-driven plan runner with resume and dry-run"
+
+batches:
+  - name: scaffold-runner
+    tasks:
+      - type: command
+        run: echo "scaffold placeholder"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_plan_schema.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_plan_state.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_plan_runner.py::test_run_dry_run --no-cov"
+    commit:
+      message: "feat(plan): add YAML plan runner with resume state"
