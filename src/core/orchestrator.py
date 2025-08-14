@@ -593,6 +593,8 @@ class AgentOrchestrator:
         self.running = False
         self.task_assignment_running = False
         await self.health_monitor.stop_monitoring()
+        # Give background tasks a brief moment to exit cleanly
+        await asyncio.sleep(0)
         logger.info("Agent orchestrator stopped")
 
     async def spawn_agent(
