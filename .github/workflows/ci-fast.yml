@@ -9,25 +9,20 @@ on:
 
 jobs:
   tests:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install uv
-        run: pipx install uv
-      - name: Prepare venv
-        run: |
-          uv venv
-          source .venv/bin/activate
-          python -V
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: latest
       - name: Install deps
         run: |
-          source .venv/bin/activate
-          uv pip install -e .[dev]
+          uv sync --extra dev
       - name: Run focused fast tests (no coverage gate)
         run: |
-          source .venv/bin/activate
-          pytest -q tests/unit/test_orchestrator.py tests/unit/test_tmux_manager.py --no-cov
-          pytest -q tests/unit/test_realtime_collaboration.py tests/unit/test_shared_knowledge_base.py --no-cov
+          uv run pytest -q tests/unit/test_orchestrator.py tests/unit/test_tmux_manager.py --no-cov
+          uv run pytest -q tests/unit/test_realtime_collaboration.py tests/unit/test_shared_knowledge_base.py --no-cov
