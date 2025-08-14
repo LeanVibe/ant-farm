@@ -1,0 +1,33 @@
+version: 1
+plan_id: epic6-9
+goal: "CLI metrics budgets + broker contracts + graceful lifecycle (slices)"
+
+batches:
+  - name: cli-budgets-counters
+    tasks:
+      - type: command
+        run: echo "ensure budgets and counters covered by tests"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_base_agent.py::TestCLIBudgets::test_budget_enforcement --no-cov"
+    commit:
+      message: "test(agent): budgets covered (already implemented)"
+
+  - name: broker-idem-dlq
+    depends_on: ["cli-budgets-counters"]
+    tasks:
+      - type: command
+        run: echo "ensure broker idempotency/DLQ tests pass"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_idempotency_and_dlq --no-cov"
+    commit:
+      message: "test(broker): idempotency/DLQ pass (already implemented)"
+
+  - name: orchestrator-graceful-stop
+    depends_on: ["broker-idem-dlq"]
+    tasks:
+      - type: command
+        run: echo "ensure orchestrator stop is graceful"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_orchestrator.py::TestAgentOrchestrator::test_orchestrator_stop --no-cov"
+    commit:
+      message: "refactor(orchestrator): clean shutdown (already implemented)"
