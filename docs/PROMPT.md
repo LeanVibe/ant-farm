@@ -1,139 +1,69 @@
-# LeanVibe Agent Hive 2.0 - Handoff Prompt
+# Cursor Agent Handoff Prompt
 
-## 🎯 Current status: Epic 1 complete, test shims in place
+You are a senior engineer agent continuing work on LeanVibe Agent Hive 2.0. Adopt the plan→batch→verify approach with short-lived `uv run` commands and persist state under `.agent_state/`. Keep PR-sized changes small and test-first.
 
-You are taking over development of LeanVibe Agent Hive 2.0, a self-improving autonomous multi-agent system.
+## Context
+- Package manager: `uv`
+- Test: `uv run pytest`
+- Plan runner: `src/cli/plan_runner.py` (supports depends_on/env, resume)
+- Metrics bulk helper: `AsyncDatabaseManager.record_metrics_bulk`
+- Brokers: `MessageBroker` and `EnhancedMessageBroker`; structured API `send_message_with_result` exists (legacy bool remains)
+- Orchestrator: clean shutdown implemented; tracks background tasks
 
-- Epic 1 (Process Resilience) is complete and pushed to `main`.
-- Orchestrator/tmux resilience is implemented; unit tests pass locally when run without the global coverage gate.
-- Test-aligned shims were added to unblock suites for collaboration and knowledge base.
+## Immediate Epics to Execute (in order)
 
-### System snapshot
-- ✅ Orchestrator stabilized for tests (registry, spawner, health monitor)
-- ✅ Tmux resilience via `RetryableTmuxManager`; orchestrator uses subprocess in tests for compatibility
-- ✅ Realtime collaboration suite unblocked via `RealTimeCollaborationManager`
-- ✅ Knowledge base suite unblocked via extended `SharedKnowledgeBase` test API
-- ⚠️ Coverage gate (<50%) blocks full-suite; use focused runs with `--no-cov` during hardening (see PLAN)
+### Epic 1: Deterministic broker pub/sub test doubles
+- Implement `src/testing/fakes/fake_pubsub.py` that provides:
+  - `listen()` async generator yielding pre-seeded messages
+  - `publish(channel, data)` to append messages
+- Add DI seam in `MessageBroker` to inject pubsub/client under test (e.g., optional ctor args or setters).
+- Update `tests/unit/test_message_broker_comprehensive.py` to use the fake where appropriate and remove AsyncMock warnings.
+- Verify: `uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov`
+- Commit: `feat(testing): add deterministic pubsub fake and inject into broker`
 
-### Branch & environment
-- Branch: `main`
-- Service ports: API(9001), PostgreSQL(5433), Redis(6381), pgAdmin(9050)
+### Epic 2: Metrics wiring + minimal exporter
+- Wire selected counters to DB using `record_metrics_bulk`:
+  - In `BaseAgent` (CLI tool counters): create a flush method that converts counters to metric dicts and calls bulk write (feature flag `HIVE_METRICS_FLUSH=1`).
+  - In `MessageBroker` DLQ path: accumulate reason counters and flush periodically via bulk write (feature flag).
+- Extend `/api/v1/metrics` (or add `/api/v1/metrics/custom`) to include aggregated counters (read from DB or in-memory if flag disabled).
+- Tests:
+  - Counter flush triggers `record_metrics_bulk` (monkeypatch DB manager).
+  - DLQ increments persisted.
+  - Endpoint returns aggregated counters.
+- Verify: run targeted tests.
+- Commit: `feat(metrics): persist CLI counters and broker DLQ via bulk write; expose in metrics API`
 
----
+### Epic 3: Plan runner UX v3
+- `src/cli/plan_runner.py`:
+  - Add `--continue` to execute all remaining batches.
+  - Add `--rerun-failed` to run only batches recorded in `failed_batches`.
+  - Validate plan DAG for cycles; raise friendly error.
+  - On failure, record batch under `failed_batches` and print a concise summary.
+- `src/cli/state/store.py`: add `failed_batches: list[str]` and load/save with back-compat.
+- Tests: extend `tests/unit/test_plan_runner.py` for continue, rerun-failed, and DAG validation.
+- Verify: `uv run pytest -q tests/unit/test_plan_runner.py --no-cov`
+- Commit: `feat(plan): add continue/rerun-failed and DAG validation`
 
-## Your next priorities (execution plan)
+### Epic 4: Enhanced broker structured API adoption
+- Add contract tests that, when `send_message_with_result` exists, assert `BrokerSendResult` fields and reasons.
+- Migrate one internal site (e.g., orchestrator broadcast/ping) to use structured API and log reason on failure.
+- Verify: orchestrator and contract tests.
+- Commit: `feat(broker): adopt structured result in orchestrator broadcast path`
 
-You are taking over an in-flight CI and hardening effort. Continue with ruthless prioritization (Pareto 80/20) and TDD.
+## Operational Guidelines
+- Use small, resumable YAML plans in `plans/` and run via the plan runner.
+- After each change, run focused tests and keep suites green.
+- Prefer DI and fakes over heavy mocks for reliability.
+- Enforce conventional commits.
+- Push after each epic; open a PR when the series is complete.
 
-Phase 4.1.1 - Tmux Bridge Injection (stability)
-- Ensure `AgentSpawner` uses `TmuxBackendProtocol` with default selection:
-  - Production: `TmuxManagerBackend` (resilient)
-  - Tests: `SubprocessTmuxBackend`
-- Extend `RetryableTmuxManager` tests to cover
-  - Timeout kill-await
-  - Optimistic validation and idempotent termination
-- Keep orphan cleanup behind `HIVE_CLEANUP_ORPHANS=1`
+## Commands Cheat Sheet
+- Dry-run a plan: `uv run python -m src.cli.plan_runner run plans/<file>.yaml --resume`
+- Execute a plan: `uv run python -m src.cli.plan_runner run plans/<file>.yaml --execute --resume`
+- Run focused tests: `uv run pytest -q tests/unit/test_<name>.py --no-cov`
 
-Phase 5 - Coverage & CI Hardening (incremental)
-- CI is split:
-  - Fast PR job runs green suites only: orchestrator, tmux, collaboration, knowledge base
-  - Nightly/scheduled coverage job targets `src/core/{orchestrator,tmux_manager,tmux_backend}`; performance workflow is schedule-only
-- Next actions:
-  - Add minimal smoke tests to lift coverage for `message_broker`, `caching`, `async_db`
-  - Document local guidance for focused runs
-
-Phase 6 - Test‑Shim Consolidation
-- Create `CollaborationSyncService` and `KnowledgeBaseService` interfaces
-- Tests bind lightweight adapters; production binds full implementations
-See `docs/PLAN.md` for full detail and acceptance criteria.
-Key suites to keep green as you iterate:
-- `tests/unit/test_orchestrator.py`
-- `tests/unit/test_tmux_manager.py`
-- `tests/unit/test_realtime_collaboration.py`
-- `tests/unit/test_shared_knowledge_base.py`
-
----
-
-## Coverage strategy (Phase 5)
-- Target: restore CI by lifting coverage ≥50% first; then aim for 80%+
-- Prioritize orchestrator/tmux_manager; add smoke tests to large legacy files
-
-Recent highlights
-- Fixed Redis port conflicts (6381 vs 6379)
-- Orchestrator registry/spawner/health monitor stabilized for tests
-- Retryable tmux manager implemented and refined
-- Test shims added for collaboration/knowledge base suites
-
-### Key files & areas
-- Coverage/Hardening: `src/core/orchestrator.py`, `src/core/tmux_manager.py`, `src/core/message_broker.py`, `src/core/caching.py`, `src/core/async_db.py`, `tests/`
-- Tmux Bridge: `src/core/orchestrator.py`, `src/core/tmux_manager.py`
-- Shim Consolidation: `src/core/realtime_collaboration.py`, `src/core/shared_knowledge_base.py`
-
----
-
-## Success metrics for your session
-
-Path A: Coverage & CI
-- ✅ Coverage ≥50% in full CI by adding targeted tests and `.coveragerc`
-- ✅ No regressions in orchestrator/tmux suites
-- ✅ Documented developer guidance for focused runs
-
-Path B: Tmux Bridge Injection
-- ✅ Spawner uses injectable backend; prod uses resilient manager
-- ✅ Expanded tmux manager tests for timeouts/validation/termination
-- ✅ Orphan cleanup behind feature flag
-
-Path C: Shim Consolidation
-- ✅ Services behind interfaces; tests bind test adapters
-- ✅ No direct imports from test helpers in prod paths
-- ✅ Contracts documented in `tests/contracts/`
-
----
-
-## Getting started commands
-
-Quick local check
-```bash
-# from repo root
-git status && git log --oneline -3
-pytest -q tests/unit/test_orchestrator.py tests/unit/test_tmux_manager.py --no-cov
-pytest -q tests/unit/test_realtime_collaboration.py tests/unit/test_shared_knowledge_base.py --no-cov
-```
-
-Choose your path
-
-CI hardening quick loop
-```bash
-# Inspect plan tasks
-sed -n '660,760p' docs/PLAN.md
-# Run focused coverage while adding smoke tests
-pytest --cov=src/core --cov-report=term-missing -k "orchestrator or tmux_manager"
-```
-
-Tmux bridge quick checks
-```bash
-# Green suites while iterating
-pytest -q tests/unit/test_tmux_manager.py tests/unit/test_orchestrator.py --no-cov
-# After backend protocol changes
-pytest -q tests/unit/test_tmux_manager.py -q
-```
-
-Shim consolidation quick grep
-```bash
-# Find direct references to test helpers
-rg "RealTimeCollaborationManager|SharedKnowledgeBase" -n src | sed -n '1,200p'
-```
-
-Current CI state & solutions
-- Coverage gate blocks repo-wide runs due to legacy modules. Fast job runs green suites only.
-- Nightly coverage is scoped to orchestrator/tmux; performance workflow is schedule-only.
-- Continue adding smoke tests to raise global coverage ≥50%.
-
----
-
-## Principles & guardrails
-- TDD; async I/O; comprehensive typing; meaningful error handling
-- Keep code simple, well-tested, and thoroughly documented
-- Every change should make the system easier for future agents to understand and enhance
-
-Good luck. Keep suites green, raise coverage pragmatically, and harden the tmux bridge for production usage. 
+## Definition of Done
+- Tests added/updated, all green.
+- Code is readable, minimal, and cohesive.
+- Changes are committed with descriptive messages and pushed.
+- If adding flags, defaults must be safe (features off by default).
