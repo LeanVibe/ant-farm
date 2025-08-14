@@ -170,6 +170,25 @@ class CLIToolManager:
             },
         }
 
+    @staticmethod
+    def classify_error_text(text: str) -> str:
+        """Classify stderr/stdout text into an ErrorCategory string.
+
+        Lightweight heuristics to surface actionable categories.
+        """
+        if not text:
+            return ErrorCategory.OTHER.value
+        lower = text.lower()
+        if "rate limit" in lower or "too many requests" in lower or "429" in lower:
+            return ErrorCategory.RATE_LIMIT.value
+        if "timed out" in lower or "timeout" in lower:
+            return ErrorCategory.TIMEOUT.value
+        if "unauthorized" in lower or "forbidden" in lower or "401" in lower or "403" in lower:
+            return ErrorCategory.AUTH.value
+        if "out of memory" in lower or "oom" in lower or "memory limit" in lower:
+            return ErrorCategory.OOM.value
+        return ErrorCategory.OTHER.value
+
     async def execute_prompt(
         self, prompt: str, tool_override: CLIToolType | None = None
     ) -> ToolResult:
@@ -277,8 +296,12 @@ class CLIToolManager:
             if process.returncode == 0:
                 return ToolResult(success=True, output=stdout.decode(), error=None)
             else:
+                stderr_text = stderr.decode() if stderr else ""
                 return ToolResult(
-                    success=False, output=stdout.decode(), error=stderr.decode()
+                    success=False,
+                    output=stdout.decode(),
+                    error=stderr_text,
+                    error_category=self.classify_error_text(stderr_text),
                 )
 
         except TimeoutError:
@@ -307,8 +330,12 @@ class CLIToolManager:
             if process.returncode == 0:
                 return ToolResult(success=True, output=stdout.decode(), error=None)
             else:
+                stderr_text = stderr.decode() if stderr else ""
                 return ToolResult(
-                    success=False, output=stdout.decode(), error=stderr.decode()
+                    success=False,
+                    output=stdout.decode(),
+                    error=stderr_text,
+                    error_category=self.classify_error_text(stderr_text),
                 )
 
         except TimeoutError:
@@ -337,8 +364,12 @@ class CLIToolManager:
             if process.returncode == 0:
                 return ToolResult(success=True, output=stdout.decode(), error=None)
             else:
+                stderr_text = stderr.decode() if stderr else ""
                 return ToolResult(
-                    success=False, output=stdout.decode(), error=stderr.decode()
+                    success=False,
+                    output=stdout.decode(),
+                    error=stderr_text,
+                    error_category=self.classify_error_text(stderr_text),
                 )
 
         except TimeoutError:
@@ -618,7 +649,7 @@ class BaseAgent(ABC):
         pass
 
     async def execute_with_cli_tool(
-        self, prompt: str, tool_override: CLIToolType | None = None
+        self, prompt: str, tool_override: CLIToolType | None = None, prompt_file: str | None = None
     ) -> ToolResult:
         """Execute prompt using CLI tools with persistent session support."""
 
@@ -633,6 +664,15 @@ class BaseAgent(ABC):
 
         self._last_cli_call = current_time
         self._cli_call_count += 1
+
+        # If a prompt file is provided, prefer loading its contents to reduce round-trips
+        if prompt_file:
+            try:
+                prompt_path = Path(prompt_file)
+                if prompt_path.exists():
+                    prompt = prompt_path.read_text()
+            except Exception as e:
+                logger.warning("Failed to read prompt file", path=prompt_file, error=str(e))
 
         # Try persistent session first
         if self.cli_session and self.cli_session.status == "active":
