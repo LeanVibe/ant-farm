@@ -1,6 +1,7 @@
 """Base agent class for LeanVibe Agent Hive 2.0 with multi-CLI tool support."""
 
 import asyncio
+import os
 import subprocess
 import sys
 import time
@@ -188,7 +189,12 @@ class CLIToolManager:
             return ErrorCategory.RATE_LIMIT.value
         if "timed out" in lower or "timeout" in lower:
             return ErrorCategory.TIMEOUT.value
-        if "unauthorized" in lower or "forbidden" in lower or "401" in lower or "403" in lower:
+        if (
+            "unauthorized" in lower
+            or "forbidden" in lower
+            or "401" in lower
+            or "403" in lower
+        ):
             return ErrorCategory.AUTH.value
         if "out of memory" in lower or "oom" in lower or "memory limit" in lower:
             return ErrorCategory.OOM.value
@@ -222,7 +228,9 @@ class CLIToolManager:
             self._tool_attempts_in_window[tool_key] = 0
         attempts = self._tool_attempts_in_window.get(tool_key, 0)
         if attempts >= self.per_tool_budget_per_minute:
-            self._increment_counters(tool_key, success=False, category=ErrorCategory.RATE_LIMIT.value)
+            self._increment_counters(
+                tool_key, success=False, category=ErrorCategory.RATE_LIMIT.value
+            )
             return ToolResult(
                 success=False,
                 output="",
@@ -248,11 +256,11 @@ class CLIToolManager:
                     self._increment_counters(tool_key, success=True)
                     return result
                 # If timeout or rate limit, optionally backoff once
-                if (
-                    attempt == 0
-                    and result.error_category in {ErrorCategory.TIMEOUT.value, ErrorCategory.RATE_LIMIT.value}
-                ):
-                    delay = min(1.0 * (2 ** attempt), 3.0) + random.uniform(0, 0.2)
+                if attempt == 0 and result.error_category in {
+                    ErrorCategory.TIMEOUT.value,
+                    ErrorCategory.RATE_LIMIT.value,
+                }:
+                    delay = min(1.0 * (2**attempt), 3.0) + random.uniform(0, 0.2)
                     logger.warning(
                         "Primary tool transient failure; backing off",
                         tool=tool_to_use.value,
@@ -261,13 +269,17 @@ class CLIToolManager:
                     )
                     await asyncio.sleep(delay)
                     continue
-                self._increment_counters(tool_key, success=False, category=result.error_category)
+                self._increment_counters(
+                    tool_key, success=False, category=result.error_category
+                )
                 break
             except Exception as e:
                 logger.error(
                     "CLI tool execution error", tool=tool_to_use.value, error=str(e)
                 )
-                self._increment_counters(tool_key, success=False, category=ErrorCategory.OTHER.value)
+                self._increment_counters(
+                    tool_key, success=False, category=ErrorCategory.OTHER.value
+                )
                 break
 
         # Try fallback tools
@@ -296,7 +308,11 @@ class CLIToolManager:
                     tool=fallback_tool.value,
                     error=str(e),
                 )
-                self._increment_counters(fallback_tool.value, success=False, category=ErrorCategory.OTHER.value)
+                self._increment_counters(
+                    fallback_tool.value,
+                    success=False,
+                    category=ErrorCategory.OTHER.value,
+                )
 
         # All tools failed
         return ToolResult(
@@ -307,9 +323,13 @@ class CLIToolManager:
             error_category=ErrorCategory.OTHER.value,
         )
 
-    def _increment_counters(self, tool_key: str, success: bool, category: str | None = None) -> None:
+    def _increment_counters(
+        self, tool_key: str, success: bool, category: str | None = None
+    ) -> None:
         """Increment per-tool counters with minimal overhead."""
-        c = self._counters.setdefault(tool_key, {"calls": 0, "success": 0, "failure": 0, "by_category": {}})
+        c = self._counters.setdefault(
+            tool_key, {"calls": 0, "success": 0, "failure": 0, "by_category": {}}
+        )
         c["calls"] += 1
         if success:
             c["success"] += 1
@@ -321,7 +341,110 @@ class CLIToolManager:
     def get_counters(self) -> dict[str, dict[str, Any]]:
         """Return a snapshot of CLI counters per tool."""
         # Return a shallow copy to avoid external mutation
-        return {k: {**v, "by_category": dict(v.get("by_category", {}))} for k, v in self._counters.items()}
+        return {
+            k: {**v, "by_category": dict(v.get("by_category", {}))}
+            for k, v in self._counters.items()
+        }
+
+    async def flush_metrics(self) -> None:
+        """Flush CLI tool counters to database using bulk write if feature flag is enabled."""
+        if not os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
+            return
+
+        if not self.async_db_manager or not self.agent_uuid:
+            logger.debug(
+                "Cannot flush metrics - database manager or agent UUID not available"
+            )
+            return
+
+        try:
+            # Convert counters to metric format for bulk write
+            metrics_to_write = []
+            current_time = time.time()
+
+            for tool_key, counter_data in self._counters.items():
+                # Total calls counter
+                metrics_to_write.append(
+                    {
+                        "metric_name": f"cli_tool_calls_total",
+                        "metric_type": "counter",
+                        "value": float(counter_data.get("calls", 0)),
+                        "unit": "count",
+                        "agent_id": self.agent_uuid,
+                        "labels": {
+                            "tool": tool_key,
+                            "agent_name": self.name,
+                            "agent_type": self.agent_type,
+                        },
+                    }
+                )
+
+                # Success counter
+                metrics_to_write.append(
+                    {
+                        "metric_name": f"cli_tool_calls_success",
+                        "metric_type": "counter",
+                        "value": float(counter_data.get("success", 0)),
+                        "unit": "count",
+                        "agent_id": self.agent_uuid,
+                        "labels": {
+                            "tool": tool_key,
+                            "agent_name": self.name,
+                            "agent_type": self.agent_type,
+                        },
+                    }
+                )
+
+                # Failure counter
+                metrics_to_write.append(
+                    {
+                        "metric_name": f"cli_tool_calls_failure",
+                        "metric_type": "counter",
+                        "value": float(counter_data.get("failure", 0)),
+                        "unit": "count",
+                        "agent_id": self.agent_uuid,
+                        "labels": {
+                            "tool": tool_key,
+                            "agent_name": self.name,
+                            "agent_type": self.agent_type,
+                        },
+                    }
+                )
+
+                # Error category counters
+                by_category = counter_data.get("by_category", {})
+                for category, count in by_category.items():
+                    metrics_to_write.append(
+                        {
+                            "metric_name": f"cli_tool_errors_by_category",
+                            "metric_type": "counter",
+                            "value": float(count),
+                            "unit": "count",
+                            "agent_id": self.agent_uuid,
+                            "labels": {
+                                "tool": tool_key,
+                                "category": category,
+                                "agent_name": self.name,
+                                "agent_type": self.agent_type,
+                            },
+                        }
+                    )
+
+            if metrics_to_write:
+                written_count = await self.async_db_manager.record_metrics_bulk(
+                    metrics_to_write
+                )
+                logger.debug(
+                    "Flushed CLI tool metrics to database",
+                    agent=self.name,
+                    metrics_count=written_count,
+                )
+
+                # Clear counters after successful flush
+                self._counters.clear()
+
+        except Exception as e:
+            logger.error("Failed to flush metrics", agent=self.name, error=str(e))
 
     async def _opencode_execute(self, prompt: str) -> ToolResult:
         """Execute prompt using opencode."""
@@ -695,7 +818,10 @@ class BaseAgent(ABC):
         pass
 
     async def execute_with_cli_tool(
-        self, prompt: str, tool_override: CLIToolType | None = None, prompt_file: str | None = None
+        self,
+        prompt: str,
+        tool_override: CLIToolType | None = None,
+        prompt_file: str | None = None,
     ) -> ToolResult:
         """Execute prompt using CLI tools with persistent session support."""
 
@@ -718,7 +844,9 @@ class BaseAgent(ABC):
                 if prompt_path.exists():
                     prompt = prompt_path.read_text()
             except Exception as e:
-                logger.warning("Failed to read prompt file", path=prompt_file, error=str(e))
+                logger.warning(
+                    "Failed to read prompt file", path=prompt_file, error=str(e)
+                )
 
         # Try persistent session first
         if self.cli_session and self.cli_session.status == "active":

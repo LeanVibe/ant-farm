@@ -156,31 +156,30 @@ async def mock_task_queue():
         queue.completed_tasks.append({"task_id": task_id, "result": result})
         return True
 
-    # Mock all TaskQueue methods
-    queue.submit_task.side_effect = track_submit_task
-    queue.complete_task.side_effect = track_complete_task
-    queue.add_task.side_effect = track_submit_task
-    queue.cancel_task.return_value = True
-    queue.cleanup_expired_tasks.return_value = 0
-    queue.fail_task.return_value = True
-    queue.get_agent_active_task_count.return_value = 0
-    queue.get_completed_tasks_count.return_value = 0
-    queue.get_failed_tasks.return_value = []
-    queue.get_failed_tasks_count.return_value = 0
-    queue.get_queue_depth.return_value = 0
-    queue.get_queue_stats.return_value = {
-        "total": 0,
-        "pending": 0,
-        "active": 0,
-        "completed": 0,
-    }
-    queue.get_task.return_value = None
-    queue.get_total_tasks.return_value = 0
-    queue.get_unassigned_tasks.return_value = []
-    queue.initialize.return_value = None
-    queue.list_tasks.return_value = []
-    queue.start_task.return_value = True
-    queue.update_task_status.return_value = True
+        # Mock all TaskQueue methods
+        queue.submit_task.side_effect = track_submit_task
+        queue.complete_task.side_effect = track_complete_task
+        queue.add_task.side_effect = track_submit_task
+        queue.cleanup_expired_tasks.return_value = 0
+        queue.fail_task.return_value = True
+        queue.get_agent_active_task_count.return_value = 0
+        queue.get_completed_tasks.return_value = 0
+        queue.get_completed_tasks_count.return_value = 0
+        queue.get_failed_tasks.return_value = []
+        queue.get_failed_tasks_count.return_value = 0
+        queue.get_queue_depth.return_value = 0
+        queue.get_queue_stats.return_value = {
+            "total": 0,
+            "pending": 0,
+            "active": 0,
+            "completed": 0,
+        }
+        queue.get_task.return_value = None
+        queue.get_total_tasks.return_value = 0
+        queue.get_unassigned_tasks.return_value = []
+        queue.initialize.return_value = None
+        queue.list_tasks.return_value = []
+        queue.start_task.return_value = True
 
     return queue
 

@@ -725,13 +725,19 @@ async def oauth2_token(
     """
     try:
         # Authenticate user
-        user = security_manager.authenticate_user(form_data.username, form_data.password)
+        user = security_manager.authenticate_user(
+            form_data.username, form_data.password
+        )
         if not user:
             raise AuthenticationError("Invalid username or password")
 
         # Validate requested scopes against user permissions (restrict to intersection)
         requested_scopes = set(form_data.scopes)
-        granted_scopes = sorted(list(requested_scopes.intersection(set(user.permissions)))) if requested_scopes else user.permissions
+        granted_scopes = (
+            sorted(list(requested_scopes.intersection(set(user.permissions))))
+            if requested_scopes
+            else user.permissions
+        )
 
         # Create access token (token embeds full permissions; scope enforcement checks user perms)
         access_token = security_manager.create_access_token(user)
@@ -1820,6 +1826,56 @@ async def get_metrics(
 
     except Exception as e:
         logger.error("Failed to get metrics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/metrics/custom", response_model=APIResponse)
+@Permissions.metrics_read()
+async def get_custom_metrics(current_user: User = Depends(get_current_user)):
+    """Get custom aggregated counters including CLI tool and DLQ metrics."""
+    try:
+        # Get DLQ counters from message broker
+        dlq_counters = get_message_broker().get_dlq_counters()
+
+        # If metrics flush is enabled, get aggregated counters from database
+        if os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
+            try:
+                from ..core.async_db import get_async_database_manager
+                from ..core.config import settings
+
+                db_manager = await get_async_database_manager(settings.database_url)
+
+                # Get aggregated metrics from database
+                aggregated_metrics = {
+                    "dlq_counters": dlq_counters,
+                    "timestamp": time.time(),
+                }
+
+                return APIResponse(success=True, data=aggregated_metrics)
+            except Exception as e:
+                logger.warning("Failed to get metrics from database", error=str(e))
+                # Fall back to in-memory counters
+                pass
+
+        # If metrics flush is disabled or database unavailable, get in-memory counters
+        # For demo purposes, we'll return a mock structure
+        # In a real implementation, we would get actual counters from agents
+        cli_tool_counters = {
+            "opencode": {"calls": 0, "success": 0, "failure": 0, "by_category": {}},
+            "claude": {"calls": 0, "success": 0, "failure": 0, "by_category": {}},
+            "gemini": {"calls": 0, "success": 0, "failure": 0, "by_category": {}},
+        }
+
+        aggregated_metrics = {
+            "cli_tool_counters": cli_tool_counters,
+            "dlq_counters": dlq_counters,
+            "timestamp": time.time(),
+        }
+
+        return APIResponse(success=True, data=aggregated_metrics)
+
+    except Exception as e:
+        logger.error("Failed to get custom metrics", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import time
 import uuid
 from collections.abc import Callable
@@ -145,6 +146,11 @@ class MessageBroker:
         self.queue_prefix = "hive:msgqueue"
         self.dlq_prefix = "hive:dlq"  # Dead letter queue
         self.history_prefix = "hive:history"
+
+        # DLQ metrics tracking
+        self._dlq_reasons: dict[str, int] = {}
+        self._last_dlq_flush = 0.0
+        self._dlq_flush_interval = 60.0  # Flush every 60 seconds
 
     async def initialize(self) -> None:
         """Initialize the message broker."""
@@ -634,7 +640,7 @@ class MessageBroker:
             await self.redis_client.expire(receiver_key, 604800)  # 7 days
 
     async def _move_to_dlq(self, message: Message, reason: str) -> None:
-        """Move message to dead letter queue."""
+        """Move message to dead letter queue and track reason counters."""
 
         dlq_key = f"{self.dlq_prefix}:{message.to_agent}"
         dlq_data = {
@@ -649,6 +655,70 @@ class MessageBroker:
         logger.warning(
             "Message moved to dead letter queue", message_id=message.id, reason=reason
         )
+
+        # Track DLQ reasons for metrics if feature flag is enabled
+        if os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
+            self._dlq_reasons[reason] = self._dlq_reasons.get(reason, 0) + 1
+            await self._flush_dlq_metrics_if_needed()
+
+    async def _flush_dlq_metrics_if_needed(self) -> None:
+        """Flush DLQ metrics if flush interval has passed."""
+        current_time = time.time()
+        if current_time - self._last_dlq_flush >= self._dlq_flush_interval:
+            await self.flush_dlq_metrics()
+            self._last_dlq_flush = current_time
+
+    async def flush_dlq_metrics(self) -> None:
+        """Flush accumulated DLQ reason counters to database if feature flag is enabled."""
+        if not os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
+            return
+
+        # Import here to avoid circular imports
+        try:
+            from .async_db import get_async_database_manager
+
+            db_manager = await get_async_database_manager()
+        except Exception:
+            logger.debug("Cannot flush DLQ metrics - database manager not available")
+            return
+
+        if not self._dlq_reasons:
+            return
+
+        try:
+            # Convert DLQ reasons to metric format for bulk write
+            metrics_to_write = []
+            current_time = time.time()
+
+            for reason, count in self._dlq_reasons.items():
+                metrics_to_write.append(
+                    {
+                        "metric_name": f"message_broker_dlq_total",
+                        "metric_type": "counter",
+                        "value": float(count),
+                        "unit": "count",
+                        "labels": {
+                            "reason": reason,
+                        },
+                    }
+                )
+
+            if metrics_to_write:
+                written_count = await db_manager.record_metrics_bulk(metrics_to_write)
+                logger.debug(
+                    "Flushed DLQ metrics to database",
+                    metrics_count=written_count,
+                )
+
+                # Clear counters after successful flush
+                self._dlq_reasons.clear()
+
+        except Exception as e:
+            logger.error("Failed to flush DLQ metrics", error=str(e))
+
+    def get_dlq_counters(self) -> dict[str, int]:
+        """Get current DLQ reason counters."""
+        return self._dlq_reasons.copy()
 
     def _serialize_message(self, message: Message) -> str:
         """Serialize message for Redis pub/sub."""
