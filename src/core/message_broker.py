@@ -183,6 +183,17 @@ class MessageBroker:
             await self.pubsub.unsubscribe(agent_channel)
             self.subscriptions.remove(agent_channel)
 
+        # Also unsubscribe from broadcast channel if no other agents are listening
+        broadcast_channel = "broadcast"
+        # Check if any other agents are still subscribed to broadcast
+        other_agents_subscribed = any(
+            channel.startswith("agent:") and channel != agent_channel
+            for channel in self.subscriptions
+        )
+        if broadcast_channel in self.subscriptions and not other_agents_subscribed:
+            await self.pubsub.unsubscribe(broadcast_channel)
+            self.subscriptions.remove(broadcast_channel)
+
         logger.info("Stopped listening for messages", agent=agent_name)
 
     async def send_message(

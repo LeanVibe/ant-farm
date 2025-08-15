@@ -133,7 +133,13 @@ def mock_redis():
 async def message_broker(mock_redis):
     """Create MessageBroker instance with mocked Redis."""
     with patch("redis.asyncio.from_url", return_value=mock_redis):
-        broker = MessageBroker("redis://localhost:6379/1")
+        from src.testing.fakes.fake_pubsub import FakePubSub
+
+        fake_pubsub = FakePubSub()
+        # Mock the pubsub methods to avoid calling Redis methods
+        fake_pubsub.subscribe = AsyncMock()
+        fake_pubsub.unsubscribe = AsyncMock()
+        broker = MessageBroker("redis://localhost:6379/1", pubsub_client=fake_pubsub)
         await broker.initialize()
         return broker
 
@@ -343,8 +349,11 @@ class TestMessageBrokerPubSub:
         await message_broker.start_listening("test-agent", message_handler)
 
         # Assert - Subscription operations called
-        pubsub_mock = mock_redis.pubsub.return_value
-        pubsub_mock.subscribe.assert_called()
+        # When using fake pubsub, we check that the broker's pubsub client is our fake
+        assert hasattr(message_broker.pubsub, "subscribe")
+        # The subscribe method should have been called for both channels
+        message_broker.pubsub.subscribe.assert_any_call("agent:test-agent")
+        message_broker.pubsub.subscribe.assert_any_call("broadcast")
 
     @pytest.mark.asyncio
     async def test_unsubscribe_from_topics(
@@ -358,9 +367,11 @@ class TestMessageBrokerPubSub:
         await message_broker.stop_listening("test-agent")
 
         # Assert - Unsubscription operations called
-        pubsub_mock = mock_redis.pubsub.return_value
-        # Verify subscription and unsubscription were called
-        assert pubsub_mock.subscribe.called or pubsub_mock.unsubscribe.called
+        # When using fake pubsub, we check that the broker's pubsub client is our fake
+        assert hasattr(message_broker.pubsub, "unsubscribe")
+        # The unsubscribe method should have been called for both channels
+        message_broker.pubsub.unsubscribe.assert_any_call("agent:test-agent")
+        message_broker.pubsub.unsubscribe.assert_any_call("broadcast")
 
     @pytest.mark.asyncio
     async def test_message_routing(self, message_broker, mock_redis):
