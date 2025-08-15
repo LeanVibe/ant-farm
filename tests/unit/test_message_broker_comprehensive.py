@@ -19,8 +19,10 @@ async def test_idempotency_and_dlq(monkeypatch):
         mock_redis.return_value = rc
 
         from src.core.message_broker import MessageBroker
+        from src.testing.fakes.fake_pubsub import FakePubSub
 
-        broker = MessageBroker("redis://localhost:6379")
+        fake_pubsub = FakePubSub()
+        broker = MessageBroker("redis://localhost:6379", pubsub_client=fake_pubsub)
         await broker.initialize()
 
         # First send with idempotency key succeeds
@@ -53,6 +55,8 @@ async def test_idempotency_and_dlq(monkeypatch):
             idempotency_key="k2",
         )
         assert ok3 is False
+
+
 """Focused TDD tests for MessageBroker - Critical Agent Communication Component.
 
 This test suite covers the essential MessageBroker functionality for reliable agent coordination:
@@ -305,11 +309,11 @@ class TestMessageBrokerReliability:
         if hasattr(message_broker, "send_request"):
             try:
                 response = await message_broker.send_request(
-                from_agent="requester",
-                to_agent="responder",
-                topic="test_request",
-                payload={"query": "test"},
-                timeout=1.0,
+                    from_agent="requester",
+                    to_agent="responder",
+                    topic="test_request",
+                    payload={"query": "test"},
+                    timeout=1.0,
                 )
                 assert response is not None or response is None
             except TimeoutError:

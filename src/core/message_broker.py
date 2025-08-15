@@ -28,7 +28,6 @@ except Exception:
             super().__init__(**kwargs)
 
 
-
 class MessageType(Enum):
     """Message type enumeration."""
 
@@ -129,13 +128,13 @@ class MessageHandler:
 class MessageBroker:
     """Redis-based message broker with pub/sub and persistence."""
 
-    def __init__(self, redis_url: str = None):
+    def __init__(self, redis_url: str = None, pubsub_client=None):
         if redis_url is None:
             from .config import get_settings
 
             redis_url = get_settings().redis_url
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
-        self.pubsub = None
+        self.pubsub = pubsub_client or None
         self.message_handlers: dict[str, MessageHandler] = {}
         self.pending_requests: dict[str, asyncio.Future] = {}
         self.subscriptions: set[str] = set()
@@ -150,7 +149,8 @@ class MessageBroker:
     async def initialize(self) -> None:
         """Initialize the message broker."""
         await self.redis_client.ping()
-        self.pubsub = self.redis_client.pubsub()
+        if self.pubsub is None:
+            self.pubsub = self.redis_client.pubsub()
         logger.info("Message broker initialized")
 
     async def start_listening(self, agent_name: str, handler: MessageHandler) -> None:
@@ -206,7 +206,10 @@ class MessageBroker:
                 try:
                     ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
                     if not ok:
-                        logger.info("Idempotent duplicate suppressed", idempotency_key=idempotency_key)
+                        logger.info(
+                            "Idempotent duplicate suppressed",
+                            idempotency_key=idempotency_key,
+                        )
                         return True
                 except Exception as e:
                     logger.warning("Idempotency check failed; continuing", error=str(e))
@@ -315,7 +318,11 @@ class MessageBroker:
                 try:
                     ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
                     if not ok:
-                        return BrokerSendResult(success=True, reason=BrokerSendReason.IDEMPOTENT_DUPLICATE, message_id=None)
+                        return BrokerSendResult(
+                            success=True,
+                            reason=BrokerSendReason.IDEMPOTENT_DUPLICATE,
+                            message_id=None,
+                        )
                 except Exception:
                     pass
 
@@ -335,8 +342,12 @@ class MessageBroker:
 
             await self._persist_message(message)
             channel = "broadcast" if to_agent == "broadcast" else f"agent:{to_agent}"
-            await self.redis_client.publish(channel, json.dumps(self._serialize_message_for_storage(message)))
-            return BrokerSendResult(success=True, reason=BrokerSendReason.OK, message_id=message.id)
+            await self.redis_client.publish(
+                channel, json.dumps(self._serialize_message_for_storage(message))
+            )
+            return BrokerSendResult(
+                success=True, reason=BrokerSendReason.OK, message_id=message.id
+            )
         except Exception as e:
             try:
                 await self._move_to_dlq(
@@ -356,7 +367,12 @@ class MessageBroker:
                 )
             except Exception:
                 pass
-            return BrokerSendResult(success=False, reason=BrokerSendReason.PUBLISH_ERROR, message_id=None, details=str(e))
+            return BrokerSendResult(
+                success=False,
+                reason=BrokerSendReason.PUBLISH_ERROR,
+                message_id=None,
+                details=str(e),
+            )
 
     async def send_request(
         self,
