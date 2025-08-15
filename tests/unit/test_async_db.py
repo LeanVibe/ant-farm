@@ -290,3 +290,18 @@ async def test_update_agent_heartbeat_not_found(db_manager):
 
         result = await db_manager.update_agent_heartbeat("nonexistent")
         assert result is False
+
+
+@pytest.mark.asyncio
+async def test_record_metrics_bulk_success(db_manager):
+    mock_session = AsyncMock()
+    mock_session.commit = AsyncMock()
+    db_manager.async_session_maker = lambda: AsyncContextManagerMock(mock_session)
+
+    metrics = [
+        {"metric_name": "cli_calls", "metric_type": "counter", "value": 1.0, "labels": {"tool": "claude"}},
+        {"metric_name": "broker_dlq", "metric_type": "counter", "value": 1.0, "labels": {"reason": "publish_error"}},
+    ]
+
+    created = await db_manager.record_metrics_bulk(metrics)
+    assert created == 2

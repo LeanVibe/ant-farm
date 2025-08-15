@@ -1,8 +1,12 @@
-# LeanVibe Agent Hive 2.0 - System Context
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# LeanVibe Agent Hive 2.0 - Development Context
 
 ## Project Overview
 
-You are building LeanVibe Agent Hive 2.0, a self-improving autonomous multi-agent system that uses Claude instances to develop and enhance itself continuously. The system should be able to build itself, improve its own code, and operate 24/7 with minimal human intervention.
+You are working on LeanVibe Agent Hive 2.0, a self-improving autonomous multi-agent development system. The system uses multiple CLI agentic coding tools (opencode, Claude CLI, Gemini CLI) to build and enhance itself continuously through a hybrid architecture: Docker for infrastructure services, tmux for agent processes.
 
 ## Core Principles
 
@@ -12,20 +16,79 @@ You are building LeanVibe Agent Hive 2.0, a self-improving autonomous multi-agen
 4. **Fail-Safe Design**: All operations must be reversible (git-based rollback)
 5. **Incremental Progress**: Small, working commits that build on each other
 
+## Essential Commands
+
+### Development Workflow
+```bash
+# Setup and initialization
+hive init                              # Initialize system (DB, migrations, Docker)
+hive system start                      # Start API server and services
+hive system status                     # Check complete system health
+
+# Agent management
+hive agent spawn meta                  # Spawn meta-agent
+hive agent spawn architect             # Spawn architect agent
+hive agent list                        # List all active agents
+hive agent tools                       # Check available CLI tools
+
+# Task management
+hive task submit "description"          # Submit task to queue
+hive task list                         # List tasks
+```
+
+### Development Commands
+```bash
+# Package management (IMPORTANT: Use uv, not pip)
+uv sync --extra dev                    # Install dependencies
+uv run python -m src.cli.main         # Run CLI commands
+uv run pytest                         # Run tests
+
+# Testing (aligned with CI)
+uv run pytest -q tests/unit/test_orchestrator.py tests/unit/test_tmux_manager.py --no-cov
+make test-fast                         # Fast unit tests
+make test-coverage-core                # Coverage for core modules
+
+# Infrastructure
+make docker-up                        # Start PostgreSQL + Redis
+make docker-down                       # Stop Docker services
+alembic upgrade head                   # Run database migrations
+```
+
 ## Technology Stack
 
 - **Language**: Python 3.11+ with type hints
-- **Backend**: FastAPI (async/await patterns everywhere)
+- **Backend**: FastAPI (async/await everywhere)
 - **Database**: PostgreSQL 15 with pgvector extension
 - **Cache/Queue**: Redis 7.0+ (persistence enabled)
 - **Frontend**: LitPWA (Web Components + PWA)
-- **Package Manager**: uv (not pip)
+- **Package Manager**: uv (NEVER use pip)
 - **Testing**: pytest with pytest-asyncio
 - **Logging**: structlog for structured logging
+- **Agent Runtime**: tmux sessions with CLI tool integration
 
-## Architecture Patterns
+## Core Architecture
 
-### Async Everywhere
+### Hybrid System Design
+- **Infrastructure**: Docker containers for PostgreSQL, Redis, monitoring tools
+- **Agents**: tmux sessions on host for direct system access and CLI tool execution
+- **Communication**: Redis pub/sub for agent messaging, PostgreSQL for persistence
+- **CLI Integration**: Multi-tool support (opencode → Claude CLI → Gemini → API fallback)
+
+### Key Components (`src/core/`)
+- **orchestrator.py**: Agent lifecycle, spawning, health monitoring, task assignment
+- **task_queue.py**: Redis-based priority task distribution with dependencies
+- **message_broker.py**: Inter-agent communication via pub/sub
+- **tmux_manager.py**: Resilient tmux session management with multiple backends
+- **async_db.py**: PostgreSQL connection pooling and async operations
+
+### Agent System (`src/agents/`)
+- **base_agent.py**: Multi-CLI tool integration with fallback strategy
+- **runner.py**: Agent process entry point for tmux sessions
+- **Specialized agents**: meta_agent.py, architect_agent.py, etc.
+
+### Architecture Patterns
+
+#### Async-First Design
 ```python
 async def process_task(self, task: Task) -> Result:
     """All I/O operations must be async."""
@@ -34,55 +97,54 @@ async def process_task(self, task: Task) -> Result:
     return await self.process_result(result)
 ```
 
-### Dependency Injection
+#### Multi-Backend tmux Management
 ```python
-def __init__(self, db: AsyncSession, redis: Redis, config: Settings):
-    """Use constructor injection for dependencies."""
-    self.db = db
-    self.redis = redis
-    self.config = config
+# Environment-based backend selection
+backend = select_default_tmux_backend(project_root)
+session_created = await backend.create_session(session_name, command)
 ```
 
-### Error Handling
+#### CLI Tool Integration
 ```python
-try:
-    result = await self.execute_operation()
-except SpecificError as e:
-    logger.warning("Operation failed", error=str(e))
-    await self.rollback()
-    raise
-finally:
-    await self.cleanup()
+# Priority order: opencode → Claude CLI → Gemini → API
+tool = detect_available_cli_tools()
+result = await tool.execute_command(prompt)
 ```
 
-## Component Specifications
+## Development Workflow
 
-### Task Queue
-- Redis-based with priority levels (1-9)
-- At-least-once delivery guarantee
-- Exponential backoff for retries
-- Task dependencies support
-- Timeout monitoring
+### Starting Development
+1. **Check prerequisites**: `make check` (Claude Code, tmux, Docker)
+2. **Initialize system**: `hive init` (database, migrations, Docker services)
+3. **Start services**: `hive system start` (API server, background tasks)
+4. **Spawn agents**: `hive agent spawn meta` (first agent)
+5. **Verify status**: `hive system status` (health check)
 
-### Agent System
-- Base agent class with standard interface
-- Specialized agents inherit from base
-- Each agent has unique capabilities
-- Graceful shutdown support
-- Health monitoring
+### Testing Strategy
+- **Fast tests**: Core component tests without coverage gates
+- **Coverage tests**: Focused on orchestrator, tmux_manager, message_broker
+- **Integration tests**: Component interaction validation
+- **CI alignment**: Use same commands as `.github/workflows/ci-fast.yml`
 
-### Context Engine
-- Vector embeddings with pgvector
-- Semantic search capabilities
-- Context compression for efficiency
-- Hierarchical memory structure
+### CLI Tool Priority
+1. **opencode** (preferred): `curl -fsSL https://opencode.ai/install | bash`
+2. **Claude CLI**: https://claude.ai/cli
+3. **Gemini CLI**: https://ai.google.dev/gemini-api/docs/cli
+4. **API fallback**: Direct API calls when CLI tools unavailable
 
-### Self-Modification
-- Safe sandboxed execution
-- Git-based version control
-- Automated testing before apply
-- Performance validation
-- Rollback on regression
+### Component Integration Points
+
+#### Agent Lifecycle (`src/core/orchestrator.py`)
+- **AgentRegistry**: In-memory + PostgreSQL persistence with async locks
+- **AgentSpawner**: tmux-based spawning with backend abstraction
+- **HealthMonitor**: Heartbeat monitoring, cleanup loops, database maintenance
+- **Task Assignment**: Capability-based routing to available agents
+
+#### Database Patterns
+- **Async sessions**: All database operations use async SQLAlchemy
+- **Connection pooling**: Managed via `async_db.py`
+- **Migrations**: Alembic for schema evolution
+- **Vector search**: pgvector for semantic context retrieval
 
 ## Database Conventions
 
@@ -235,24 +297,25 @@ class AgentFactory:
         raise ValueError(f"Unknown agent type: {agent_type}")
 ```
 
-## Development Workflow
+## Development Principles
 
-1. Read requirements in IMPLEMENTATION.md
-2. Write tests first (TDD)
-3. Implement minimal code to pass tests
-4. Refactor for clarity
-5. Add comprehensive documentation
-6. Commit with descriptive message
-7. Run full test suite
-8. Create pull request if applicable
+### Core Guidelines
+- **Package manager**: Use `uv`, never `pip`
+- **Testing**: All I/O operations must be mockable
+- **Async patterns**: All database and Redis operations are async
+- **CLI integration**: Support multiple tools with graceful fallback
+- **Monitoring**: Structured logging with contextual information
 
-## Remember
+### Architecture Insights
+- **Hybrid design**: Docker for infrastructure, tmux for agents
+- **Multi-backend**: Abstraction layer for different execution environments
+- **Agent communication**: Redis pub/sub with PostgreSQL persistence
+- **Health monitoring**: Automated cleanup and failure detection
+- **Tool agnostic**: Works with any available CLI agentic coding tool
 
-- This system builds itself - make code that agents can understand
-- Every component should be testable in isolation
-- Prefer composition over inheritance
-- Use type hints everywhere
-- Handle errors gracefully
-- Log important events
-- Keep functions small and focused
-- Document "why" not just "what"
+### Remember
+- This system builds itself through autonomous agents
+- Every component must be resilient and self-monitoring
+- CLI tool availability varies - always have fallbacks
+- tmux sessions provide direct system access for agents
+- Test everything that can fail in production

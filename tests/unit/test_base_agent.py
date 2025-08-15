@@ -2,6 +2,9 @@
 
 from unittest.mock import patch
 
+from src.agents.base_agent import CLIToolManager
+from src.agents.base_agent import CLIToolType
+
 import pytest
 
 # Import the classes we'll be testing (when they exist)
@@ -98,6 +101,51 @@ class TestCLIToolDetection:
         mock_subprocess.side_effect = FileNotFoundError()
         # Test fallback behavior
         pass
+
+
+class TestErrorClassification:
+    def test_classify_timeout(self):
+        assert CLIToolManager.classify_error_text("Request timed out after 30s") == "timeout"
+
+    def test_classify_rate_limit(self):
+        assert CLIToolManager.classify_error_text("429 Too Many Requests: rate limit exceeded") == "rate_limit"
+
+    def test_classify_auth(self):
+        assert CLIToolManager.classify_error_text("401 Unauthorized: invalid API key") == "auth"
+
+    def test_classify_oom(self):
+        assert CLIToolManager.classify_error_text("Process killed: OOM") == "oom"
+
+    def test_classify_other(self):
+        assert CLIToolManager.classify_error_text("unexpected error") == "other"
+
+
+class TestCLIBudgets:
+    @pytest.mark.asyncio
+    async def test_budget_enforcement(self, monkeypatch):
+        m = CLIToolManager()
+        # Force a single preferred tool
+        m.available_tools = {
+            CLIToolType.CLAUDE: {
+                "name": "Claude",
+                "command": "claude",
+                "execute_pattern": lambda prompt: _immediate_fail(),
+                "supports_interactive": False,
+            }
+        }
+        m.preferred_tool = CLIToolType.CLAUDE
+        m.per_tool_budget_per_minute = 1
+
+        async def _immediate_fail():
+            from src.agents.base_agent import ToolResult, ErrorCategory
+
+            return ToolResult(success=False, output="", error="boom", error_category=ErrorCategory.OTHER.value)
+
+        # First call uses the budget
+        r1 = await m.execute_prompt("a")
+        # Second should be blocked by budget
+        r2 = await m.execute_prompt("b")
+        assert r2.success is False and r2.error_category == "rate_limit"
 
 
 class TestAgentExecution:

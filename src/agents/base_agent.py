@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+import random
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,15 @@ class ToolResult:
     error: str | None = None
     tool_used: str | None = None
     execution_time: float = 0.0
+    error_category: str | None = None
+
+
+class ErrorCategory(str, Enum):
+    TIMEOUT = "timeout"
+    RATE_LIMIT = "rate_limit"
+    AUTH = "auth"
+    OOM = "oom"
+    OTHER = "other"
 
 
 @dataclass
@@ -78,6 +88,11 @@ class CLIToolManager:
         self.available_tools = self._detect_available_tools()
         self.preferred_tool = self._select_preferred_tool()
         self.tool_configs = self._get_tool_configs()
+        # Counters and budgets
+        self._counters: dict[str, dict[str, Any]] = {}
+        self._tool_window_start: dict[str, float] = {}
+        self._tool_attempts_in_window: dict[str, int] = {}
+        self.per_tool_budget_per_minute: int = 30
 
     def _detect_available_tools(self) -> dict[str, dict[str, Any]]:
         """Detect available CLI tools."""
@@ -160,6 +175,25 @@ class CLIToolManager:
             },
         }
 
+    @staticmethod
+    def classify_error_text(text: str) -> str:
+        """Classify stderr/stdout text into an ErrorCategory string.
+
+        Lightweight heuristics to surface actionable categories.
+        """
+        if not text:
+            return ErrorCategory.OTHER.value
+        lower = text.lower()
+        if "rate limit" in lower or "too many requests" in lower or "429" in lower:
+            return ErrorCategory.RATE_LIMIT.value
+        if "timed out" in lower or "timeout" in lower:
+            return ErrorCategory.TIMEOUT.value
+        if "unauthorized" in lower or "forbidden" in lower or "401" in lower or "403" in lower:
+            return ErrorCategory.AUTH.value
+        if "out of memory" in lower or "oom" in lower or "memory limit" in lower:
+            return ErrorCategory.OOM.value
+        return ErrorCategory.OTHER.value
+
     async def execute_prompt(
         self, prompt: str, tool_override: CLIToolType | None = None
     ) -> ToolResult:
@@ -179,30 +213,62 @@ class CLIToolManager:
 
         tool_config = self.available_tools[tool_to_use]
 
-        try:
-            # Execute with selected tool
-            result = await tool_config["execute_pattern"](prompt)
-            result.tool_used = tool_to_use.value
-            result.execution_time = time.time() - start_time
-
-            if result.success:
-                logger.info(
-                    "CLI tool execution successful",
-                    tool=tool_to_use.value,
-                    execution_time=result.execution_time,
-                )
-                return result
-            else:
-                logger.warning(
-                    "CLI tool execution failed, trying fallback",
-                    tool=tool_to_use.value,
-                    error=result.error,
-                )
-
-        except Exception as e:
-            logger.error(
-                "CLI tool execution error", tool=tool_to_use.value, error=str(e)
+        # Budget enforcement per tool (rolling 60s window)
+        tool_key = tool_to_use.value
+        now = time.time()
+        window_start = self._tool_window_start.get(tool_key, now)
+        if now - window_start >= 60:
+            self._tool_window_start[tool_key] = now
+            self._tool_attempts_in_window[tool_key] = 0
+        attempts = self._tool_attempts_in_window.get(tool_key, 0)
+        if attempts >= self.per_tool_budget_per_minute:
+            self._increment_counters(tool_key, success=False, category=ErrorCategory.RATE_LIMIT.value)
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Per-minute budget exceeded for {tool_key}",
+                execution_time=time.time() - start_time,
+                error_category=ErrorCategory.RATE_LIMIT.value,
             )
+        # Count attempted call in window
+        self._tool_attempts_in_window[tool_key] = attempts + 1
+
+        # Try primary tool once, with a single timed backoff retry on timeout/rate limit
+        for attempt in range(2):
+            try:
+                result = await tool_config["execute_pattern"](prompt)
+                result.tool_used = tool_to_use.value
+                result.execution_time = time.time() - start_time
+                if result.success:
+                    logger.info(
+                        "CLI tool execution successful",
+                        tool=tool_to_use.value,
+                        execution_time=result.execution_time,
+                    )
+                    self._increment_counters(tool_key, success=True)
+                    return result
+                # If timeout or rate limit, optionally backoff once
+                if (
+                    attempt == 0
+                    and result.error_category in {ErrorCategory.TIMEOUT.value, ErrorCategory.RATE_LIMIT.value}
+                ):
+                    delay = min(1.0 * (2 ** attempt), 3.0) + random.uniform(0, 0.2)
+                    logger.warning(
+                        "Primary tool transient failure; backing off",
+                        tool=tool_to_use.value,
+                        category=result.error_category,
+                        delay=delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                self._increment_counters(tool_key, success=False, category=result.error_category)
+                break
+            except Exception as e:
+                logger.error(
+                    "CLI tool execution error", tool=tool_to_use.value, error=str(e)
+                )
+                self._increment_counters(tool_key, success=False, category=ErrorCategory.OTHER.value)
+                break
 
         # Try fallback tools
         for fallback_tool in self.available_tools:
@@ -221,6 +287,7 @@ class CLIToolManager:
                         tool=fallback_tool.value,
                         execution_time=result.execution_time,
                     )
+                    self._increment_counters(fallback_tool.value, success=True)
                     return result
 
             except Exception as e:
@@ -229,6 +296,7 @@ class CLIToolManager:
                     tool=fallback_tool.value,
                     error=str(e),
                 )
+                self._increment_counters(fallback_tool.value, success=False, category=ErrorCategory.OTHER.value)
 
         # All tools failed
         return ToolResult(
@@ -236,7 +304,24 @@ class CLIToolManager:
             output="",
             error="All CLI tools failed",
             execution_time=time.time() - start_time,
+            error_category=ErrorCategory.OTHER.value,
         )
+
+    def _increment_counters(self, tool_key: str, success: bool, category: str | None = None) -> None:
+        """Increment per-tool counters with minimal overhead."""
+        c = self._counters.setdefault(tool_key, {"calls": 0, "success": 0, "failure": 0, "by_category": {}})
+        c["calls"] += 1
+        if success:
+            c["success"] += 1
+        else:
+            c["failure"] += 1
+            if category:
+                c["by_category"][category] = c["by_category"].get(category, 0) + 1
+
+    def get_counters(self) -> dict[str, dict[str, Any]]:
+        """Return a snapshot of CLI counters per tool."""
+        # Return a shallow copy to avoid external mutation
+        return {k: {**v, "by_category": dict(v.get("by_category", {}))} for k, v in self._counters.items()}
 
     async def _opencode_execute(self, prompt: str) -> ToolResult:
         """Execute prompt using opencode."""
@@ -257,13 +342,20 @@ class CLIToolManager:
             if process.returncode == 0:
                 return ToolResult(success=True, output=stdout.decode(), error=None)
             else:
+                stderr_text = stderr.decode() if stderr else ""
                 return ToolResult(
-                    success=False, output=stdout.decode(), error=stderr.decode()
+                    success=False,
+                    output=stdout.decode(),
+                    error=stderr_text,
+                    error_category=self.classify_error_text(stderr_text),
                 )
 
         except TimeoutError:
             return ToolResult(
-                success=False, output="", error="opencode execution timed out"
+                success=False,
+                output="",
+                error="opencode execution timed out",
+                error_category=ErrorCategory.TIMEOUT.value,
             )
 
     async def _claude_execute(self, prompt: str) -> ToolResult:
@@ -284,13 +376,20 @@ class CLIToolManager:
             if process.returncode == 0:
                 return ToolResult(success=True, output=stdout.decode(), error=None)
             else:
+                stderr_text = stderr.decode() if stderr else ""
                 return ToolResult(
-                    success=False, output=stdout.decode(), error=stderr.decode()
+                    success=False,
+                    output=stdout.decode(),
+                    error=stderr_text,
+                    error_category=self.classify_error_text(stderr_text),
                 )
 
         except TimeoutError:
             return ToolResult(
-                success=False, output="", error="Claude CLI execution timed out"
+                success=False,
+                output="",
+                error="Claude CLI execution timed out",
+                error_category=ErrorCategory.TIMEOUT.value,
             )
 
     async def _gemini_execute(self, prompt: str) -> ToolResult:
@@ -311,13 +410,20 @@ class CLIToolManager:
             if process.returncode == 0:
                 return ToolResult(success=True, output=stdout.decode(), error=None)
             else:
+                stderr_text = stderr.decode() if stderr else ""
                 return ToolResult(
-                    success=False, output=stdout.decode(), error=stderr.decode()
+                    success=False,
+                    output=stdout.decode(),
+                    error=stderr_text,
+                    error_category=self.classify_error_text(stderr_text),
                 )
 
         except TimeoutError:
             return ToolResult(
-                success=False, output="", error="Gemini CLI execution timed out"
+                success=False,
+                output="",
+                error="Gemini CLI execution timed out",
+                error_category=ErrorCategory.TIMEOUT.value,
             )
 
 
@@ -589,7 +695,7 @@ class BaseAgent(ABC):
         pass
 
     async def execute_with_cli_tool(
-        self, prompt: str, tool_override: CLIToolType | None = None
+        self, prompt: str, tool_override: CLIToolType | None = None, prompt_file: str | None = None
     ) -> ToolResult:
         """Execute prompt using CLI tools with persistent session support."""
 
@@ -604,6 +710,15 @@ class BaseAgent(ABC):
 
         self._last_cli_call = current_time
         self._cli_call_count += 1
+
+        # If a prompt file is provided, prefer loading its contents to reduce round-trips
+        if prompt_file:
+            try:
+                prompt_path = Path(prompt_file)
+                if prompt_path.exists():
+                    prompt = prompt_path.read_text()
+            except Exception as e:
+                logger.warning("Failed to read prompt file", path=prompt_file, error=str(e))
 
         # Try persistent session first
         if self.cli_session and self.cli_session.status == "active":

@@ -13,6 +13,20 @@ import redis.asyncio as redis
 import structlog
 
 logger = structlog.get_logger()
+try:
+    from .contracts import BrokerSendResult, BrokerSendReason
+except Exception:
+    # Soft import for tests if contracts not available
+    class BrokerSendReason:
+        OK = "ok"
+        IDEMPOTENT_DUPLICATE = "idempotent_duplicate"
+        PUBLISH_ERROR = "publish_error"
+        INVALID = "invalid"
+
+    class BrokerSendResult(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
 
 
 class MessageType(Enum):
@@ -43,6 +57,7 @@ class Message:
     priority: int = 5  # 1=highest, 9=lowest
     delivery_count: int = 0
     max_retries: int = 3
+    idempotency_key: str | None = None
 
 
 class MessageHandler:
@@ -180,9 +195,22 @@ class MessageBroker:
         priority: int = 5,
         expires_in: int | None = None,
         correlation_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> bool:
         """Send a message to an agent or broadcast."""
         try:
+            # Idempotency check (best-effort)
+            if idempotency_key:
+                idem_key = f"{self.message_prefix}:idem:{idempotency_key}"
+                # set key with NX and 24h TTL; if already exists, consider success
+                try:
+                    ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
+                    if not ok:
+                        logger.info("Idempotent duplicate suppressed", idempotency_key=idempotency_key)
+                        return True
+                except Exception as e:
+                    logger.warning("Idempotency check failed; continuing", error=str(e))
+
             message = Message(
                 id=str(uuid.uuid4()),
                 from_agent=from_agent,
@@ -194,6 +222,7 @@ class MessageBroker:
                 expires_at=time.time() + expires_in if expires_in else None,
                 priority=priority,
                 correlation_id=correlation_id,
+                idempotency_key=idempotency_key,
             )
 
             # Persist message
@@ -220,6 +249,7 @@ class MessageBroker:
                 "priority": message.priority,
                 "delivery_count": message.delivery_count,
                 "max_retries": message.max_retries,
+                "idempotency_key": message.idempotency_key,
             }
 
             await self.redis_client.publish(
@@ -234,7 +264,7 @@ class MessageBroker:
                 message_id=message.id,
             )
 
-            return True  # Return success indicator instead of message ID
+            return True
 
         except Exception as e:
             logger.error(
@@ -244,7 +274,89 @@ class MessageBroker:
                 topic=topic,
                 error=str(e),
             )
+            # Move to DLQ on publish failure
+            try:
+                await self._move_to_dlq(
+                    Message(
+                        id=str(uuid.uuid4()),
+                        from_agent=from_agent,
+                        to_agent=to_agent,
+                        topic=topic,
+                        message_type=MessageType.DIRECT,
+                        payload=payload,
+                        timestamp=time.time(),
+                        priority=priority,
+                        correlation_id=correlation_id,
+                        idempotency_key=idempotency_key,
+                    ),
+                    reason="publish_error",
+                )
+            except Exception:
+                pass
             return False
+
+    async def send_message_with_result(
+        self,
+        from_agent: str,
+        to_agent: str,
+        topic: str,
+        payload: dict[str, Any],
+        message_type: MessageType = MessageType.DIRECT,
+        priority: int = 5,
+        expires_in: int | None = None,
+        correlation_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> BrokerSendResult:
+        """Structured send API with explicit result semantics."""
+        try:
+            # Idempotency check
+            if idempotency_key:
+                idem_key = f"{self.message_prefix}:idem:{idempotency_key}"
+                try:
+                    ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
+                    if not ok:
+                        return BrokerSendResult(success=True, reason=BrokerSendReason.IDEMPOTENT_DUPLICATE, message_id=None)
+                except Exception:
+                    pass
+
+            message = Message(
+                id=str(uuid.uuid4()),
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                message_type=message_type,
+                payload=payload,
+                timestamp=time.time(),
+                expires_at=time.time() + expires_in if expires_in else None,
+                priority=priority,
+                correlation_id=correlation_id,
+                idempotency_key=idempotency_key,
+            )
+
+            await self._persist_message(message)
+            channel = "broadcast" if to_agent == "broadcast" else f"agent:{to_agent}"
+            await self.redis_client.publish(channel, json.dumps(self._serialize_message_for_storage(message)))
+            return BrokerSendResult(success=True, reason=BrokerSendReason.OK, message_id=message.id)
+        except Exception as e:
+            try:
+                await self._move_to_dlq(
+                    Message(
+                        id=str(uuid.uuid4()),
+                        from_agent=from_agent,
+                        to_agent=to_agent,
+                        topic=topic,
+                        message_type=MessageType.DIRECT,
+                        payload=payload,
+                        timestamp=time.time(),
+                        priority=priority,
+                        correlation_id=correlation_id,
+                        idempotency_key=idempotency_key,
+                    ),
+                    reason="publish_error",
+                )
+            except Exception:
+                pass
+            return BrokerSendResult(success=False, reason=BrokerSendReason.PUBLISH_ERROR, message_id=None, details=str(e))
 
     async def send_request(
         self,
@@ -255,7 +367,6 @@ class MessageBroker:
         timeout: int = 30,
     ) -> dict[str, Any]:
         """Send a request and wait for reply."""
-
         correlation_id = str(uuid.uuid4())
 
         # Create future for the reply
@@ -264,7 +375,7 @@ class MessageBroker:
 
         try:
             # Send request
-            await self.send_message(
+            ok = await self.send_message(
                 from_agent=from_agent,
                 to_agent=to_agent,
                 topic=topic,
@@ -272,6 +383,8 @@ class MessageBroker:
                 message_type=MessageType.REQUEST,
                 correlation_id=correlation_id,
             )
+            if not ok:
+                raise TimeoutError("failed to send request")
 
             # Wait for reply
             reply = await asyncio.wait_for(reply_future, timeout=timeout)
@@ -384,7 +497,6 @@ class MessageBroker:
 
     async def _message_listener(self) -> None:
         """Main message listening loop."""
-
         async for message in self.pubsub.listen():
             if message["type"] == "message":
                 try:
@@ -405,6 +517,9 @@ class MessageBroker:
 
                 except Exception as e:
                     logger.error("Message processing error", error=str(e))
+            else:
+                # In tests, pubsub.listen may be an AsyncMock; yield control
+                await asyncio.sleep(0)
 
     async def _route_message(self, message: Message) -> None:
         """Route message to appropriate handler."""
@@ -552,6 +667,8 @@ class MessageBroker:
             data["reply_to"] = message.reply_to
         if message.correlation_id:
             data["correlation_id"] = message.correlation_id
+        if message.idempotency_key:
+            data["idempotency_key"] = message.idempotency_key
 
         return data
 
@@ -580,6 +697,7 @@ class MessageBroker:
             priority=int(data.get("priority", 5)),
             delivery_count=int(data.get("delivery_count", 0)),
             max_retries=int(data.get("max_retries", 3)),
+            idempotency_key=data.get("idempotency_key"),
         )
 
     async def shutdown(self) -> None:
