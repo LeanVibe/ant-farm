@@ -1,10 +1,11 @@
 {
   "plan_id": "epic3-plan-runner-ux",
-  "last_completed_batch": "add-continue-flag",
+  "last_completed_batch": "add-rerun-failed-flag",
   "created_by": "plan_runner",
   "version": 1,
   "completed_batches": [
-    "add-continue-flag"
+    "add-continue-flag",
+    "add-rerun-failed-flag"
   ],
   "failed_batches": [],
   "failed_batch_errors": {}
