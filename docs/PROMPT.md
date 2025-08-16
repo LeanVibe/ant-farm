@@ -1,69 +1,87 @@
-# Cursor Agent Handoff Prompt
+# Cursor Agent Handoff Prompt (Execution-Ready)
 
-You are a senior engineer agent continuing work on LeanVibe Agent Hive 2.0. Adopt the plan→batch→verify approach with short-lived `uv run` commands and persist state under `.agent_state/`. Keep PR-sized changes small and test-first.
+You are a senior engineer agent continuing work on LeanVibe Agent Hive 2.0. Operate with a plan → batch → verify approach using short-lived `uv run` commands. Persist state under `.agent_state/`. Keep PR-sized changes small and test-first.
 
-## Context
-- Package manager: `uv`
-- Test: `uv run pytest`
-- Plan runner: `src/cli/plan_runner.py` (supports depends_on/env, resume)
-- Metrics bulk helper: `AsyncDatabaseManager.record_metrics_bulk`
-- Brokers: `MessageBroker` and `EnhancedMessageBroker`; structured API `send_message_with_result` exists (legacy bool remains)
-- Orchestrator: clean shutdown implemented; tracks background tasks
+## Ground Rules
+- Package manager: `uv` (never `pip`).
+- Tests: `uv run pytest` (prefer focused `-q` with `--no-cov` for speed locally).
+- Plan runner: `src/cli/plan_runner.py` supports `depends_on`, `env`, `--resume`.
+- Coding style: async-first, clear naming, DI-friendly seams, docstrings; match repo conventions.
+- Feature flags default OFF; make additive changes.
+- Prefer fakes/adapters over heavy mocks.
 
-## Immediate Epics to Execute (in order)
+## Immediate Epics (execute in order)
 
 ### Epic 1: Deterministic broker pub/sub test doubles
-- Implement `src/testing/fakes/fake_pubsub.py` that provides:
-  - `listen()` async generator yielding pre-seeded messages
-  - `publish(channel, data)` to append messages
-- Add DI seam in `MessageBroker` to inject pubsub/client under test (e.g., optional ctor args or setters).
-- Update `tests/unit/test_message_broker_comprehensive.py` to use the fake where appropriate and remove AsyncMock warnings.
-- Verify: `uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov`
-- Commit: `feat(testing): add deterministic pubsub fake and inject into broker`
+- Implement `src/testing/fakes/fake_pubsub.py` with:
+  - `class FakePubSub`:
+    - `__init__(self, preseed: dict[str, list[dict]] | None = None, delay_ms: int = 0)`
+    - `async def listen(self)` yields `{"channel": str, "data": bytes|str}` in FIFO order per channel
+    - `def publish(self, channel: str, data: bytes|str)` adds to in-memory queue
+  - Optional `advance_clock(ms:int)` or `delay_ms` to simulate timing.
+- Add DI seam in broker: `MessageBroker(pubsub: Optional[PubSubProto] = None)`; default to real client; accept our fake in tests.
+- Update tests to use fake where appropriate to eliminate `AsyncMock` warnings.
+- Verify:
+  - `uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov`
+  - `uv run pytest -q tests/unit/test_message_broker_isolation.py --no-cov`
+- Commit: `feat(testing): deterministic FakePubSub and broker DI seam`
 
 ### Epic 2: Metrics wiring + minimal exporter
-- Wire selected counters to DB using `record_metrics_bulk`:
-  - In `BaseAgent` (CLI tool counters): create a flush method that converts counters to metric dicts and calls bulk write (feature flag `HIVE_METRICS_FLUSH=1`).
-  - In `MessageBroker` DLQ path: accumulate reason counters and flush periodically via bulk write (feature flag).
-- Extend `/api/v1/metrics` (or add `/api/v1/metrics/custom`) to include aggregated counters (read from DB or in-memory if flag disabled).
+- In `src/agents/base_agent.py`: add `flush_metrics_if_enabled()` to batch CLI counters and call `AsyncDatabaseManager.record_metrics_bulk` behind `HIVE_METRICS_FLUSH=1`.
+- In `src/core/message_broker.py`: accumulate DLQ reason counters; periodic flush behind same flag.
+- In `src/api/main.py`: extend `/api/v1/metrics` (or `/api/v1/metrics/custom`) to include these aggregates.
 - Tests:
-  - Counter flush triggers `record_metrics_bulk` (monkeypatch DB manager).
-  - DLQ increments persisted.
-  - Endpoint returns aggregated counters.
-- Verify: run targeted tests.
-- Commit: `feat(metrics): persist CLI counters and broker DLQ via bulk write; expose in metrics API`
+  - `tests/unit/test_base_agent.py` (monkeypatch bulk writer; assert called)
+  - `tests/unit/test_message_broker_comprehensive.py` (DLQ increments persisted)
+  - `tests/integration/test_api.py::test_metrics_api` (returns aggregated counters)
+- Verify: run above tests focused.
+- Commit: `feat(metrics): persist CLI counters and broker DLQ; expose in metrics API`
 
 ### Epic 3: Plan runner UX v3
-- `src/cli/plan_runner.py`:
-  - Add `--continue` to execute all remaining batches.
-  - Add `--rerun-failed` to run only batches recorded in `failed_batches`.
-  - Validate plan DAG for cycles; raise friendly error.
-  - On failure, record batch under `failed_batches` and print a concise summary.
-- `src/cli/state/store.py`: add `failed_batches: list[str]` and load/save with back-compat.
+- In `src/cli/plan_runner.py`:
+  - Add `--continue` to run all remaining batches.
+  - Add `--rerun-failed` to run only batches saved under `failed_batches`.
+  - Validate DAG (no cycles) for `depends_on`; raise friendly error.
+  - On failure, record batch under `failed_batches` and print concise summary (batch and first error line).
+- In `src/cli/state/store.py`: persist `failed_batches` with backward-compatible load/save.
 - Tests: extend `tests/unit/test_plan_runner.py` for continue, rerun-failed, and DAG validation.
-- Verify: `uv run pytest -q tests/unit/test_plan_runner.py --no-cov`
-- Commit: `feat(plan): add continue/rerun-failed and DAG validation`
+- Verify: `uv run pytest -q tests/unit/test_plan_runner.py --no-cov`.
+- Commit: `feat(plan): continue/rerun-failed flags and DAG validation`
 
 ### Epic 4: Enhanced broker structured API adoption
-- Add contract tests that, when `send_message_with_result` exists, assert `BrokerSendResult` fields and reasons.
-- Migrate one internal site (e.g., orchestrator broadcast/ping) to use structured API and log reason on failure.
-- Verify: orchestrator and contract tests.
-- Commit: `feat(broker): adopt structured result in orchestrator broadcast path`
+- Add contract tests for `BrokerSendResult` in `tests/contracts/test_component_contracts.py`.
+- Migrate one internal usage (orchestrator broadcast/heartbeat) to `send_message_with_result`, logging reason on failure.
+- Tests: contract + `tests/unit/test_orchestrator.py` path for structured result.
+- Verify: run focused tests.
+- Commit: `feat(broker): adopt structured send result in orchestrator`
 
-## Operational Guidelines
-- Use small, resumable YAML plans in `plans/` and run via the plan runner.
-- After each change, run focused tests and keep suites green.
-- Prefer DI and fakes over heavy mocks for reliability.
-- Enforce conventional commits.
-- Push after each epic; open a PR when the series is complete.
+## How to Work (loop)
+1. Create a small plan under `plans/epic<N>.yaml` with 2–5 batches.
+2. Dry-run: `uv run python -m src.cli.plan_runner run plans/epic<N>.yaml --resume`.
+3. Implement the first batch; run focused tests; commit.
+4. Execute the plan with `--execute --resume`; fix failures; keep commits small.
+5. Open a PR after each epic with a brief summary and validation details.
 
-## Commands Cheat Sheet
-- Dry-run a plan: `uv run python -m src.cli.plan_runner run plans/<file>.yaml --resume`
-- Execute a plan: `uv run python -m src.cli.plan_runner run plans/<file>.yaml --execute --resume`
-- Run focused tests: `uv run pytest -q tests/unit/test_<name>.py --no-cov`
+## Commands
+- Run a single test file: `uv run pytest -q tests/unit/test_<name>.py --no-cov`
+- Run API tests: `uv run pytest -q tests/integration/test_api.py -k metrics --no-cov`
+- Plan runner: `uv run python -m src.cli.plan_runner run plans/<file>.yaml --execute --resume`
 
 ## Definition of Done
-- Tests added/updated, all green.
-- Code is readable, minimal, and cohesive.
-- Changes are committed with descriptive messages and pushed.
-- If adding flags, defaults must be safe (features off by default).
+- Tests added/updated and all green.
+- Flags default off; no breaking changes.
+- Code readable, cohesive, and DI-friendly.
+- Commits conventional; PR includes rationale and validation.
+
+## Guardrails
+- Avoid long-running processes; prefer short `uv run` steps.
+- Keep deltas small; do not refactor broadly.
+- No `pip`; no global installs; stay within repo.
+- Respect existing interfaces; prefer adapters and fakes.
+
+## Starting Checklist (first 60–90 minutes)
+- [ ] Read `docs/PLAN.md` and scan `src/core/message_broker.py`, `src/agents/base_agent.py`, `src/cli/plan_runner.py`.
+- [ ] Draft `plans/epic1.yaml` with batches: fake, DI seam, tests, verify.
+- [ ] Implement `FakePubSub`; run focused broker tests; commit.
+- [ ] Add DI seam; switch tests; verify green; commit.
+- [ ] Prepare PR with summary and validation steps.
