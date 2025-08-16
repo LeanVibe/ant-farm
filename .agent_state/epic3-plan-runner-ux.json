@@ -1,12 +1,13 @@
 {
   "plan_id": "epic3-plan-runner-ux",
-  "last_completed_batch": "implement-dag-validation",
+  "last_completed_batch": "implement-failed-batches-tracking",
   "created_by": "plan_runner",
   "version": 1,
   "completed_batches": [
     "add-continue-flag",
     "add-rerun-failed-flag",
-    "implement-dag-validation"
+    "implement-dag-validation",
+    "implement-failed-batches-tracking"
   ],
   "failed_batches": [],
   "failed_batch_errors": {}
