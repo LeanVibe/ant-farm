@@ -22,6 +22,8 @@ class PlanCheckpoint:
     created_by: str = "plan_runner"
     version: int = 1
     completed_batches: list[str] = field(default_factory=list)
+    failed_batches: list[str] = field(default_factory=list)
+    failed_batch_errors: dict[str, str] = field(default_factory=dict)
 
 
 def _checkpoint_path(plan_id: str) -> Path:

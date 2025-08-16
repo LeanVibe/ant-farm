@@ -1,0 +1,53 @@
+version: 1
+plan_id: epic3-plan-runner-ux
+goal: "Plan runner UX v3: continue/rerun-failed flags and DAG validation"
+
+batches:
+  - name: add-continue-flag
+    tasks:
+      - type: command
+        run: echo "Add --continue flag to run all remaining batches"
+    verify:
+      - run: "uv run python -m src.cli.plan_runner run plans/epic3_plan_runner_ux.yaml --help | grep continue"
+    commit:
+      message: "feat(plan): add --continue flag to run remaining batches"
+
+  - name: add-rerun-failed-flag
+    depends_on: ["add-continue-flag"]
+    tasks:
+      - type: command
+        run: echo "Add --rerun-failed flag to run only failed batches"
+    verify:
+      - run: "uv run python -m src.cli.plan_runner run plans/epic3_plan_runner_ux.yaml --help | grep rerun-failed"
+    commit:
+      message: "feat(plan): add --rerun-failed flag for failed batches"
+
+  - name: implement-dag-validation
+    depends_on: ["add-rerun-failed-flag"]
+    tasks:
+      - type: command
+        run: echo "Implement DAG validation with cycle detection"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_plan_runner.py::test_dag_validation --no-cov"
+    commit:
+      message: "feat(plan): add DAG validation with cycle detection"
+
+  - name: implement-failed-batches-tracking
+    depends_on: ["implement-dag-validation"]
+    tasks:
+      - type: command
+        run: echo "Implement failed batches recording and summary"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_plan_runner.py::test_failed_batches_tracking --no-cov"
+    commit:
+      message: "feat(plan): track failed batches with error summaries"
+
+  - name: comprehensive-testing
+    depends_on: ["implement-failed-batches-tracking"]
+    tasks:
+      - type: command
+        run: echo "Run comprehensive plan runner tests"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_plan_runner.py --no-cov"
+    commit:
+      message: "test(plan): comprehensive plan runner UX v3 coverage"
