@@ -764,13 +764,23 @@ class AgentOrchestrator:
                 agent_info.name, AgentStatus.BUSY, task.id
             )
 
-            # Send task to agent via message broker
-            await message_broker.send_message(
+            # Send task to agent via message broker with structured result
+            result = await message_broker.send_message_with_result(
                 from_agent="orchestrator",
                 to_agent=agent_info.name,
                 topic="task_assignment",
                 payload={"task_id": task.id, "task": task.model_dump()},
             )
+
+            # Log reason on failure
+            if not result.success:
+                logger.error(
+                    "Failed to send task assignment",
+                    task_id=task.id,
+                    agent_name=agent_info.name,
+                    reason=result.reason,
+                    details=result.details,
+                )
 
             logger.info(
                 "Task assigned to agent", task_id=task.id, agent_name=agent_info.name

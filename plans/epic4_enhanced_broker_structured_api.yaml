@@ -12,28 +12,18 @@ batches:
     commit:
       message: "test(contracts): add BrokerSendResult contract tests"
 
-  - name: migrate-orchestrator-broadcast
+  - name: migrate-orchestrator-task-assignment
     depends_on: ["add-contract-tests"]
     tasks:
       - type: command
-        run: echo "Migrate orchestrator broadcast to use send_message_with_result"
+        run: echo "Migrate orchestrator task assignment to use send_message_with_result"
     verify:
-      - run: "uv run pytest -q tests/unit/test_orchestrator.py::test_orchestrator_broadcast_structured_result --no-cov"
+      - run: "uv run pytest -q tests/unit/test_orchestrator.py::TestAgentOrchestrator::test_orchestrator_task_assignment_structured_result --no-cov"
     commit:
-      message: "feat(orchestrator): adopt structured send result for broadcast"
-
-  - name: migrate-orchestrator-heartbeat
-    depends_on: ["migrate-orchestrator-broadcast"]
-    tasks:
-      - type: command
-        run: echo "Migrate orchestrator heartbeat to use send_message_with_result"
-    verify:
-      - run: "uv run pytest -q tests/unit/test_orchestrator.py::test_orchestrator_heartbeat_structured_result --no-cov"
-    commit:
-      message: "feat(orchestrator): adopt structured send result for heartbeat"
+      message: "feat(orchestrator): adopt structured send result for task assignment"
 
   - name: comprehensive-testing
-    depends_on: ["migrate-orchestrator-heartbeat"]
+    depends_on: ["migrate-orchestrator-task-assignment"]
     tasks:
       - type: command
         run: echo "Run comprehensive broker structured API tests"
