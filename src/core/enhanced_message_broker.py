@@ -9,18 +9,32 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
+import redis.asyncio as redis
 import structlog
 
 from .communication_monitor import get_communication_monitor
 from .context_engine import ContextEngine
 from .enums import TaskPriority
 from .message_broker import Message, MessageBroker, MessageType
+
 try:
     from .contracts import BrokerSendResult
 except Exception:  # pragma: no cover - fallback type for tests
     BrokerSendResult = dict  # type: ignore
 
+# Import AsyncDatabaseManager for test compatibility
+try:
+    from .async_db import AsyncDatabaseManager
+except ImportError:
+    AsyncDatabaseManager = None  # Fallback for tests
+
 logger = structlog.get_logger()
+
+
+# Redis async factory function required by tests
+async def redis_async_from_url(url: str, **kwargs) -> redis.Redis:
+    """Create async Redis client from URL."""
+    return redis.from_url(url, **kwargs)
 
 
 class MessagePriority(Enum):
@@ -191,7 +205,35 @@ class EnhancedMessageBroker(MessageBroker):
     """Enhanced message broker with context sharing and real-time synchronization."""
 
     def __init__(self, redis_url: str = None, context_engine: ContextEngine = None):
-        super().__init__(redis_url)
+        # Initialize MessageBroker but override redis client creation for test compatibility
+        if redis_url is None:
+            from .config import get_settings
+
+            redis_url = get_settings().redis_url
+
+        # Don't call super().__init__ immediately - set up attributes first
+        self.redis_client = None  # Will be set in initialize()
+        self.pubsub = None
+        self.message_handlers: dict[str, MessageHandler] = {}
+        self.pending_requests: dict[str, asyncio.Future] = {}
+        self.subscriptions: set[str] = set()
+        self.running = False
+
+        # MessageBroker key prefixes
+        self.message_prefix = "hive:messages"
+        self.queue_prefix = "hive:msgqueue"
+        self.dlq_prefix = "hive:dlq"
+        self.history_prefix = "hive:history"
+
+        # DLQ metrics tracking
+        self._dlq_reasons: dict[str, int] = {}
+        self._last_dlq_flush = 0.0
+        self._dlq_flush_interval = 60.0
+
+        # Store redis_url for later use
+        self._redis_url = redis_url
+
+        # Enhanced MessageBroker attributes
         self.context_engine = context_engine
         self.shared_contexts: dict[str, SharedContext] = {}
         self.agent_states: dict[str, AgentState] = {}
@@ -207,7 +249,14 @@ class EnhancedMessageBroker(MessageBroker):
 
     async def initialize(self) -> None:
         """Initialize the enhanced message broker."""
-        await super().initialize()
+        # Create Redis client using our factory function for test compatibility
+        self.redis_client = await redis_async_from_url(
+            self._redis_url, decode_responses=True
+        )
+
+        await self.redis_client.ping()
+        if self.pubsub is None:
+            self.pubsub = self.redis_client.pubsub()
 
         # Start background synchronization tasks
         self.sync_tasks["context_sync"] = asyncio.create_task(self._context_sync_loop())

@@ -1,15 +1,16 @@
 {
   "plan_id": "epic4-enhanced-broker-structured-api",
-  "last_completed_batch": "add-contract-tests",
+  "last_completed_batch": "migrate-orchestrator-task-assignment",
   "created_by": "plan_runner",
   "version": 1,
   "completed_batches": [
-    "add-contract-tests"
-  ],
-  "failed_batches": [
+    "add-contract-tests",
     "migrate-orchestrator-task-assignment"
   ],
+  "failed_batches": [
+    "comprehensive-testing"
+  ],
   "failed_batch_errors": {
-    "migrate-orchestrator-task-assignment": "verify failed: uv run pytest -q tests/unit/test_orchestrator.py::TestAgentOrchestrator::test_orchestrator_task_assignment_structured_result --no-cov"
+    "comprehensive-testing": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py tests/unit/test_orchestrator.py --no-cov"
   }
 }
