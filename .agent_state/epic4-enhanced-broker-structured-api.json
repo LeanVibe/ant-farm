@@ -1,0 +1,13 @@
+{
+  "plan_id": "epic4-enhanced-broker-structured-api",
+  "last_completed_batch": null,
+  "created_by": "plan_runner",
+  "version": 1,
+  "completed_batches": [],
+  "failed_batches": [
+    "add-contract-tests"
+  ],
+  "failed_batch_errors": {
+    "add-contract-tests": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py::test_broker_send_result_contract --no-cov"
+  }
+}

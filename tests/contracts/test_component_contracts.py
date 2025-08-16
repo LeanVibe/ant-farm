@@ -13,6 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.contracts import BrokerSendResult, BrokerSendReason
+
 
 # Test the enhanced message broker component in isolation
 class TestEnhancedMessageBrokerContract:
@@ -36,7 +38,9 @@ class TestEnhancedMessageBrokerContract:
     async def enhanced_message_broker(self, mock_dependencies):
         """Create EnhancedMessageBroker with mocked dependencies."""
         # Patch the factory function used inside enhanced_message_broker
-        with patch("src.core.enhanced_message_broker.redis_async_from_url") as redis_from_url:
+        with patch(
+            "src.core.enhanced_message_broker.redis_async_from_url"
+        ) as redis_from_url:
             redis_from_url.return_value = mock_dependencies["redis"]
 
             with patch(
@@ -341,6 +345,77 @@ class TestDatabaseContract:
 
         # Should return False on error, not raise exception
         assert is_healthy is False
+
+
+class TestBrokerSendResultContract:
+    """Contract tests for BrokerSendResult."""
+
+    def test_broker_send_result_success_contract(self):
+        """Test BrokerSendResult success contract."""
+        result = BrokerSendResult(
+            success=True, reason=BrokerSendReason.OK, message_id="test-message-id"
+        )
+
+        assert result.success is True
+        assert result.reason == BrokerSendReason.OK
+        assert result.message_id == "test-message-id"
+        assert result.details is None
+
+    def test_broker_send_result_idempotent_duplicate_contract(self):
+        """Test BrokerSendResult idempotent duplicate contract."""
+        result = BrokerSendResult(
+            success=True, reason=BrokerSendReason.IDEMPOTENT_DUPLICATE, message_id=None
+        )
+
+        assert result.success is True
+        assert result.reason == BrokerSendReason.IDEMPOTENT_DUPLICATE
+        assert result.message_id is None
+
+    def test_broker_send_result_publish_error_contract(self):
+        """Test BrokerSendResult publish error contract."""
+        result = BrokerSendResult(
+            success=False,
+            reason=BrokerSendReason.PUBLISH_ERROR,
+            message_id=None,
+            details="Redis connection failed",
+        )
+
+        assert result.success is False
+        assert result.reason == BrokerSendReason.PUBLISH_ERROR
+        assert result.message_id is None
+        assert result.details == "Redis connection failed"
+
+    def test_broker_send_result_invalid_contract(self):
+        """Test BrokerSendResult invalid contract."""
+        result = BrokerSendResult(
+            success=False,
+            reason=BrokerSendReason.INVALID,
+            message_id=None,
+            details="Invalid message format",
+        )
+
+        assert result.success is False
+        assert result.reason == BrokerSendReason.INVALID
+        assert result.details == "Invalid message format"
+
+    def test_broker_send_result_serialization_contract(self):
+        """Test BrokerSendResult serialization contract."""
+        result = BrokerSendResult(
+            success=True, reason=BrokerSendReason.OK, message_id="test-id"
+        )
+
+        # Test dict conversion
+        result_dict = result.model_dump()
+        assert isinstance(result_dict, dict)
+        assert result_dict["success"] is True
+        assert result_dict["reason"] == "ok"
+        assert result_dict["message_id"] == "test-id"
+
+        # Test JSON serialization
+        result_json = result.model_dump_json()
+        assert isinstance(result_json, str)
+        assert "success" in result_json
+        assert "ok" in result_json
 
 
 # Example test runner

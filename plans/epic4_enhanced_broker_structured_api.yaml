@@ -1,0 +1,43 @@
+version: 1
+plan_id: epic4-enhanced-broker-structured-api
+goal: "Enhanced broker structured API adoption"
+
+batches:
+  - name: add-contract-tests
+    tasks:
+      - type: command
+        run: echo "Add contract tests for BrokerSendResult"
+    verify:
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py::TestBrokerSendResultContract::test_broker_send_result_success_contract --no-cov"
+    commit:
+      message: "test(contracts): add BrokerSendResult contract tests"
+
+  - name: migrate-orchestrator-broadcast
+    depends_on: ["add-contract-tests"]
+    tasks:
+      - type: command
+        run: echo "Migrate orchestrator broadcast to use send_message_with_result"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_orchestrator.py::test_orchestrator_broadcast_structured_result --no-cov"
+    commit:
+      message: "feat(orchestrator): adopt structured send result for broadcast"
+
+  - name: migrate-orchestrator-heartbeat
+    depends_on: ["migrate-orchestrator-broadcast"]
+    tasks:
+      - type: command
+        run: echo "Migrate orchestrator heartbeat to use send_message_with_result"
+    verify:
+      - run: "uv run pytest -q tests/unit/test_orchestrator.py::test_orchestrator_heartbeat_structured_result --no-cov"
+    commit:
+      message: "feat(orchestrator): adopt structured send result for heartbeat"
+
+  - name: comprehensive-testing
+    depends_on: ["migrate-orchestrator-heartbeat"]
+    tasks:
+      - type: command
+        run: echo "Run comprehensive broker structured API tests"
+    verify:
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py tests/unit/test_orchestrator.py --no-cov"
+    commit:
+      message: "test(broker): comprehensive structured API adoption coverage"
