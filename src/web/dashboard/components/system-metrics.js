@@ -192,13 +192,51 @@ export class SystemMetrics extends LitElement {
             this.requestUpdate();
         };
 
-        // Listen for metrics updates
+        // Enhanced metrics update handler for new observability data
         this.handleMetricsUpdate = (event) => {
             const metricsData = event.detail;
             
-            // Process metrics data and update display
-            if (Array.isArray(metricsData)) {
-                // Calculate aggregated metrics from individual metrics
+            // Handle both old format and new observability format
+            if (metricsData.recent_metrics && Array.isArray(metricsData.recent_metrics)) {
+                // Process new observability metrics format
+                const latestMetrics = {};
+                metricsData.recent_metrics.forEach(metric => {
+                    switch (metric.name) {
+                        case 'system_cpu_usage':
+                            latestMetrics.cpuUsage = Math.round(metric.value);
+                            break;
+                        case 'system_memory_usage':
+                            latestMetrics.memoryUsage = Math.round(metric.value);
+                            break;
+                        case 'agent_response_time':
+                            latestMetrics.averageResponseTime = Math.round(metric.value);
+                            break;
+                        case 'active_agents_count':
+                            latestMetrics.activeAgents = metric.value;
+                            break;
+                        case 'task_queue_depth':
+                            latestMetrics.queueDepth = metric.value;
+                            break;
+                        case 'completed_tasks_count':
+                            latestMetrics.completedTasks = metric.value;
+                            break;
+                    }
+                });
+                
+                this.metrics = { ...this.metrics, ...latestMetrics };
+                this.requestUpdate();
+            } else if (metricsData.summary) {
+                // Handle summary metrics
+                const summary = metricsData.summary;
+                this.metrics = {
+                    ...this.metrics,
+                    totalMetrics: summary.total_metrics,
+                    metricsToday: summary.metrics_today,
+                    lastUpdate: new Date(summary.last_update * 1000).toLocaleTimeString()
+                };
+                this.requestUpdate();
+            } else if (Array.isArray(metricsData)) {
+                // Legacy format support
                 const latestMetrics = {};
                 metricsData.forEach(metric => {
                     if (metric.name === 'cpu_usage') latestMetrics.cpuUsage = metric.value;
@@ -211,8 +249,78 @@ export class SystemMetrics extends LitElement {
             }
         };
 
+        // Listen for dashboard data updates
+        this.handleDashboardData = (event) => {
+            const dashboardData = event.detail;
+            
+            if (dashboardData.metrics_summary) {
+                const summary = dashboardData.metrics_summary;
+                this.metrics = {
+                    ...this.metrics,
+                    totalMetrics: summary.total_metrics,
+                    metricsToday: summary.metrics_today,
+                    lastUpdate: new Date(summary.last_update * 1000).toLocaleTimeString()
+                };
+            }
+            
+            if (dashboardData.event_statistics) {
+                const eventStats = dashboardData.event_statistics;
+                this.metrics = {
+                    ...this.metrics,
+                    totalEvents: eventStats.total_events,
+                    eventsToday: eventStats.events_today
+                };
+            }
+            
+            this.requestUpdate();
+        };
+
+        // Listen for real-time metrics from the new system
+        this.handleRealTimeMetrics = (event) => {
+            const payload = event.detail;
+            
+            if (payload.recent_metrics && Array.isArray(payload.recent_metrics)) {
+                // Update chart data with latest metrics
+                const latestPoint = {
+                    time: new Date().toLocaleTimeString(),
+                    timestamp: Date.now(),
+                    tasks: 0,
+                    performance: 0,
+                    cpu: 0,
+                    memory: 0
+                };
+                
+                payload.recent_metrics.forEach(metric => {
+                    switch (metric.name) {
+                        case 'completed_tasks_count':
+                            latestPoint.tasks = metric.value;
+                            break;
+                        case 'system_cpu_usage':
+                            latestPoint.cpu = metric.value;
+                            break;
+                        case 'system_memory_usage':
+                            latestPoint.memory = metric.value;
+                            break;
+                    }
+                });
+                
+                // Calculate performance score
+                latestPoint.performance = Math.max(0, 100 - (latestPoint.cpu + latestPoint.memory) / 2);
+                
+                // Update chart data
+                if (this.chartData.length >= 24) {
+                    this.chartData.shift();
+                }
+                this.chartData.push(latestPoint);
+                
+                this.requestUpdate();
+            }
+        };
+
         window.addEventListener('hive-status-update', this.handleSystemStatus);
         window.addEventListener('metrics-update', this.handleMetricsUpdate);
+        window.addEventListener('real-time-metrics', this.handleRealTimeMetrics);
+        window.addEventListener('dashboard-data', this.handleDashboardData);
     }
 
     removeWebSocketListeners() {
@@ -221,6 +329,12 @@ export class SystemMetrics extends LitElement {
         }
         if (this.handleMetricsUpdate) {
             window.removeEventListener('metrics-update', this.handleMetricsUpdate);
+        }
+        if (this.handleRealTimeMetrics) {
+            window.removeEventListener('real-time-metrics', this.handleRealTimeMetrics);
+        }
+        if (this.handleDashboardData) {
+            window.removeEventListener('dashboard-data', this.handleDashboardData);
         }
     }
 

@@ -69,9 +69,42 @@ class WebSocketService {
     }
 
     handleMessage(data) {
-        const { type, payload } = data;
+        const { type, payload, timestamp, client_id } = data;
         
         switch (type) {
+            case 'system_status':
+                this.dispatchEvent('hive-status-update', payload);
+                this.dispatchEvent('system-status-update', payload);
+                break;
+            case 'agent_update':
+                this.dispatchEvent('agent-status-update', payload);
+                break;
+            case 'task_update':
+                this.dispatchEvent('task-status-update', payload);
+                break;
+            case 'metrics_update':
+                this.dispatchEvent('metrics-update', payload);
+                this.dispatchEvent('real-time-metrics', payload);
+                break;
+            case 'alert_update':
+                this.dispatchEvent('alert-update', payload);
+                this.dispatchEvent('alert-notification', payload);
+                break;
+            case 'dashboard_data':
+                this.dispatchEvent('dashboard-data', payload);
+                break;
+            case 'subscription_confirmed':
+                this.dispatchEvent('subscription-confirmed', payload);
+                console.log('Subscriptions confirmed:', payload.subscriptions);
+                break;
+            case 'heartbeat':
+                this.handleHeartbeat(payload);
+                break;
+            case 'error':
+                this.dispatchEvent('websocket-error', payload);
+                console.error('WebSocket error:', payload.message);
+                break;
+            // Legacy support for existing message types
             case 'system-status':
                 this.dispatchEvent('hive-status-update', payload);
                 break;
@@ -126,12 +159,68 @@ class WebSocketService {
         window.dispatchEvent(event);
     }
 
-    send(message) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(message));
-        } else {
-            console.warn('WebSocket not connected, cannot send message');
+    handleHeartbeat(payload) {
+        // Update server time offset if needed
+        if (payload.server_time) {
+            this.serverTimeOffset = payload.server_time - Date.now() / 1000;
         }
+        
+        // Respond to ping with pong
+        if (payload.status === 'ping') {
+            this.send({
+                type: 'heartbeat',
+                payload: { status: 'pong', client_time: Date.now() / 1000 }
+            });
+        }
+    }
+
+    subscribe(subscriptions) {
+        if (Array.isArray(subscriptions)) {
+            this.send({
+                type: 'subscribe',
+                payload: { subscriptions }
+            });
+        } else {
+            this.send({
+                type: 'subscribe',
+                payload: { subscriptions: [subscriptions] }
+            });
+        }
+    }
+
+    unsubscribe(subscriptions) {
+        if (Array.isArray(subscriptions)) {
+            this.send({
+                type: 'unsubscribe',
+                payload: { subscriptions }
+            });
+        } else {
+            this.send({
+                type: 'unsubscribe',
+                payload: { subscriptions: [subscriptions] }
+            });
+        }
+    }
+
+    requestDashboardData() {
+        this.send({
+            type: 'request_dashboard_data',
+            payload: {}
+        });
+    }
+
+    requestMetrics(filters = {}) {
+        this.send({
+            type: 'request_metrics',
+            payload: filters
+        });
+    }
+
+    requestAlerts() {
+        this.send({
+            type: 'request_alerts',
+            payload: {}
+        });
     }
 
     getConnectionStatus() {
@@ -158,6 +247,23 @@ const webSocketService = new WebSocketService();
 // Auto-connect when page loads
 document.addEventListener('DOMContentLoaded', () => {
     webSocketService.connect();
+    
+    // Auto-subscribe to common data streams after connection
+    window.addEventListener('hive-status-update', (e) => {
+        // Only subscribe once we're connected
+        if (e.detail.status === 'connected') {
+            // Subscribe to essential data streams
+            webSocketService.subscribe([
+                'system_events',
+                'metrics',
+                'alerts',
+                'dashboard_data'
+            ]);
+            
+            // Request initial dashboard data
+            webSocketService.requestDashboardData();
+        }
+    }, { once: true });
 });
 
 // Reconnect when page becomes visible again

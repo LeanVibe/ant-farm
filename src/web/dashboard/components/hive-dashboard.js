@@ -235,8 +235,10 @@ export class HiveDashboard extends LitElement {
                     ${this.renderActiveView()}
                 </main>
             </div>
+            
+            <!-- Global alert notifications overlay -->
+            <alert-notifications></alert-notifications>
         `;
-    }
 
     renderNavigation() {
         const navItems = [

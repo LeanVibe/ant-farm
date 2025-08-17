@@ -143,8 +143,8 @@ export class AgentStatus extends LitElement {
             this.requestUpdate();
         };
 
+        // Listen for system status updates
         this.handleSystemStatus = (event) => {
-            // System status updates may contain agent count changes
             const systemData = event.detail;
             if (systemData.active_agents !== undefined) {
                 // Trigger agents reload if count mismatch
@@ -153,10 +153,81 @@ export class AgentStatus extends LitElement {
                     this.loadAgents();
                 }
             }
+            
+            // Handle system events that may affect agents
+            if (systemData.event && systemData.event.source && systemData.event.data) {
+                const event = systemData.event;
+                if (event.source.includes('agent')) {
+                    this.updateAgentFromEvent(event);
+                }
+            }
+        };
+
+        // Listen for metrics updates to get agent performance data
+        this.handleMetricsUpdate = (event) => {
+            const metricsData = event.detail;
+            
+            if (metricsData.recent_metrics && Array.isArray(metricsData.recent_metrics)) {
+                // Process agent-specific metrics
+                const agentMetrics = {};
+                
+                metricsData.recent_metrics.forEach(metric => {
+                    if (metric.tags && metric.tags.agent_id) {
+                        const agentId = metric.tags.agent_id;
+                        if (!agentMetrics[agentId]) {
+                            agentMetrics[agentId] = {};
+                        }
+                        
+                        switch (metric.name) {
+                            case 'agent_cpu_usage':
+                                agentMetrics[agentId].cpu_usage = metric.value;
+                                break;
+                            case 'agent_memory_usage':
+                                agentMetrics[agentId].memory_usage = metric.value;
+                                break;
+                            case 'agent_response_time':
+                                agentMetrics[agentId].response_time = metric.value;
+                                break;
+                            case 'agent_task_count':
+                                agentMetrics[agentId].active_tasks = metric.value;
+                                break;
+                            case 'agent_health_score':
+                                agentMetrics[agentId].health_score = metric.value;
+                                break;
+                        }
+                    }
+                });
+                
+                // Update agents with new metrics
+                this.agents = this.agents.map(agent => {
+                    const metrics = agentMetrics[agent.id] || agentMetrics[agent.name];
+                    return metrics ? { ...agent, ...metrics } : agent;
+                });
+                
+                this.requestUpdate();
+            }
+        };
+
+        // Listen for dashboard data updates
+        this.handleDashboardData = (event) => {
+            const dashboardData = event.detail;
+            
+            if (dashboardData.recent_events) {
+                // Process recent events for agent-related updates
+                dashboardData.recent_events.forEach(event => {
+                    if (event.source && event.source.includes('agent')) {
+                        this.updateAgentFromEvent(event);
+                    }
+                });
+            }
         };
 
         window.addEventListener('agent-status-update', this.handleAgentUpdate);
+        window.addEventListener('system-status-update', this.handleSystemStatus);
         window.addEventListener('hive-status-update', this.handleSystemStatus);
+        window.addEventListener('metrics-update', this.handleMetricsUpdate);
+        window.addEventListener('real-time-metrics', this.handleMetricsUpdate);
+        window.addEventListener('dashboard-data', this.handleDashboardData);
     }
 
     removeWebSocketListeners() {
@@ -164,8 +235,42 @@ export class AgentStatus extends LitElement {
             window.removeEventListener('agent-status-update', this.handleAgentUpdate);
         }
         if (this.handleSystemStatus) {
+            window.removeEventListener('system-status-update', this.handleSystemStatus);
             window.removeEventListener('hive-status-update', this.handleSystemStatus);
         }
+        if (this.handleMetricsUpdate) {
+            window.removeEventListener('metrics-update', this.handleMetricsUpdate);
+            window.removeEventListener('real-time-metrics', this.handleMetricsUpdate);
+        }
+        if (this.handleDashboardData) {
+            window.removeEventListener('dashboard-data', this.handleDashboardData);
+        }
+    }
+
+    updateAgentFromEvent(event) {
+        // Update agent based on system event
+        if (event.source && event.data) {
+            const agentId = this.extractAgentIdFromSource(event.source);
+            if (agentId) {
+                this.agents = this.agents.map(agent => {
+                    if (agent.id === agentId || agent.name === agentId) {
+                        return {
+                            ...agent,
+                            last_event: event.timestamp,
+                            last_event_type: event.event_type
+                        };
+                    }
+                    return agent;
+                });
+                this.requestUpdate();
+            }
+        }
+    }
+
+    extractAgentIdFromSource(source) {
+        // Extract agent ID from source string like "agent:meta-agent-123"
+        const match = source.match(/agent:(.+)/);
+        return match ? match[1] : null;
     }
 
     async loadAgents() {
@@ -228,13 +333,37 @@ export class AgentStatus extends LitElement {
                                         <div class="stat-label">Failed</div>
                                     </div>
                                     <div class="stat">
-                                        <div class="stat-value">${(agent.load_factor * 100 || 0).toFixed(0)}%</div>
-                                        <div class="stat-label">Load</div>
+                                        <div class="stat-value">${agent.active_tasks || 0}</div>
+                                        <div class="stat-label">Active</div>
                                     </div>
                                     <div class="stat">
                                         <div class="stat-value">${this.formatUptime(agent.uptime)}</div>
                                         <div class="stat-label">Uptime</div>
                                     </div>
+                                    ${agent.cpu_usage !== undefined ? html`
+                                        <div class="stat">
+                                            <div class="stat-value">${Math.round(agent.cpu_usage)}%</div>
+                                            <div class="stat-label">CPU</div>
+                                        </div>
+                                    ` : ''}
+                                    ${agent.memory_usage !== undefined ? html`
+                                        <div class="stat">
+                                            <div class="stat-value">${Math.round(agent.memory_usage)}%</div>
+                                            <div class="stat-label">Memory</div>
+                                        </div>
+                                    ` : ''}
+                                    ${agent.response_time !== undefined ? html`
+                                        <div class="stat">
+                                            <div class="stat-value">${Math.round(agent.response_time)}ms</div>
+                                            <div class="stat-label">Response</div>
+                                        </div>
+                                    ` : ''}
+                                    ${agent.health_score !== undefined ? html`
+                                        <div class="stat">
+                                            <div class="stat-value ${this.getHealthScoreClass(agent.health_score)}">${Math.round(agent.health_score * 100)}%</div>
+                                            <div class="stat-label">Health</div>
+                                        </div>
+                                    ` : ''}
                                 </div>
                             ` : ''}
                         </div>
