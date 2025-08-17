@@ -10,6 +10,10 @@
     "implement-failed-batches-tracking",
     "comprehensive-testing"
   ],
-  "failed_batches": [],
-  "failed_batch_errors": {}
+  "failed_batches": [
+    "add-continue-flag"
+  ],
+  "failed_batch_errors": {
+    "add-continue-flag": "commit failed"
+  }
 }
