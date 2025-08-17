@@ -1,6 +1,6 @@
 {
   "plan_id": "epic3-plan-runner-ux",
-  "last_completed_batch": "comprehensive-testing",
+  "last_completed_batch": "add-continue-flag",
   "created_by": "plan_runner",
   "version": 1,
   "completed_batches": [
