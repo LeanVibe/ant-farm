@@ -1,0 +1,48 @@
+version: 1
+plan_id: epic2-metrics
+goal: "Add metrics persistence and API export with feature flags"
+
+batches:
+  - name: agent-metrics-flush
+    tasks:
+      - type: edit
+        file: src/agents/base_agent.py
+        apply: Add flush_metrics_if_enabled() method with HIVE_METRICS_FLUSH flag
+        details: |
+          - The CLIToolManager.flush_metrics() method already exists and uses HIVE_METRICS_FLUSH
+          - Need to call this method periodically from BaseAgent
+          - Add method to call CLI manager flush_metrics() and expose agent_uuid
+    verify:
+      - run: "uv run pytest -q tests/unit/test_base_agent.py::test_metrics_flush --no-cov"
+    commit:
+      message: "feat(agents): add metrics flush with feature flag"
+
+  - name: broker-dlq-metrics
+    depends_on: ["agent-metrics-flush"]
+    tasks:
+      - type: edit
+        file: src/core/message_broker.py
+        apply: Add DLQ reason counters with periodic flush
+        details: |
+          - DLQ metrics tracking already exists with _dlq_reasons counter
+          - flush_dlq_metrics() method already implemented
+          - Need to ensure periodic flush happens when HIVE_METRICS_FLUSH=1
+    verify:
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_dlq_metrics --no-cov"
+    commit:
+      message: "feat(broker): add DLQ metrics collection and persistence"
+
+  - name: metrics-api-endpoint
+    depends_on: ["broker-dlq-metrics"]
+    tasks:
+      - type: edit
+        file: src/api/main.py
+        apply: Extend /api/v1/metrics endpoint with aggregated counters
+        details: |
+          - /api/v1/metrics/custom endpoint already exists (lines 832-880)
+          - Need to enhance it to include actual CLI tool counters from agents
+          - Add agent CLI counters aggregation when HIVE_METRICS_FLUSH=1
+    verify:
+      - run: "uv run pytest -q tests/integration/test_api.py::test_metrics_api --no-cov"
+    commit:
+      message: "feat(api): expose aggregated metrics in API endpoint"

@@ -346,12 +346,14 @@ class CLIToolManager:
             for k, v in self._counters.items()
         }
 
-    async def flush_metrics(self) -> None:
+    async def flush_metrics(
+        self, async_db_manager, agent_uuid, agent_name, agent_type
+    ) -> None:
         """Flush CLI tool counters to database using bulk write if feature flag is enabled."""
         if not os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
             return
 
-        if not self.async_db_manager or not self.agent_uuid:
+        if not async_db_manager or not agent_uuid:
             logger.debug(
                 "Cannot flush metrics - database manager or agent UUID not available"
             )
@@ -370,11 +372,11 @@ class CLIToolManager:
                         "metric_type": "counter",
                         "value": float(counter_data.get("calls", 0)),
                         "unit": "count",
-                        "agent_id": self.agent_uuid,
+                        "agent_id": agent_uuid,
                         "labels": {
                             "tool": tool_key,
-                            "agent_name": self.name,
-                            "agent_type": self.agent_type,
+                            "agent_name": agent_name,
+                            "agent_type": agent_type,
                         },
                     }
                 )
@@ -386,11 +388,11 @@ class CLIToolManager:
                         "metric_type": "counter",
                         "value": float(counter_data.get("success", 0)),
                         "unit": "count",
-                        "agent_id": self.agent_uuid,
+                        "agent_id": agent_uuid,
                         "labels": {
                             "tool": tool_key,
-                            "agent_name": self.name,
-                            "agent_type": self.agent_type,
+                            "agent_name": agent_name,
+                            "agent_type": agent_type,
                         },
                     }
                 )
@@ -402,11 +404,11 @@ class CLIToolManager:
                         "metric_type": "counter",
                         "value": float(counter_data.get("failure", 0)),
                         "unit": "count",
-                        "agent_id": self.agent_uuid,
+                        "agent_id": agent_uuid,
                         "labels": {
                             "tool": tool_key,
-                            "agent_name": self.name,
-                            "agent_type": self.agent_type,
+                            "agent_name": agent_name,
+                            "agent_type": agent_type,
                         },
                     }
                 )
@@ -420,23 +422,23 @@ class CLIToolManager:
                             "metric_type": "counter",
                             "value": float(count),
                             "unit": "count",
-                            "agent_id": self.agent_uuid,
+                            "agent_id": agent_uuid,
                             "labels": {
                                 "tool": tool_key,
                                 "category": category,
-                                "agent_name": self.name,
-                                "agent_type": self.agent_type,
+                                "agent_name": agent_name,
+                                "agent_type": agent_type,
                             },
                         }
                     )
 
             if metrics_to_write:
-                written_count = await self.async_db_manager.record_metrics_bulk(
+                written_count = await async_db_manager.record_metrics_bulk(
                     metrics_to_write
                 )
                 logger.debug(
                     "Flushed CLI tool metrics to database",
-                    agent=self.name,
+                    agent=agent_name,
                     metrics_count=written_count,
                 )
 
@@ -444,7 +446,7 @@ class CLIToolManager:
                 self._counters.clear()
 
         except Exception as e:
-            logger.error("Failed to flush metrics", agent=self.name, error=str(e))
+            logger.error("Failed to flush metrics", agent=agent_name, error=str(e))
 
     async def _opencode_execute(self, prompt: str) -> ToolResult:
         """Execute prompt using opencode."""
@@ -1975,3 +1977,26 @@ class BaseAgent(ABC):
                 error=str(e),
             )
             return []
+
+    async def flush_metrics_if_enabled(self) -> None:
+        """Flush CLI tool metrics to database if feature flag is enabled."""
+        if not os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
+            return
+
+        if not self.async_db_manager or not self.agent_uuid:
+            logger.debug(
+                "Cannot flush metrics - database manager or agent UUID not available",
+                agent=self.name,
+            )
+            return
+
+        try:
+            # Flush CLI tool metrics
+            await self.cli_tools.flush_metrics(
+                self.async_db_manager, self.agent_uuid, self.name, self.agent_type
+            )
+            logger.debug("CLI tool metrics flushed", agent=self.name)
+        except Exception as e:
+            logger.error(
+                "Failed to flush CLI tool metrics", agent=self.name, error=str(e)
+            )
