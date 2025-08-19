@@ -1,0 +1,11 @@
+{
+  "plan_id": "epic1-fake-pubsub",
+  "last_completed_batch": "create-fake-pubsub",
+  "created_by": "plan_runner",
+  "version": 1,
+  "completed_batches": [
+    "create-fake-pubsub"
+  ],
+  "failed_batches": [],
+  "failed_batch_errors": {}
+}

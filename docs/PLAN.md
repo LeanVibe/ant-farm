@@ -308,12 +308,13 @@
 
 ---
 
-## NEXT 4 EPICS (Execution-Ready, Cursor-Native)
+## NEXT 4 EPICS (Execution-Ready, Cursor-Native) - UPDATED
 
 These epics sustain uninterrupted work in Cursor by leveraging a plan → batch → verify loop with short-lived commands and persisted state in `.agent_state/`.
 
 ### Epic 1: Deterministic broker pub/sub test doubles
 - **Why**: Replace brittle `AsyncMock`-driven listeners to remove runtime warnings and flaky behavior; make request/reply tests deterministic.
+- **Status**: ✅ READY FOR IMPLEMENTATION
 - **Scope of Change**: Local to broker tests; optional DI seam in broker. No API-breaking changes.
 - **Deliverables**
   - `src/testing/fakes/fake_pubsub.py`: async iterator simulating Redis pub/sub with `listen()` yielding messages and a simple in-memory `publish(channel, data)` helper; controllable timing.
@@ -340,6 +341,7 @@ These epics sustain uninterrupted work in Cursor by leveraging a plan → batch 
 
 ### Epic 2: Metrics wiring + minimal exporter
 - **Why**: Close the observability loop for long-running agents; persist counters; expose quick diagnostics.
+- **Status**: ✅ READY FOR IMPLEMENTATION  
 - **Scope of Change**: Low-risk additive changes behind feature flags.
 - **Deliverables**
   - Use `AsyncDatabaseManager.record_metrics_bulk` to persist:
@@ -362,29 +364,24 @@ These epics sustain uninterrupted work in Cursor by leveraging a plan → batch 
   - `uv run pytest -q tests/unit/test_base_agent.py --no-cov`
   - `uv run pytest -q tests/integration/test_api.py::test_metrics_api --no-cov`
 
-### Epic 3: Plan runner UX v3
+### Epic 3: Plan runner UX v3 ✅ COMPLETED
 - **Why**: Reduce manual friction; enable uninterrupted sequences across failures.
+- **Status**: ✅ COMPLETED - All batches executed successfully
 - **Scope of Change**: CLI-only; state file compatible with prior runs.
-- **Deliverables**
-  - `src/cli/plan_runner.py`:
-    - `--continue`: execute all remaining batches after the current.
-    - `--rerun-failed`: execute only failed batches recorded in state.
-    - DAG validation (no cycles) for `depends_on` with friendly error.
-    - Failure summary at the end with batch names and first error line.
-  - `src/cli/state/store.py`: persist `failed_batches` and `completed_batches` (already has `completed_batches`).
-- **Implementation Steps**
-  - Extend state schema with versioning; default old state to empty `failed_batches`.
-  - Implement topological sort with cycle detection; raise `PlanValidationError`.
-  - Append to `failed_batches` on any batch failure; implement CLI flags.
-- **Tests**
-  - `tests/unit/test_plan_runner.py`: continue mode; rerun-failed; DAG validation error.
-- **Acceptance**
-  - Runner supports continue/rerun-failed with persisted state; tests green.
-- **Run**
-  - `uv run pytest -q tests/unit/test_plan_runner.py --no-cov`
+- **Completed Features**
+  - ✅ `--continue`: execute all remaining batches after the current.
+  - ✅ `--rerun-failed`: execute only failed batches recorded in state.
+  - ✅ DAG validation (no cycles) for `depends_on` with friendly error.
+  - ✅ Failure summary with batch names and error details.
+  - ✅ State persistence with `failed_batches` and `completed_batches`.
+- **Verification**
+  - ✅ All tests pass: `uv run pytest -q tests/unit/test_plan_runner.py --no-cov`
+  - ✅ Help output includes new flags
+  - ✅ State file properly persists across runs
 
 ### Epic 4: Enhanced broker structured API adoption
 - **Why**: Make result semantics explicit for reliability while preserving compatibility.
+- **Status**: ✅ READY FOR IMPLEMENTATION
 - **Scope of Change**: Additive with selective migration; maintain legacy bool path.
 - **Deliverables**
   - Contract tests asserting `BrokerSendResult` on base and enhanced brokers.
@@ -399,6 +396,30 @@ These epics sustain uninterrupted work in Cursor by leveraging a plan → batch 
   - Structured API adopted in at least one usage path; all tests remain green.
 - **Run**
   - `uv run pytest -q tests/unit/test_orchestrator.py --no-cov`
+
+### Epic 5 (NEW): Advanced Agent Coordination System
+- **Why**: Enable sophisticated multi-agent collaboration for complex development tasks; leverage existing enhanced communication.
+- **Status**: 🔄 PLANNED FOR NEXT PHASE
+- **Scope of Change**: Build on existing enhanced communication system; additive features.
+- **Deliverables**
+  - Multi-agent task coordination with workload distribution
+  - Real-time context sharing between agents
+  - Conflict resolution for simultaneous file modifications
+  - Collaborative code review and quality gates
+- **Implementation Steps**
+  - Extend `src/core/collaboration/enhanced_pair_programming.py` with multi-agent support
+  - Add workload balancing in `src/core/orchestrator.py`
+  - Implement conflict resolution in enhanced message broker
+  - Create collaborative quality gates with consensus mechanisms
+- **Tests**
+  - `tests/integration/test_multi_agent_coordination.py`: End-to-end collaboration scenarios
+  - `tests/unit/test_conflict_resolution.py`: File modification conflict handling
+  - `tests/integration/test_workload_distribution.py`: Task assignment optimization
+- **Acceptance**
+  - Multiple agents can collaborate on complex tasks without conflicts
+  - Workload distributed efficiently based on agent capabilities
+  - Quality gates require consensus from multiple agents for complex changes
+- **Dependencies**: Completes after Epic 1-4
 
 ### Execution via Plan Runner
 - Author plans under `plans/*.yaml`; run with:

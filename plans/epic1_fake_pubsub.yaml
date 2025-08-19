@@ -1,0 +1,36 @@
+version: 1
+plan_id: epic1-fake-pubsub
+goal: "Replace AsyncMock with deterministic FakePubSub for broker tests"
+
+batches:
+  - name: create-fake-pubsub
+    tasks:
+      - type: edit
+        file: src/testing/fakes/fake_pubsub.py
+        apply: Create FakePubSub class with preseed, listen(), publish() methods
+    verify:
+      - run: "uv run python -c 'from src.testing.fakes.fake_pubsub import FakePubSub; print(\"OK\")'"
+    commit:
+      message: "feat(testing): add FakePubSub for deterministic broker tests"
+
+  - name: add-broker-di-seam
+    depends_on: ["create-fake-pubsub"]
+    tasks:
+      - type: edit
+        file: src/core/message_broker.py
+        apply: Add optional pubsub parameter to MessageBroker constructor
+    verify:
+      - run: "uv run python -c 'from src.core.message_broker import MessageBroker; print(\"OK\")'"
+    commit:
+      message: "feat(broker): add DI seam for pubsub client in tests"
+
+  - name: update-broker-tests
+    depends_on: ["add-broker-di-seam"]
+    tasks:
+      - type: edit
+        file: tests/unit/test_message_broker_comprehensive.py
+        apply: Replace AsyncMock with FakePubSub where appropriate
+    verify:
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov"
+    commit:
+      message: "test(broker): use FakePubSub to eliminate AsyncMock warnings"
