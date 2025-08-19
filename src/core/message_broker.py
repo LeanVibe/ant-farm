@@ -129,13 +129,19 @@ class MessageHandler:
 class MessageBroker:
     """Redis-based message broker with pub/sub and persistence."""
 
-    def __init__(self, redis_url: str = None, pubsub_client=None):
+    def __init__(self, redis_url: str = None, pubsub=None):
+        """Initialize MessageBroker.
+
+        Args:
+            redis_url: Redis connection URL
+            pubsub: Optional pubsub client for dependency injection (testing)
+        """
         if redis_url is None:
             from .config import get_settings
 
             redis_url = get_settings().redis_url
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
-        self.pubsub = pubsub_client or None
+        self.pubsub = pubsub
         self.message_handlers: dict[str, MessageHandler] = {}
         self.pending_requests: dict[str, asyncio.Future] = {}
         self.subscriptions: set[str] = set()

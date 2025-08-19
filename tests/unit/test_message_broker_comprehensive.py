@@ -22,7 +22,7 @@ async def test_idempotency_and_dlq(monkeypatch):
         from src.testing.fakes.fake_pubsub import FakePubSub
 
         fake_pubsub = FakePubSub()
-        broker = MessageBroker("redis://localhost:6379", pubsub_client=fake_pubsub)
+        broker = MessageBroker("redis://localhost:6379", pubsub=fake_pubsub)
         await broker.initialize()
 
         # First send with idempotency key succeeds
@@ -139,7 +139,7 @@ async def message_broker(mock_redis):
         # Mock the pubsub methods to avoid calling Redis methods
         fake_pubsub.subscribe = AsyncMock()
         fake_pubsub.unsubscribe = AsyncMock()
-        broker = MessageBroker("redis://localhost:6379/1", pubsub_client=fake_pubsub)
+        broker = MessageBroker("redis://localhost:6379/1", pubsub=fake_pubsub)
         await broker.initialize()
         return broker
 
