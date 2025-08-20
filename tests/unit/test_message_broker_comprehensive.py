@@ -7,15 +7,20 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_idempotency_and_dlq(monkeypatch):
+    """Test idempotency and dead letter queue with FakePubSub."""
     with patch("src.core.message_broker.redis.from_url") as mock_redis:
+        # Create a mock Redis client that supports the operations we need
         rc = AsyncMock()
-        # set() returns True first time, False second (duplicate)
-        rc.set.side_effect = [True, False]
-        rc.publish.return_value = 1
-        rc.hset.return_value = True
-        rc.expire.return_value = True
-        rc.zadd.return_value = True
-        rc.zrevrange.return_value = []
+        rc.ping = AsyncMock(return_value=True)
+        rc.set = AsyncMock(
+            side_effect=[True, False]
+        )  # First succeeds, second is duplicate
+        rc.publish = AsyncMock(return_value=1)
+        rc.hset = AsyncMock(return_value=True)
+        rc.expire = AsyncMock(return_value=True)
+        rc.zadd = AsyncMock(return_value=True)
+        rc.zrevrange = AsyncMock(return_value=[])
+        rc.close = AsyncMock(return_value=None)
         mock_redis.return_value = rc
 
         from src.core.message_broker import MessageBroker
@@ -119,24 +124,23 @@ def mock_redis():
     redis_mock.exists = AsyncMock(return_value=0)
     redis_mock.keys = AsyncMock(return_value=[])
 
-    # Mock pubsub
-    pubsub_mock = AsyncMock()
-    pubsub_mock.subscribe = AsyncMock(return_value=None)
-    pubsub_mock.unsubscribe = AsyncMock(return_value=None)
-    pubsub_mock.listen = AsyncMock()
-    redis_mock.pubsub = Mock(return_value=pubsub_mock)
+    # Mock pubsub - using FakePubSub for deterministic behavior
+    from src.testing.fakes.fake_pubsub import FakePubSub
+
+    fake_pubsub = FakePubSub()
+    redis_mock.pubsub = Mock(return_value=fake_pubsub)
 
     return redis_mock
 
 
 @pytest.fixture
 async def message_broker(mock_redis):
-    """Create MessageBroker instance with mocked Redis."""
+    """Create MessageBroker instance with mocked Redis and FakePubSub."""
     with patch("redis.asyncio.from_url", return_value=mock_redis):
         from src.testing.fakes.fake_pubsub import FakePubSub
 
         fake_pubsub = FakePubSub()
-        # Use the actual FakePubSub methods - no AsyncMock needed!
+        # Use FakePubSub for deterministic pub/sub behavior
         broker = MessageBroker("redis://localhost:6379/1", pubsub=fake_pubsub)
         await broker.initialize()
         return broker

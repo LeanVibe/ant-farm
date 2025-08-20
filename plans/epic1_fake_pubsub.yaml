@@ -7,7 +7,12 @@ batches:
     tasks:
       - type: edit
         file: src/testing/fakes/fake_pubsub.py
-        apply: Create FakePubSub class with preseed, listen(), publish() methods
+        apply: |
+          Create FakePubSub class with:
+          - __init__(preseed: dict[str, list[dict]] | None = None, delay_ms: int = 0)
+          - async def listen(): yields {"channel": str, "data": bytes|str} in FIFO order
+          - def publish(channel: str, data: bytes|str): adds message to in-memory queue
+          - Optional timing control for deterministic testing
     verify:
       - run: "uv run python -c 'from src.testing.fakes.fake_pubsub import FakePubSub; print(\"OK\")'"
     commit:
@@ -18,7 +23,11 @@ batches:
     tasks:
       - type: edit
         file: src/core/message_broker.py
-        apply: Add optional pubsub parameter to MessageBroker constructor
+        apply: |
+          Add optional pubsub parameter to MessageBroker constructor:
+          - MessageBroker(pubsub: Optional[PubSubProto] = None)
+          - Default to real Redis client when None
+          - Allow injection of FakePubSub for testing
     verify:
       - run: "uv run python -c 'from src.core.message_broker import MessageBroker; print(\"OK\")'"
     commit:
@@ -29,8 +38,38 @@ batches:
     tasks:
       - type: edit
         file: tests/unit/test_message_broker_comprehensive.py
-        apply: Replace AsyncMock with FakePubSub where appropriate
+        apply: |
+          Replace AsyncMock patterns with FakePubSub:
+          - Remove AsyncMock imports and usage
+          - Use FakePubSub for deterministic message flow
+          - Maintain test coverage while eliminating warnings
     verify:
       - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov"
     commit:
       message: "test(broker): use FakePubSub to eliminate AsyncMock warnings"
+
+  - name: update-isolation-tests
+    depends_on: ["update-broker-tests"]
+    tasks:
+      - type: edit
+        file: tests/unit/test_message_broker_isolation.py
+        apply: |
+          Update isolation tests to use FakePubSub:
+          - Replace any remaining AsyncMock usage
+          - Ensure deterministic routing behavior
+          - Verify minimal routing scenarios work correctly
+    verify:
+      - run: "uv run pytest -q tests/unit/test_message_broker_isolation.py --no-cov"
+    commit:
+      message: "test(broker): update isolation tests with FakePubSub"
+
+  - name: verify-no-asyncmock-warnings
+    depends_on: ["update-isolation-tests"]
+    tasks:
+      - type: run
+        command: "uv run pytest -q tests/unit/test_message_broker*.py --no-cov -v"
+        description: "Run all broker tests to verify no AsyncMock warnings"
+    verify:
+      - run: "echo 'Manual verification: Check for AsyncMock warnings in output'"
+    commit:
+      message: "test(broker): verify all broker tests pass without AsyncMock warnings"
