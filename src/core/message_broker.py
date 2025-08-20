@@ -282,6 +282,9 @@ class MessageBroker:
                 channel, json.dumps(message_dict, default=str)
             )
 
+            # Store in history
+            await self._store_message_history(message)
+
             logger.info(
                 "Message sent",
                 from_agent=from_agent,

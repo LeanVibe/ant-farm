@@ -1,11 +1,12 @@
 {
   "plan_id": "epic1-fake-pubsub",
-  "last_completed_batch": "add-broker-di-seam",
+  "last_completed_batch": "update-broker-tests",
   "created_by": "plan_runner",
   "version": 1,
   "completed_batches": [
     "create-fake-pubsub",
-    "add-broker-di-seam"
+    "add-broker-di-seam",
+    "update-broker-tests"
   ],
   "failed_batches": [],
   "failed_batch_errors": {}
