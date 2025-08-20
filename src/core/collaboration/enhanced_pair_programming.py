@@ -141,6 +141,290 @@ class EnhancedAIPairProgramming:
 
         logger.info("Enhanced AI pair programming initialized")
 
+    async def start_multi_agent_session(
+        self,
+        participants: list[str],
+        mode: CollaborationMode,
+        project_context: dict[str, Any],
+        task_description: str,
+    ) -> str:
+        """Start a multi-agent collaboration session."""
+        if len(participants) < 2:
+            raise ValueError("Multi-agent session requires at least 2 participants")
+
+        session_id = str(uuid.uuid4())
+
+        # Create enhanced session with multi-agent support
+        session = CollaborationSession(
+            session_id=session_id,
+            participants=participants,
+            mode=mode,
+            project_context=project_context,
+        )
+
+        # Initialize multi-agent coordination
+        await self._initialize_multi_agent_coordination(session, task_description)
+
+        self.active_sessions[session_id] = session
+        self.collaboration_metrics["sessions_created"] += 1
+
+        logger.info(
+            "Multi-agent collaboration session started",
+            session_id=session_id,
+            participants=participants,
+            mode=mode.value,
+        )
+
+        return session_id
+
+    async def _initialize_multi_agent_coordination(
+        self, session: CollaborationSession, task_description: str
+    ):
+        """Initialize coordination mechanisms for multi-agent collaboration."""
+        # Set initial driver based on mode
+        if session.mode == CollaborationMode.MOB_PROGRAMMING:
+            # In mob programming, rotate driver role
+            session.current_driver = session.participants[0]
+            await self._setup_driver_rotation(session)
+        elif session.mode == CollaborationMode.PARALLEL_CODING:
+            # In parallel coding, all agents are active
+            session.current_driver = None  # No single driver
+        else:
+            # Default to first participant as driver
+            session.current_driver = session.participants[0]
+
+        # Initialize context sharing for all participants
+        await self._initialize_context_sharing(session)
+
+        # Broadcast session start to all participants
+        await self._broadcast_session_start(session, task_description)
+
+    async def _setup_driver_rotation(self, session: CollaborationSession):
+        """Setup automatic driver rotation for mob programming."""
+        rotation_interval = Intervals.TASK_COORDINATION_CYCLE * 2  # Rotate every 10 seconds
+
+        async def rotate_driver():
+            while session.session_id in self.active_sessions:
+                await asyncio.sleep(rotation_interval)
+                await self._rotate_driver(session)
+
+        # Start rotation task
+        asyncio.create_task(rotate_driver())
+
+    async def _rotate_driver(self, session: CollaborationSession):
+        """Rotate the driver role to the next participant."""
+        if not session.participants:
+            return
+
+        current_index = 0
+        if session.current_driver:
+            try:
+                current_index = session.participants.index(session.current_driver)
+            except ValueError:
+                current_index = 0
+
+        next_index = (current_index + 1) % len(session.participants)
+        new_driver = session.participants[next_index]
+
+        session.current_driver = new_driver
+
+        # Notify all participants of driver change
+        await self._broadcast_driver_change(session, new_driver)
+
+    async def _broadcast_driver_change(self, session: CollaborationSession, new_driver: str):
+        """Broadcast driver change to all session participants."""
+        for participant in session.participants:
+            await message_broker.send_message(
+                from_agent="collaboration_system",
+                to_agent=participant,
+                topic="driver_changed",
+                payload={
+                    "session_id": session.session_id,
+                    "new_driver": new_driver,
+                    "timestamp": time.time(),
+                },
+                message_type=MessageType.NOTIFICATION,
+            )
+
+    async def _initialize_context_sharing(self, session: CollaborationSession):
+        """Initialize context sharing mechanisms for the session."""
+        # Share initial project context with all participants
+        initial_context = SharedContext(
+            session_id=session.session_id,
+            context_type=ContextShareType.PROJECT_HISTORY,
+            content=session.project_context,
+            source_agent="system",
+            tags={"initial", "project_context"},
+        )
+
+        session.shared_contexts.append(initial_context)
+
+        # Setup periodic context synchronization
+        asyncio.create_task(self._periodic_context_sync(session))
+
+    async def _periodic_context_sync(self, session: CollaborationSession):
+        """Periodically synchronize context between participants."""
+        while session.session_id in self.active_sessions:
+            await asyncio.sleep(session.context_sync_interval)
+            await self._synchronize_contexts(session)
+
+    async def _synchronize_contexts(self, session: CollaborationSession):
+        """Synchronize contexts between all participants."""
+        # Clean expired contexts
+        session.shared_contexts = [
+            ctx for ctx in session.shared_contexts if not ctx.is_expired()
+        ]
+
+        # Limit context count
+        if len(session.shared_contexts) > self.max_shared_contexts_per_session:
+            # Keep most recent contexts
+            session.shared_contexts.sort(key=lambda x: x.timestamp, reverse=True)
+            session.shared_contexts = session.shared_contexts[:self.max_shared_contexts_per_session]
+
+        # Broadcast updated contexts to participants
+        for participant in session.participants:
+            await self._send_context_update(session, participant)
+
+    async def _send_context_update(self, session: CollaborationSession, participant: str):
+        """Send context update to a specific participant."""
+        relevant_contexts = [
+            ctx for ctx in session.shared_contexts
+            if ctx.relevance_score >= self.context_relevance_threshold
+        ]
+
+        if relevant_contexts:
+            await message_broker.send_message(
+                from_agent="collaboration_system",
+                to_agent=participant,
+                topic="context_update",
+                payload={
+                    "session_id": session.session_id,
+                    "contexts": [
+                        {
+                            "type": ctx.context_type.value,
+                            "content": ctx.content,
+                            "source": ctx.source_agent,
+                            "timestamp": ctx.timestamp,
+                            "relevance": ctx.relevance_score,
+                        }
+                        for ctx in relevant_contexts
+                    ],
+                    "timestamp": time.time(),
+                },
+                message_type=MessageType.NOTIFICATION,
+            )
+
+    async def share_context(
+        self,
+        session_id: str,
+        context_type: ContextShareType,
+        content: dict[str, Any],
+        source_agent: str,
+        tags: set[str] | None = None,
+    ):
+        """Share context within a collaboration session."""
+        session = self.active_sessions.get(session_id)
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        # Calculate relevance score based on context type and content
+        relevance_score = await self._calculate_context_relevance(
+            session, context_type, content
+        )
+
+        if relevance_score >= self.context_relevance_threshold:
+            shared_context = SharedContext(
+                session_id=session_id,
+                context_type=context_type,
+                content=content,
+                source_agent=source_agent,
+                relevance_score=relevance_score,
+                tags=tags or set(),
+                expiry_time=time.time() + (self.context_retention_hours * 3600),
+            )
+
+            session.shared_contexts.append(shared_context)
+            session.context_exchanges += 1
+            self.collaboration_metrics["contexts_shared"] += 1
+
+            # Broadcast to other participants
+            for participant in session.participants:
+                if participant != source_agent:
+                    await self._send_context_update(session, participant)
+
+            logger.debug(
+                "Context shared in session",
+                session_id=session_id,
+                type=context_type.value,
+                source=source_agent,
+                relevance=relevance_score,
+            )
+
+    async def _calculate_context_relevance(
+        self, session: CollaborationSession, context_type: ContextShareType, content: dict[str, Any]
+    ) -> float:
+        """Calculate relevance score for shared context."""
+        # Base relevance by context type
+        base_relevance = {
+            ContextShareType.CODE_PATTERNS: 0.9,
+            ContextShareType.BUG_PATTERNS: 0.8,
+            ContextShareType.BEST_PRACTICES: 0.7,
+            ContextShareType.ARCHITECTURE_KNOWLEDGE: 0.8,
+            ContextShareType.PERFORMANCE_INSIGHTS: 0.6,
+            ContextShareType.TESTING_STRATEGIES: 0.7,
+            ContextShareType.PROJECT_HISTORY: 0.5,
+            ContextShareType.DOMAIN_KNOWLEDGE: 0.6,
+        }.get(context_type, 0.5)
+
+        # Adjust based on session context and active files
+        if context_type == ContextShareType.CODE_PATTERNS:
+            # Higher relevance if related to active files
+            if any(file in str(content) for file in session.active_files):
+                base_relevance += 0.2
+
+        return min(base_relevance, 1.0)  # Cap at 1.0
+
+    async def get_session_status(self, session_id: str) -> dict[str, Any]:
+        """Get status of a collaboration session."""
+        session = self.active_sessions.get(session_id)
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        return {
+            "session_id": session.session_id,
+            "participants": session.participants,
+            "mode": session.mode.value,
+            "current_driver": session.current_driver,
+            "active_phase": session.active_phase.value,
+            "context_exchanges": session.context_exchanges,
+            "shared_contexts_count": len(session.shared_contexts),
+            "active_files": list(session.active_files),
+            "duration": time.time() - session.start_time,
+        }
+
+    async def end_session(self, session_id: str):
+        """End a collaboration session."""
+        if session_id in self.active_sessions:
+            session = self.active_sessions[session_id]
+
+            # Broadcast session end
+            for participant in session.participants:
+                await message_broker.send_message(
+                    from_agent="collaboration_system",
+                    to_agent=participant,
+                    topic="session_ended",
+                    payload={
+                        "session_id": session_id,
+                        "timestamp": time.time(),
+                    },
+                    message_type=MessageType.NOTIFICATION,
+                )
+
+            # Clean up
+            del self.active_sessions[session_id]
+
+            logger.info("Collaboration session ended", session_id=session_id)
+
     async def start_enhanced_session(
         self,
         participants: list[str],
