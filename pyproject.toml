@@ -29,6 +29,8 @@ dependencies = [
     "psutil>=5.9.0",
     "greenlet>=3.2.3",
     "pyjwt>=2.10.1",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
 ]
 
 [project.optional-dependencies]

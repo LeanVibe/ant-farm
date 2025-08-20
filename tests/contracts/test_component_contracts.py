@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
 
 from src.core.contracts import BrokerSendResult, BrokerSendReason
 
@@ -20,7 +21,7 @@ from src.core.contracts import BrokerSendResult, BrokerSendReason
 class TestEnhancedMessageBrokerContract:
     """Contract tests for EnhancedMessageBroker component."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def mock_dependencies(self):
         """Setup mocked dependencies for isolation."""
         mock_redis = AsyncMock()
@@ -34,7 +35,7 @@ class TestEnhancedMessageBrokerContract:
 
         return {"redis": mock_redis, "session": mock_session}
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def enhanced_message_broker(self, mock_dependencies):
         """Create EnhancedMessageBroker with mocked dependencies."""
         # Patch the factory function used inside enhanced_message_broker
@@ -148,6 +149,94 @@ class TestEnhancedMessageBrokerContract:
         )
 
         # Should handle errors gracefully and return False
+        result = await enhanced_message_broker.send_message(
+            "test_agent", "target_agent", "test_topic", {"data": "test"}
+        )
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_broker_send_result_contract(self, enhanced_message_broker):
+        """Test BrokerSendResult contract for structured API."""
+        # Test successful send with structured result
+        result = await enhanced_message_broker.send_message_with_result(
+            from_agent="test_agent",
+            to_agent="target_agent",
+            topic="test_topic",
+            payload={"data": "test"},
+        )
+
+        # Verify result structure
+        assert isinstance(result, BrokerSendResult)
+        assert result.success is True
+        assert result.reason == BrokerSendReason.OK
+        assert result.message_id is not None
+        assert isinstance(result.message_id, str)
+
+    @pytest.mark.asyncio
+    async def test_broker_send_result_failure_contract(self, enhanced_message_broker, mock_dependencies):
+        """Test BrokerSendResult contract for failure cases."""
+        # Simulate Redis failure
+        mock_dependencies["redis"].publish.side_effect = Exception("Redis connection failed")
+
+        # Test structured failure result
+        result = await enhanced_message_broker.send_message_with_result(
+            from_agent="test_agent",
+            to_agent="target_agent",
+            topic="test_topic",
+            payload={"data": "test"},
+        )
+
+        # Verify failure result structure
+        assert isinstance(result, BrokerSendResult)
+        assert result.success is False
+        assert result.reason == BrokerSendReason.PUBLISH_ERROR
+        assert result.message_id is None
+        assert "Redis connection failed" in str(result.details)
+
+    @pytest.mark.asyncio
+    async def test_boolean_api_backward_compatibility(self, enhanced_message_broker):
+        """Test that boolean API remains backward compatible."""
+        # Test boolean API still works
+        result = await enhanced_message_broker.send_message(
+            from_agent="test_agent",
+            to_agent="target_agent",
+            topic="test_topic",
+            payload={"data": "test"},
+        )
+
+        # Should return boolean for backward compatibility
+        assert isinstance(result, bool)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_structured_api_idempotency(self, enhanced_message_broker):
+        """Test structured API with idempotency."""
+        idempotency_key = "test_idempotent_key"
+
+        # First send should succeed
+        result1 = await enhanced_message_broker.send_message_with_result(
+            from_agent="test_agent",
+            to_agent="target_agent",
+            topic="test_topic",
+            payload={"data": "test1"},
+            idempotency_key=idempotency_key,
+        )
+
+        assert result1.success is True
+        assert result1.reason == BrokerSendReason.OK
+
+        # Second send with same key should return idempotent duplicate
+        result2 = await enhanced_message_broker.send_message_with_result(
+            from_agent="test_agent",
+            to_agent="target_agent",
+            topic="test_topic",
+            payload={"data": "test2"},
+            idempotency_key=idempotency_key,
+        )
+
+        assert result2.success is True
+        assert result2.reason == BrokerSendReason.IDEMPOTENT_DUPLICATE
+        assert result2.message_id is None
         result = await enhanced_message_broker.send_message(
             "test_agent", "target_agent", "test_topic", {"test": "data"}
         )

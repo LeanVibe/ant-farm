@@ -1,0 +1,44 @@
+version: 1
+plan_id: epic4-structured-api
+goal: "Adopt BrokerSendResult for explicit reliability semantics"
+
+batches:
+  - name: broker-contracts
+    tasks:
+      - type: edit
+        file: tests/contracts/test_component_contracts.py
+        apply: |
+          Add BrokerSendResult contract tests for base and enhanced brokers:
+          - Test that both boolean and structured result APIs work
+          - Verify structured results include success, reason, and message_id
+          - Ensure backward compatibility with existing boolean paths
+    verify:
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py --no-cov"
+    commit:
+      message: "test(contracts): add BrokerSendResult API contracts"
+
+  - name: orchestrator-adoption
+    depends_on: ["broker-contracts"]
+    tasks:
+      - type: edit
+        file: src/core/orchestrator.py
+        apply: |
+          Migrate orchestrator heartbeat/broadcast to send_message_with_result:
+          - Replace send_message with send_message_with_result
+          - Add structured logging for failure reasons
+          - Handle BrokerSendResult responses appropriately
+    verify:
+      - run: "uv run pytest -q tests/unit/test_orchestrator.py --no-cov"
+    commit:
+      message: "feat(orchestrator): adopt structured broker send results"
+
+  - name: verify-backward-compatibility
+    depends_on: ["orchestrator-adoption"]
+    tasks:
+      - type: run
+        command: "uv run pytest -q tests/unit/test_message_broker*.py --no-cov -v"
+        description: "Run all broker tests to ensure no regressions"
+    verify:
+      - run: "echo 'Verify all tests pass and no AsyncMock warnings'"
+    commit:
+      message: "test(broker): verify structured API adoption maintains compatibility"
