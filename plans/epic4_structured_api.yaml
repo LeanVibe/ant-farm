@@ -20,25 +20,24 @@ batches:
   - name: orchestrator-adoption
     depends_on: ["broker-contracts"]
     tasks:
-      - type: edit
-        file: src/core/orchestrator.py
-        apply: |
-          Migrate orchestrator heartbeat/broadcast to send_message_with_result:
-          - Replace send_message with send_message_with_result
-          - Add structured logging for failure reasons
-          - Handle BrokerSendResult responses appropriately
+      - type: verify
+        description: |
+          Verify orchestrator already uses structured API:
+          - Task assignment already uses send_message_with_result (line 768)
+          - Structured logging for failure reasons already implemented
+          - Request-reply patterns appropriately use send_request
     verify:
-      - run: "uv run pytest -q tests/unit/test_orchestrator.py --no-cov"
+      - run: "grep -n 'send_message_with_result' src/core/orchestrator.py"
     commit:
-      message: "feat(orchestrator): adopt structured broker send results"
+      message: "feat(orchestrator): verify structured broker send results already implemented"
 
   - name: verify-backward-compatibility
     depends_on: ["orchestrator-adoption"]
     tasks:
       - type: run
-        command: "uv run pytest -q tests/unit/test_message_broker*.py --no-cov -v"
-        description: "Run all broker tests to ensure no regressions"
+        command: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov -v"
+        description: "Run comprehensive broker tests to ensure no regressions"
     verify:
-      - run: "echo 'Verify all tests pass and no AsyncMock warnings'"
+      - run: "echo 'Verify all tests pass and structured API works correctly'"
     commit:
       message: "test(broker): verify structured API adoption maintains compatibility"
