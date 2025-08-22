@@ -28,7 +28,7 @@ batches:
           - flush_dlq_metrics() method already implemented
           - Need to ensure periodic flush happens when HIVE_METRICS_FLUSH=1
     verify:
-      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_dlq_metrics --override-ini addopts=\"--strict-markers --strict-config\""
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::TestMessageBrokerMetrics::test_dlq_metrics --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "feat(broker): add DLQ metrics collection and persistence"
 

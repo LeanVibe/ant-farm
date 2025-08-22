@@ -157,6 +157,7 @@ class MessageBroker:
         self._dlq_reasons: dict[str, int] = {}
         self._last_dlq_flush = 0.0
         self._dlq_flush_interval = 60.0  # Flush every 60 seconds
+        self._async_db_manager = None  # Will be set when needed
 
     async def initialize(self) -> None:
         """Initialize the message broker."""
@@ -805,6 +806,54 @@ class MessageBroker:
             max_retries=int(data.get("max_retries", 3)),
             idempotency_key=data.get("idempotency_key"),
         )
+
+    def increment_dlq_reason(self, reason: str) -> None:
+        """Increment DLQ reason counter."""
+        self._dlq_reasons[reason] = self._dlq_reasons.get(reason, 0) + 1
+
+    async def flush_dlq_metrics(self, async_db_manager, agent_uuid: str, agent_name: str) -> None:
+        """Flush DLQ metrics to database if feature flag is enabled."""
+        import os
+        if not os.getenv("HIVE_METRICS_FLUSH", "0") == "1":
+            return
+
+        if not async_db_manager or not agent_uuid:
+            logger.debug("Cannot flush DLQ metrics - database manager or agent UUID not available")
+            return
+
+        try:
+            # Convert DLQ reasons to metric format for bulk write
+            metrics_to_write = []
+            current_time = time.time()
+
+            for reason, count in self._dlq_reasons.items():
+                metrics_to_write.append(
+                    {
+                        "metric_name": "message_broker_dlq_reasons",
+                        "metric_type": "counter",
+                        "value": float(count),
+                        "unit": "count",
+                        "agent_id": agent_uuid,
+                        "labels": {
+                            "reason": reason,
+                            "agent_name": agent_name,
+                        },
+                    }
+                )
+
+            if metrics_to_write:
+                written_count = await async_db_manager.record_metrics_bulk(metrics_to_write)
+                logger.debug(
+                    "Flushed DLQ metrics to database",
+                    agent=agent_name,
+                    metrics_count=written_count,
+                )
+
+                # Clear counters after successful flush
+                self._dlq_reasons.clear()
+
+        except Exception as e:
+            logger.error("Failed to flush DLQ metrics", agent=agent_name, error=str(e))
 
     async def shutdown(self) -> None:
         """Shutdown the message broker and close connections."""

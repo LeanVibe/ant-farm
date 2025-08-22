@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -648,3 +649,59 @@ class TestMessageBrokerIntegration:
         # Assert - Broadcast message sent
         assert success is True
         mock_redis.publish.assert_called()
+
+
+class TestMessageBrokerMetrics:
+    """Test message broker metrics functionality."""
+
+    @pytest.mark.asyncio
+    async def test_dlq_metrics(self):
+        """Test DLQ metrics collection and flushing."""
+        with patch("src.core.message_broker.redis.from_url") as mock_redis:
+            # Create a mock Redis client
+            rc = AsyncMock()
+            rc.ping = AsyncMock(return_value=True)
+            rc.close = AsyncMock(return_value=None)
+            mock_redis.return_value = rc
+
+            from src.core.message_broker import MessageBroker
+            from src.testing.fakes.fake_pubsub import FakePubSub
+
+            fake_pubsub = FakePubSub()
+            broker = MessageBroker("redis://localhost:6379", pubsub=fake_pubsub)
+            await broker.initialize()
+
+            # Mock async database manager
+            mock_async_db_manager = AsyncMock()
+            mock_async_db_manager.record_metrics_bulk = AsyncMock(return_value=2)
+
+            # Increment DLQ reasons
+            broker.increment_dlq_reason("handler_error")
+            broker.increment_dlq_reason("timeout")
+            broker.increment_dlq_reason("handler_error")  # Increment again
+
+            # Flush metrics with feature flag enabled
+            with patch.dict(os.environ, {"HIVE_METRICS_FLUSH": "1"}):
+                await broker.flush_dlq_metrics(
+                    mock_async_db_manager, "test-uuid", "test-agent"
+                )
+
+            # Verify metrics were written
+            mock_async_db_manager.record_metrics_bulk.assert_called_once()
+            call_args = mock_async_db_manager.record_metrics_bulk.call_args[0][0]
+
+            # Should have 2 metrics (handler_error: 2, timeout: 1)
+            assert len(call_args) == 2
+
+            # Check handler_error metric
+            handler_error_metric = next(m for m in call_args if m["labels"]["reason"] == "handler_error")
+            assert handler_error_metric["value"] == 2.0
+            assert handler_error_metric["agent_id"] == "test-uuid"
+
+            # Check timeout metric
+            timeout_metric = next(m for m in call_args if m["labels"]["reason"] == "timeout")
+            assert timeout_metric["value"] == 1.0
+            assert timeout_metric["agent_id"] == "test-uuid"
+
+            # Verify counters were cleared
+            assert len(broker._dlq_reasons) == 0
