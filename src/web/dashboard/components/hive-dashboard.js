@@ -119,26 +119,154 @@ export class HiveDashboard extends LitElement {
             .dashboard {
                 grid-template-columns: 1fr;
                 grid-template-rows: 60px auto 1fr;
-                grid-template-areas: 
+                grid-template-areas:
                     "header"
                     "sidebar"
                     "main";
             }
 
+            .header {
+                padding: 0 1rem;
+                font-size: 0.9rem;
+            }
+
+            .logo {
+                font-size: 1.2rem;
+            }
+
             .sidebar {
                 display: flex;
                 overflow-x: auto;
-                padding: 1rem;
+                padding: 0.5rem 1rem;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .sidebar::-webkit-scrollbar {
+                display: none;
             }
 
             .nav-item {
                 white-space: nowrap;
-                margin-right: 1rem;
+                margin-right: 0.5rem;
+                padding: 0.5rem 0.75rem;
+                font-size: 0.85rem;
+                min-width: auto;
             }
 
             .grid-layout {
                 grid-template-columns: 1fr;
+                gap: 1rem;
             }
+
+            .widget {
+                margin: 0;
+            }
+
+            .main {
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 0 0.5rem;
+            }
+
+            .logo {
+                font-size: 1rem;
+            }
+
+            .status-indicator {
+                font-size: 0.8rem;
+                gap: 0.25rem;
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+            }
+
+            .nav-item {
+                padding: 0.5rem 0.5rem;
+                font-size: 0.8rem;
+            }
+
+            .main {
+                padding: 0.5rem;
+            }
+
+            .widget-header {
+                padding: 0.75rem 1rem;
+                font-size: 0.9rem;
+            }
+
+            .widget-content {
+                padding: 1rem 0.75rem;
+            }
+        }
+
+        /* Touch-friendly interactions */
+        .touch-target {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Swipe gestures for mobile */
+        .swipe-container {
+            touch-action: pan-y;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .swipe-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* PWA install prompt */
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 212, 170, 0.95);
+            color: #1a1a2e;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+        }
+
+        .install-prompt.show {
+            display: block;
+        }
+
+        .install-prompt .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .install-prompt .btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .install-prompt .btn-primary {
+            background: #1a1a2e;
+            color: #00d4aa;
+        }
+
+        .install-prompt .btn-secondary {
+            background: transparent;
+            color: #1a1a2e;
         }
     `;
 

@@ -1,0 +1,100 @@
+version: 1
+plan_id: mobile-pwa-completion
+goal: "Complete Mobile PWA with responsive design, offline capabilities, and push notifications"
+
+batches:
+  - name: responsive-design
+    tasks:
+      - type: edit
+        file: src/web/dashboard/styles/dashboard.css
+        apply: |
+          Add comprehensive responsive design media queries:
+          - Mobile-first approach with breakpoints for tablet and desktop
+          - Touch-friendly button sizes and spacing
+          - Optimized typography scaling
+          - Flexible grid layouts for all screen sizes
+          - Mobile navigation patterns
+    verify:
+      - run: "echo 'Manual verification: Test responsive design on different screen sizes'"
+    commit:
+      message: "feat(pwa): add comprehensive responsive design with mobile-first approach"
+
+  - name: enhanced-service-worker
+    tasks:
+      - type: edit
+        file: src/web/dashboard/sw.js
+        apply: |
+          Enhance service worker with advanced offline capabilities:
+          - Background sync for failed API calls
+          - Cache-first strategy for static assets
+          - Network-first strategy for dynamic data
+          - Cache versioning and cleanup
+          - Offline page serving
+    verify:
+      - run: "echo 'Manual verification: Test offline functionality and cache behavior'"
+    commit:
+      message: "feat(pwa): enhance service worker with advanced offline capabilities"
+
+  - name: push-notifications
+    tasks:
+      - type: edit
+        file: src/web/dashboard/services/pwa-manager.js
+        apply: |
+          Implement push notification system:
+          - Notification permission management
+          - Web Push API integration
+          - Notification preferences
+          - Critical event notifications
+          - Background notification handling
+    verify:
+      - run: "echo 'Manual verification: Test push notification subscription and delivery'"
+    commit:
+      message: "feat(pwa): implement push notification system for critical events"
+
+  - name: mobile-interactions
+    tasks:
+      - type: edit
+        file: src/web/dashboard/components/hive-dashboard.js
+        apply: |
+          Add mobile-specific interactions:
+          - Touch gesture support
+          - Swipe navigation
+          - Pull-to-refresh functionality
+          - Mobile-optimized modals and dialogs
+          - Touch-friendly controls
+    verify:
+      - run: "echo 'Manual verification: Test touch interactions on mobile devices'"
+    commit:
+      message: "feat(pwa): add mobile-specific interactions and touch optimizations"
+
+  - name: performance-optimization
+    tasks:
+      - type: edit
+        file: src/web/dashboard/services/api-service.js
+        apply: |
+          Optimize performance for mobile networks:
+          - Request compression and optimization
+          - Lazy loading for components
+          - Image optimization and WebP support
+          - Connection pooling and reuse
+          - Progressive loading strategies
+    verify:
+      - run: "echo 'Manual verification: Test performance on slow mobile networks'"
+    commit:
+      message: "feat(pwa): optimize performance for mobile networks and devices"
+
+  - name: manifest-enhancement
+    tasks:
+      - type: edit
+        file: src/web/dashboard/manifest.json
+        apply: |
+          Enhance PWA manifest for better mobile experience:
+          - Add mobile-specific icons and splash screens
+          - Configure proper display modes
+          - Add orientation preferences
+          - Configure theme colors for mobile
+          - Add shortcuts for common actions
+    verify:
+      - run: "echo 'Manual verification: Test PWA installation and mobile experience'"
+    commit:
+      message: "feat(pwa): enhance manifest for optimal mobile experience"

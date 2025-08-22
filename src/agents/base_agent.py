@@ -814,6 +814,25 @@ class BaseAgent(ABC):
         await message_broker.stop_listening(self.name)
         logger.info("Agent stopped", agent=self.name)
 
+    async def flush_metrics_if_enabled(self) -> None:
+        """Flush CLI tool metrics to database if feature flag is enabled."""
+        if not self.async_db_manager or not self.agent_uuid:
+            return
+
+        try:
+            await self.cli_tools.flush_metrics(
+                async_db_manager=self.async_db_manager,
+                agent_uuid=self.agent_uuid,
+                agent_name=self.name,
+                agent_type=self.agent_type,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to flush CLI metrics",
+                agent=self.name,
+                error=str(e)
+            )
+
     @abstractmethod
     async def run(self) -> None:
         """Main agent execution loop - must be implemented by subclasses."""

@@ -1,18 +1,104 @@
 """Unit tests for base agent functionality."""
 
-from unittest.mock import patch
+import asyncio
+import os
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.agents.base_agent import CLIToolManager
-from src.agents.base_agent import CLIToolType
+from src.agents.base_agent import BaseAgent, CLIToolManager, CLIToolType
 
 import pytest
-
-# Import the classes we'll be testing (when they exist)
-# from src.agents.base_agent import BaseAgent
 
 
 class TestBaseAgent:
     """Test cases for BaseAgent class."""
+
+    @pytest.fixture
+    def mock_async_db_manager(self):
+        """Mock async database manager."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_cli_tools(self):
+        """Mock CLI tool manager."""
+        return MagicMock(spec=CLIToolManager)
+
+    @pytest.fixture
+    def base_agent(self, mock_async_db_manager, mock_cli_tools):
+        """Create a test BaseAgent instance."""
+        with patch('src.agents.base_agent.get_persistent_cli_manager'), \
+             patch('src.agents.base_agent.get_async_database_manager', return_value=mock_async_db_manager), \
+             patch('src.agents.base_agent.message_broker'):
+
+            # Create a concrete implementation for testing
+            class TestAgent(BaseAgent):
+                async def run(self):
+                    pass
+
+            agent = TestAgent(
+                name="test_agent",
+                agent_type="test_type",
+                role="test_role"
+            )
+            agent.cli_tools = mock_cli_tools
+            agent.async_db_manager = mock_async_db_manager
+            agent.agent_uuid = "test-uuid-123"
+            return agent
+
+    @pytest.mark.asyncio
+    async def test_flush_metrics_if_enabled_disabled(self, base_agent, mock_cli_tools):
+        """Test that metrics are not flushed when feature flag is disabled."""
+        # Ensure feature flag is not set
+        with patch.dict(os.environ, {}, clear=True):
+            await base_agent.flush_metrics_if_enabled()
+
+        # flush_metrics should not be called
+        mock_cli_tools.flush_metrics.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_flush_metrics_if_enabled_enabled(self, base_agent, mock_cli_tools, mock_async_db_manager):
+        """Test that metrics are flushed when feature flag is enabled."""
+        # Set feature flag
+        with patch.dict(os.environ, {"HIVE_METRICS_FLUSH": "1"}):
+            await base_agent.flush_metrics_if_enabled()
+
+        # flush_metrics should be called with correct parameters
+        mock_cli_tools.flush_metrics.assert_called_once_with(
+            mock_async_db_manager,
+            "test-uuid-123",
+            "test_agent",
+            "test_type"
+        )
+
+    @pytest.mark.asyncio
+    async def test_flush_metrics_if_enabled_no_db_manager(self, base_agent, mock_cli_tools):
+        """Test that metrics are not flushed when database manager is not available."""
+        base_agent.async_db_manager = None
+
+        with patch.dict(os.environ, {"HIVE_METRICS_FLUSH": "1"}):
+            await base_agent.flush_metrics_if_enabled()
+
+        mock_cli_tools.flush_metrics.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_flush_metrics_if_enabled_no_agent_uuid(self, base_agent, mock_cli_tools):
+        """Test that metrics are not flushed when agent UUID is not available."""
+        base_agent.agent_uuid = None
+
+        with patch.dict(os.environ, {"HIVE_METRICS_FLUSH": "1"}):
+            await base_agent.flush_metrics_if_enabled()
+
+        mock_cli_tools.flush_metrics.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_flush_metrics_if_enabled_exception_handling(self, base_agent, mock_cli_tools):
+        """Test that exceptions during metrics flush are handled gracefully."""
+        mock_cli_tools.flush_metrics.side_effect = Exception("Test error")
+
+        with patch.dict(os.environ, {"HIVE_METRICS_FLUSH": "1"}):
+            # Should not raise exception
+            await base_agent.flush_metrics_if_enabled()
+
+        mock_cli_tools.flush_metrics.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_base_agent_initialization(self, mock_cli_tools):

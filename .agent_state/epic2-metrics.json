@@ -1,0 +1,13 @@
+{
+  "plan_id": "epic2-metrics",
+  "last_completed_batch": null,
+  "created_by": "plan_runner",
+  "version": 1,
+  "completed_batches": [],
+  "failed_batches": [
+    "agent-metrics-flush"
+  ],
+  "failed_batch_errors": {
+    "agent-metrics-flush": "verify failed: uv run pytest -q tests/unit/test_base_agent.py::TestBaseAgent::test_flush_metrics_if_enabled_enabled --override-ini addopts=\"--strict-markers --strict-config\""
+  }
+}

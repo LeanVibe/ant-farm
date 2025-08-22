@@ -8,6 +8,10 @@
     "add-broker-di-seam",
     "update-broker-tests"
   ],
-  "failed_batches": [],
-  "failed_batch_errors": {}
+  "failed_batches": [
+    "update-isolation-tests"
+  ],
+  "failed_batch_errors": {
+    "update-isolation-tests": "verify failed: uv run pytest -q tests/unit/test_message_broker_isolation.py --override-ini addopts=\"--strict-markers --strict-config\""
+  }
 }

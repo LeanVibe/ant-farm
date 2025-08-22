@@ -13,7 +13,7 @@ batches:
           - Need to call this method periodically from BaseAgent
           - Add method to call CLI manager flush_metrics() and expose agent_uuid
     verify:
-      - run: "uv run pytest -q tests/unit/test_base_agent.py::test_metrics_flush --no-cov"
+      - run: "uv run pytest -q tests/unit/test_base_agent.py::TestBaseAgent::test_flush_metrics_if_enabled_enabled --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "feat(agents): add metrics flush with feature flag"
 
@@ -28,7 +28,7 @@ batches:
           - flush_dlq_metrics() method already implemented
           - Need to ensure periodic flush happens when HIVE_METRICS_FLUSH=1
     verify:
-      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_dlq_metrics --no-cov"
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_dlq_metrics --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "feat(broker): add DLQ metrics collection and persistence"
 
@@ -43,6 +43,6 @@ batches:
           - Need to enhance it to include actual CLI tool counters from agents
           - Add agent CLI counters aggregation when HIVE_METRICS_FLUSH=1
     verify:
-      - run: "uv run pytest -q tests/integration/test_api.py::test_metrics_api --no-cov"
+      - run: "uv run pytest -q tests/integration/test_api.py::test_metrics_api --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "feat(api): expose aggregated metrics in API endpoint"

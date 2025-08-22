@@ -44,7 +44,7 @@ batches:
           - Use FakePubSub for deterministic message flow
           - Maintain test coverage while eliminating warnings
     verify:
-      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "test(broker): use FakePubSub to eliminate AsyncMock warnings"
 
@@ -59,16 +59,15 @@ batches:
           - Ensure deterministic routing behavior
           - Verify minimal routing scenarios work correctly
     verify:
-      - run: "uv run pytest -q tests/unit/test_message_broker_isolation.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_message_broker_isolation.py --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "test(broker): update isolation tests with FakePubSub"
 
   - name: verify-no-asyncmock-warnings
     depends_on: ["update-isolation-tests"]
     tasks:
-      - type: run
-        command: "uv run pytest -q tests/unit/test_message_broker*.py --no-cov -v"
-        description: "Run all broker tests to verify no AsyncMock warnings"
+      - type: command
+        run: "uv run pytest -q tests/unit/test_message_broker*.py --override-ini addopts=\"--strict-markers --strict-config\" -v"
     verify:
       - run: "echo 'Manual verification: Check for AsyncMock warnings in output'"
     commit:
