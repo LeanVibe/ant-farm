@@ -1,15 +1,16 @@
 {
   "plan_id": "epic2-metrics",
-  "last_completed_batch": "agent-metrics-flush",
+  "last_completed_batch": "broker-dlq-metrics",
   "created_by": "plan_runner",
   "version": 1,
   "completed_batches": [
-    "agent-metrics-flush"
-  ],
-  "failed_batches": [
+    "agent-metrics-flush",
     "broker-dlq-metrics"
   ],
+  "failed_batches": [
+    "metrics-api-endpoint"
+  ],
   "failed_batch_errors": {
-    "broker-dlq-metrics": "verify failed: uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_dlq_metrics --override-ini addopts=\"--strict-markers --strict-config\""
+    "metrics-api-endpoint": "verify failed: uv run pytest -q tests/integration/test_api.py::test_metrics_api --override-ini addopts=\"--strict-markers --strict-config\""
   }
 }

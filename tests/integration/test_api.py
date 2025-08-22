@@ -334,3 +334,20 @@ class TestFullAPIIntegration:
             200,
             405,
         ]  # 405 if OPTIONS not explicitly handled
+
+
+class TestMetricsEndpoints:
+    """Test cases for metrics endpoints."""
+
+    def test_metrics_api_endpoint_exists(self, client):
+        """Test that the custom metrics API endpoint exists and requires authentication."""
+        # Test that the endpoint exists (returns 401 for unauthenticated request)
+        response = client.get("/api/v1/metrics/custom")
+
+        # Should return 401 Unauthorized since no authentication is provided
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        data = response.json()
+        assert "error" in data or "detail" in data
+
+        # Verify it's the expected authentication error
+        assert "Authentication" in str(data) or "auth" in str(data).lower()

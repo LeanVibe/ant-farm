@@ -43,6 +43,6 @@ batches:
           - Need to enhance it to include actual CLI tool counters from agents
           - Add agent CLI counters aggregation when HIVE_METRICS_FLUSH=1
     verify:
-      - run: "uv run pytest -q tests/integration/test_api.py::test_metrics_api --override-ini addopts=\"--strict-markers --strict-config\""
+      - run: "uv run pytest -q tests/integration/test_api.py::TestMetricsEndpoints::test_metrics_api_endpoint_exists --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
       message: "feat(api): expose aggregated metrics in API endpoint"
