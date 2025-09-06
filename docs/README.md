@@ -21,6 +21,13 @@
 - **[../ENHANCED_COMMUNICATION_SUMMARY.md](../ENHANCED_COMMUNICATION_SUMMARY.md)** - Inter-agent communication system
 - **[PROMPT.md](PROMPT.md)** - AI agent system context
 
+## 🧪 Quality Assurance & Testing
+
+- **[testing-strategy-user-profile-crud.md](testing-strategy-user-profile-crud.md)** - Comprehensive testing strategy for user profile operations
+- **[security-test-scenarios-user-profile-crud.md](security-test-scenarios-user-profile-crud.md)** - Security testing framework and scenarios
+- **[performance-edge-case-testing-user-profile-crud.md](performance-edge-case-testing-user-profile-crud.md)** - Performance testing and edge case validation
+- **[qa-analysis-user-profile-crud-summary.md](qa-analysis-user-profile-crud-summary.md)** - QA analysis summary with recommendations
+
 ## 📄 Historical Design Documents
 
 *Maintained for reference - these PRDs guided the system design:*
@@ -49,6 +56,9 @@
 | **API Security** | ✅ | 87% endpoints protected |
 | **Technical Debt** | ✅ | Very Low (manageable) |
 | **Test Coverage** | ✅ | 90%+ core components |
+| **QA Testing Strategy** | ✅ | Complete CRUD validation framework |
+| **Security Testing** | ✅ | Comprehensive security test scenarios |
+| **Performance Testing** | ✅ | Load testing with defined SLAs |
 | **Communication System** | ✅ | Enhanced multi-agent coordination |
 | **Autonomous Operation** | ✅ | 16-24 hour sessions |
 
