@@ -36,9 +36,14 @@ def mock_pair_session():
 @pytest.fixture
 async def enhanced_collaboration(mock_pair_session):
     """Create enhanced collaboration instance."""
-    collaboration = EnhancedAIPairProgramming(mock_pair_session)
-    await collaboration.initialize()
-    return collaboration
+    # Mock get_context_engine to avoid database dependency
+    with patch('src.core.collaboration.enhanced_pair_programming.get_context_engine') as mock_get_context:
+        mock_context_engine = AsyncMock()
+        mock_get_context.return_value = mock_context_engine
+        
+        collaboration = EnhancedAIPairProgramming(mock_pair_session)
+        await collaboration.initialize()
+        return collaboration
 
 
 class TestMultiAgentCollaboration:

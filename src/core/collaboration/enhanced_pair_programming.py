@@ -134,7 +134,9 @@ class EnhancedAIPairProgramming:
 
     async def initialize(self):
         """Initialize the enhanced pair programming system."""
-        self.context_engine = await get_context_engine()
+        from ..config import get_settings
+        settings = get_settings()
+        self.context_engine = await get_context_engine(settings.database_url)
 
         # Load existing patterns and best practices
         await self._load_collaboration_patterns()
