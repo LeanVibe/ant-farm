@@ -14,19 +14,11 @@ import redis.asyncio as redis
 import structlog
 
 logger = structlog.get_logger()
-try:
-    from .contracts import BrokerSendResult, BrokerSendReason
-except Exception:
-    # Soft import for tests if contracts not available
-    class BrokerSendReason:
-        OK = "ok"
-        IDEMPOTENT_DUPLICATE = "idempotent_duplicate"
-        PUBLISH_ERROR = "publish_error"
-        INVALID = "invalid"
+from .contracts import BrokerSendResult, BrokerSendReason
+from .circuit_breaker import get_message_broker_breaker, CircuitBreakerError
 
-    class BrokerSendResult(dict):
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
+# Circuit breaker for message broker operations
+message_broker_breaker = get_message_broker_breaker()
 
 
 class MessageType(Enum):
@@ -159,6 +151,9 @@ class MessageBroker:
         self._dlq_flush_interval = 60.0  # Flush every 60 seconds
         self._async_db_manager = None  # Will be set when needed
 
+        # Circuit breaker for Redis operations
+        self.redis_breaker = get_message_broker_breaker()
+
     async def initialize(self) -> None:
         """Initialize the message broker."""
         await self.redis_client.ping()
@@ -228,7 +223,7 @@ class MessageBroker:
                 idem_key = f"{self.message_prefix}:idem:{idempotency_key}"
                 # set key with NX and 24h TTL; if already exists, consider success
                 try:
-                    ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
+                    ok = await self.redis_breaker.call(self.redis_client.set, idem_key, "1", ex=86400, nx=True)
                     if not ok:
                         logger.info(
                             "Idempotent duplicate suppressed",
@@ -279,7 +274,9 @@ class MessageBroker:
                 "idempotency_key": message.idempotency_key,
             }
 
-            await self.redis_client.publish(
+            # Protect Redis publish with circuit breaker
+            await self.redis_breaker.call(
+                self.redis_client.publish,
                 channel, json.dumps(message_dict, default=str)
             )
 
@@ -296,6 +293,17 @@ class MessageBroker:
 
             return True
 
+        except CircuitBreakerError as e:
+            logger.warning(
+                "Circuit breaker open, failing fast",
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                circuit_breaker=e.service_name,
+                state=e.state.value,
+            )
+            # Don't move to DLQ for circuit breaker failures - they're expected
+            return False
         except Exception as e:
             logger.error(
                 "Failed to send message",
@@ -343,7 +351,7 @@ class MessageBroker:
             if idempotency_key:
                 idem_key = f"{self.message_prefix}:idem:{idempotency_key}"
                 try:
-                    ok = await self.redis_client.set(idem_key, "1", ex=86400, nx=True)
+                    ok = await self.redis_breaker.call(self.redis_client.set, idem_key, "1", ex=86400, nx=True)
                     if not ok:
                         return BrokerSendResult(
                             success=True,
@@ -369,11 +377,28 @@ class MessageBroker:
 
             await self._persist_message(message)
             channel = "broadcast" if to_agent == "broadcast" else f"agent:{to_agent}"
-            await self.redis_client.publish(
+            # Protect Redis publish with circuit breaker
+            await self.redis_breaker.call(
+                self.redis_client.publish,
                 channel, json.dumps(self._serialize_message_for_storage(message))
             )
             return BrokerSendResult(
                 success=True, reason=BrokerSendReason.OK, message_id=message.id
+            )
+        except CircuitBreakerError as e:
+            logger.warning(
+                "Circuit breaker open, failing fast",
+                from_agent=from_agent,
+                to_agent=to_agent,
+                topic=topic,
+                circuit_breaker=e.service_name,
+                state=e.state.value,
+            )
+            return BrokerSendResult(
+                success=False,
+                reason=BrokerSendReason.PUBLISH_ERROR,
+                message_id=None,
+                details=f"Circuit breaker open: {e.service_name}",
             )
         except Exception as e:
             try:
@@ -491,11 +516,13 @@ class MessageBroker:
 
         # Get message IDs from sorted set
         if since:
-            message_ids = await self.redis_client.zrangebyscore(
+            message_ids = await self.redis_breaker.call(
+                self.redis_client.zrangebyscore,
                 history_key, since, "+inf", withscores=False
             )
         else:
-            message_ids = await self.redis_client.zrevrange(
+            message_ids = await self.redis_breaker.call(
+                self.redis_client.zrevrange,
                 history_key, 0, limit - 1, withscores=False
             )
 
@@ -503,13 +530,28 @@ class MessageBroker:
         messages = []
         for message_id in message_ids:
             message_key = f"{self.message_prefix}:{message_id}"
-            message_data = await self.redis_client.hgetall(message_key)
+            message_data = await self.redis_breaker.call(self.redis_client.hgetall, message_key)
 
             if message_data:
                 message = self._deserialize_message(message_data)
                 messages.append(message)
 
         return messages
+
+    async def get_message_history_with_circuit_breaker(
+        self, agent_name: str, limit: int = 100, since: float | None = None
+    ) -> list[Message]:
+        """Get message history with circuit breaker protection."""
+        try:
+            return await self.get_message_history(agent_name, limit, since)
+        except CircuitBreakerError as e:
+            logger.warning(
+                "Circuit breaker open for message history",
+                agent=agent_name,
+                circuit_breaker=e.service_name,
+                state=e.state.value,
+            )
+            return []  # Return empty list when circuit breaker is open
 
     async def get_offline_messages(self, agent_name: str) -> list[Message]:
         """Get messages that arrived while agent was offline."""
@@ -519,12 +561,12 @@ class MessageBroker:
 
         # Process all queued messages
         while True:
-            message_id = await self.redis_client.rpop(queue_key)
+            message_id = await self.redis_breaker.call(self.redis_client.rpop, queue_key)
             if not message_id:
                 break
 
             message_key = f"{self.message_prefix}:{message_id}"
-            message_data = await self.redis_client.hgetall(message_key)
+            message_data = await self.redis_breaker.call(self.redis_client.hgetall, message_key)
 
             if message_data:
                 message = self._deserialize_message(message_data)
@@ -617,17 +659,19 @@ class MessageBroker:
         if message.expires_at:
             ttl = max(1, int(message.expires_at - time.time()))
 
-        await self.redis_client.hset(message_key, mapping=message_data)
-        await self.redis_client.expire(message_key, ttl)
+        # Protect Redis operations with circuit breaker
+        await self.redis_breaker.call(self.redis_client.hset, message_key, mapping=message_data)
+        await self.redis_breaker.call(self.redis_client.expire, message_key, ttl)
 
     async def _queue_for_offline_delivery(self, message: Message) -> None:
         """Queue message for offline agent."""
 
         queue_key = f"{self.queue_prefix}:{message.to_agent}"
-        await self.redis_client.lpush(queue_key, message.id)
+        # Protect Redis operations with circuit breaker
+        await self.redis_breaker.call(self.redis_client.lpush, queue_key, message.id)
 
         # Set TTL for queue
-        await self.redis_client.expire(queue_key, 86400)  # 24 hours
+        await self.redis_breaker.call(self.redis_client.expire, queue_key, 86400)  # 24 hours
 
         logger.debug(
             "Message queued for offline delivery",
@@ -640,14 +684,14 @@ class MessageBroker:
 
         # Store for sender
         sender_key = f"{self.history_prefix}:{message.from_agent}"
-        await self.redis_client.zadd(sender_key, {message.id: message.timestamp})
-        await self.redis_client.expire(sender_key, 604800)  # 7 days
+        await self.redis_breaker.call(self.redis_client.zadd, sender_key, {message.id: message.timestamp})
+        await self.redis_breaker.call(self.redis_client.expire, sender_key, 604800)  # 7 days
 
         # Store for receiver (unless broadcast)
         if message.to_agent != "broadcast":
             receiver_key = f"{self.history_prefix}:{message.to_agent}"
-            await self.redis_client.zadd(receiver_key, {message.id: message.timestamp})
-            await self.redis_client.expire(receiver_key, 604800)  # 7 days
+            await self.redis_breaker.call(self.redis_client.zadd, receiver_key, {message.id: message.timestamp})
+            await self.redis_breaker.call(self.redis_client.expire, receiver_key, 604800)  # 7 days
 
     async def _move_to_dlq(self, message: Message, reason: str) -> None:
         """Move message to dead letter queue and track reason counters."""
@@ -659,8 +703,9 @@ class MessageBroker:
             "timestamp": time.time(),
         }
 
-        await self.redis_client.lpush(dlq_key, json.dumps(dlq_data))
-        await self.redis_client.expire(dlq_key, 604800)  # 7 days
+        # Protect Redis operations with circuit breaker
+        await self.redis_breaker.call(self.redis_client.lpush, dlq_key, json.dumps(dlq_data))
+        await self.redis_breaker.call(self.redis_client.expire, dlq_key, 604800)  # 7 days
 
         logger.warning(
             "Message moved to dead letter queue", message_id=message.id, reason=reason
@@ -898,3 +943,15 @@ def get_message_broker() -> MessageBroker:
             message_broker = MessageBroker()
 
     return message_broker
+
+
+def get_message_broker_status() -> dict[str, Any]:
+    """Get message broker status including circuit breaker information."""
+    broker = get_message_broker()
+    return {
+        "redis_connected": broker.redis_client is not None,
+        "circuit_breaker": broker.redis_breaker.get_status() if hasattr(broker, 'redis_breaker') else None,
+        "active_subscriptions": len(broker.subscriptions),
+        "pending_requests": len(broker.pending_requests),
+        "dlq_metrics": broker._dlq_reasons.copy(),
+    }

@@ -287,6 +287,69 @@ class MockRedisClient:
         )
         return result
 
+    async def zrevrange(
+        self, key: str, start: int, stop: int, withscores: bool = False
+    ) -> list:
+        """Mock Redis ZREVRANGE operation."""
+        start_time = time.time()
+
+        if key not in self.sorted_sets:
+            result = []
+        else:
+            # Sort by score in reverse order (highest first)
+            sorted_items = sorted(self.sorted_sets[key].items(), key=lambda x: x[1], reverse=True)
+
+            # Apply range
+            if stop == -1:
+                range_items = sorted_items[start:]
+            else:
+                range_items = sorted_items[start : stop + 1]
+
+            if withscores:
+                result = [(member, score) for member, score in range_items]
+            else:
+                result = [member for member, score in range_items]
+
+        duration = time.time() - start_time
+        self._record_interaction(
+            "zrevrange", (key, start, stop), {"withscores": withscores}, result, duration
+        )
+        return result
+
+    async def zrangebyscore(
+        self, key: str, min_score: float, max_score: str, withscores: bool = False
+    ) -> list:
+        """Mock Redis ZRANGEBYSCORE operation."""
+        start_time = time.time()
+
+        if key not in self.sorted_sets:
+            result = []
+        else:
+            # Filter by score range
+            if max_score == "+inf":
+                max_val = float('inf')
+            else:
+                max_val = float(max_score)
+
+            filtered_items = [
+                (member, score) for member, score in self.sorted_sets[key].items()
+                if min_score <= score <= max_val
+            ]
+
+            # Sort by score
+            sorted_items = sorted(filtered_items, key=lambda x: x[1])
+
+            if withscores:
+                result = sorted_items
+            else:
+                result = [member for member, score in sorted_items]
+
+        duration = time.time() - start_time
+        self._record_interaction(
+            "zrangebyscore", (key, min_score, max_score), {"withscores": withscores}, result, duration
+        )
+        return result
+
     async def expire(self, key: str, seconds: int) -> bool:
         """Mock Redis EXPIRE operation."""
         start_time = time.time()
@@ -819,8 +882,9 @@ async def create_isolated_message_broker():
 
         # Create broker with mocked Redis
         broker = MessageBroker("redis://mock:6379")
-        broker.redis_client = framework.mock_redis_client
-        broker.pubsub = framework.mock_redis_client.pubsub()
+        if framework.mock_redis_client:
+            broker.redis_client = framework.mock_redis_client  # type: ignore
+            broker.pubsub = framework.mock_redis_client.pubsub()  # type: ignore
 
         return broker, framework
 
@@ -837,8 +901,9 @@ async def create_isolated_enhanced_message_broker():
 
         # Create broker with mocked dependencies
         broker = EnhancedMessageBroker("redis://mock:6379")
-        broker.redis_client = framework.mock_redis_client
-        broker.pubsub = framework.mock_redis_client.pubsub()
+        if framework.mock_redis_client:
+            broker.redis_client = framework.mock_redis_client  # type: ignore
+            broker.pubsub = framework.mock_redis_client.pubsub()  # type: ignore
 
         return broker, framework
 

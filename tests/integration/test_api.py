@@ -39,6 +39,7 @@ class TestHealthEndpoints:
             patch("src.api.main.message_broker") as mock_broker,
         ):
             mock_broker.redis_client.ping.return_value = True
+            mock_orch.return_value = AsyncMock()
 
             response = client.get("/api/v1/health")
             assert response.status_code == status.HTTP_200_OK
@@ -49,11 +50,12 @@ class TestHealthEndpoints:
             patch("src.api.main.task_queue") as mock_queue,
             patch("src.api.main.get_orchestrator") as mock_orch,
         ):
-            mock_queue.get_total_tasks.return_value = 10
-            mock_queue.get_completed_tasks.return_value = 8
-            mock_queue.get_failed_tasks.return_value = 1
-            mock_queue.get_queue_depth.return_value = 1
-            mock_orch.return_value.get_active_agent_count.return_value = 2
+            mock_queue.get_total_tasks = AsyncMock(return_value=10)
+            mock_queue.get_completed_tasks = AsyncMock(return_value=8)
+            mock_queue.get_failed_tasks = AsyncMock(return_value=1)
+            mock_queue.get_queue_depth = AsyncMock(return_value=1)
+            mock_orch.return_value = AsyncMock()
+            mock_orch.return_value.get_active_agent_count = AsyncMock(return_value=2)
 
             response = client.get("/api/v1/status")
             assert response.status_code == status.HTTP_200_OK
@@ -113,9 +115,9 @@ class TestAgentEndpoints:
     def test_list_agents_mock(self, client):
         """Test agent listing endpoint."""
         with patch("src.api.main.get_orchestrator") as mock_orch:
-            mock_registry = AsyncMock()
-            mock_registry.list_agents.return_value = []
-            mock_orch.return_value.registry = mock_registry
+            mock_orch.return_value = AsyncMock()
+            mock_orch.return_value.registry = AsyncMock()
+            mock_orch.return_value.registry.list_agents = AsyncMock(return_value=[])
 
             response = client.get("/api/v1/agents")
 
@@ -127,9 +129,9 @@ class TestAgentEndpoints:
     def test_get_nonexistent_agent_mock(self, client):
         """Test getting non-existent agent returns 404."""
         with patch("src.api.main.get_orchestrator") as mock_orch:
-            mock_registry = AsyncMock()
-            mock_registry.get_agent.return_value = None
-            mock_orch.return_value.registry = mock_registry
+            mock_orch.return_value = AsyncMock()
+            mock_orch.return_value.registry = AsyncMock()
+            mock_orch.return_value.registry.get_agent = AsyncMock(return_value=None)
 
             response = client.get("/api/v1/agents/nonexistent")
 
@@ -141,7 +143,8 @@ class TestAgentEndpoints:
             patch("src.api.main.get_orchestrator") as mock_orch,
             patch("src.api.main.broadcast_event"),
         ):
-            mock_orch.return_value.spawn_agent.return_value = "test-session"
+            mock_orch.return_value = AsyncMock()
+            mock_orch.return_value.spawn_agent = AsyncMock(return_value="test-session")
 
             response = client.post(
                 "/api/v1/agents",

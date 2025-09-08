@@ -268,12 +268,203 @@ export class HiveDashboard extends LitElement {
             background: transparent;
             color: #1a1a2e;
         }
+
+        /* Mobile Navigation */
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-menu-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .mobile-menu-toggle.active {
+            background: rgba(0, 212, 170, 0.2);
+            color: #00d4aa;
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 999;
+        }
+
+        .mobile-overlay.show {
+            display: block;
+        }
+
+        .mobile-nav-panel {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 280px;
+            height: 100vh;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            transition: left 0.3s ease;
+            z-index: 1000;
+            padding: 1rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mobile-nav-panel.open {
+            left: 0;
+        }
+
+        .mobile-nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mobile-nav-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #00d4aa;
+        }
+
+        .mobile-nav-close {
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-nav-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .mobile-nav-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .mobile-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+        }
+
+        .mobile-nav-item:hover,
+        .mobile-nav-item.active {
+            background: rgba(0, 212, 170, 0.2);
+            color: #00d4aa;
+        }
+
+        .mobile-nav-item span:first-child {
+            font-size: 1.2rem;
+        }
+
+        /* Bottom Navigation for Mobile */
+        .bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.5rem;
+            z-index: 100;
+        }
+
+        .bottom-nav.show {
+            display: flex;
+        }
+
+        .bottom-nav-items {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+        }
+
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            min-width: 60px;
+        }
+
+        .bottom-nav-item:hover,
+        .bottom-nav-item.active {
+            background: rgba(0, 212, 170, 0.2);
+            color: #00d4aa;
+        }
+
+        .bottom-nav-item span:first-child {
+            font-size: 1.2rem;
+        }
+
+        .bottom-nav-item span:last-child {
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        /* Swipe gesture support */
+        .swipe-indicator {
+            display: none;
+            position: fixed;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            background: rgba(0, 212, 170, 0.2);
+            color: #00d4aa;
+            padding: 0.5rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            z-index: 50;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .swipe-indicator.show {
+            opacity: 1;
+        }
     `;
 
     static properties = {
         activeView: { type: String },
         systemStatus: { type: Object },
-        notifications: { type: Array }
+        notifications: { type: Array },
+        mobileMenuOpen: { type: Boolean },
+        isMobile: { type: Boolean }
     };
 
     constructor() {
@@ -286,6 +477,10 @@ export class HiveDashboard extends LitElement {
             uptime: 0
         };
         this.notifications = [];
+        this.mobileMenuOpen = false;
+        this.isMobile = window.innerWidth <= 768;
+        this.touchStartX = 0;
+        this.touchStartY = 0;
     }
 
     connectedCallback() {
@@ -293,6 +488,7 @@ export class HiveDashboard extends LitElement {
         this.initializeWebSocket();
         this.loadSystemStatus();
         this.initializePWA();
+        this.initializeMobileFeatures();
     }
 
     initializePWA() {
@@ -348,6 +544,15 @@ export class HiveDashboard extends LitElement {
         return html`
             <div class="dashboard">
                 <header class="header">
+                    ${this.isMobile ? html`
+                        <button
+                            class="mobile-menu-toggle ${this.mobileMenuOpen ? 'active' : ''}"
+                            @click=${this.toggleMobileMenu}
+                            aria-label="Toggle navigation menu"
+                        >
+                            ☰
+                        </button>
+                    ` : ''}
                     <div class="logo">🤖 LeanVibe Hive 2.0</div>
                     <div class="status-indicator">
                         <div class="status-dot"></div>
@@ -363,32 +568,46 @@ export class HiveDashboard extends LitElement {
                     ${this.renderActiveView()}
                 </main>
             </div>
-            
+
+            <!-- Mobile Navigation Panel -->
+            ${this.isMobile ? html`
+                <div
+                    class="mobile-overlay ${this.mobileMenuOpen ? 'show' : ''}"
+                    @click=${this.closeMobileMenu}
+                ></div>
+
+                <div class="mobile-nav-panel ${this.mobileMenuOpen ? 'open' : ''}">
+                    <div class="mobile-nav-header">
+                        <div class="mobile-nav-title">Navigation</div>
+                        <button
+                            class="mobile-nav-close"
+                            @click=${this.closeMobileMenu}
+                            aria-label="Close navigation"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div class="mobile-nav-items">
+                        ${this.renderMobileNavigation()}
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Bottom Navigation for Mobile -->
+            ${this.isMobile ? html`
+                <nav class="bottom-nav ${this.isMobile ? 'show' : ''}">
+                    <div class="bottom-nav-items">
+                        ${this.renderBottomNavigation()}
+                    </div>
+                </nav>
+            ` : ''}
+
+            <!-- Swipe Indicator -->
+            <div class="swipe-indicator"></div>
+
             <!-- Global alert notifications overlay -->
             <alert-notifications></alert-notifications>
         `;
-
-    renderNavigation() {
-        const navItems = [
-            { id: 'overview', icon: '📊', label: 'Overview' },
-            { id: 'adw', icon: '🚀', label: 'ADW Monitor' },
-            { id: 'agents', icon: '🤖', label: 'Agents' },
-            { id: 'tasks', icon: '📋', label: 'Tasks' },
-            { id: 'messages', icon: '💬', label: 'Messages' },
-            { id: 'metrics', icon: '📈', label: 'Metrics' },
-            { id: 'context', icon: '🧠', label: 'Memory' },
-            { id: 'logs', icon: '📝', label: 'Logs' }
-        ];
-
-        return navItems.map(item => html`
-            <div 
-                class="nav-item ${this.activeView === item.id ? 'active' : ''}"
-                @click=${() => this.setActiveView(item.id)}
-            >
-                <span>${item.icon}</span>
-                <span>${item.label}</span>
-            </div>
-        `);
     }
 
     renderActiveView() {
@@ -451,6 +670,168 @@ export class HiveDashboard extends LitElement {
     setActiveView(view) {
         this.activeView = view;
         this.requestUpdate();
+        this.closeMobileMenu();
+    }
+
+    renderNavigation() {
+        const navItems = [
+            { id: 'overview', icon: '📊', label: 'Overview' },
+            { id: 'adw', icon: '🚀', label: 'ADW Monitor' },
+            { id: 'agents', icon: '🤖', label: 'Agents' },
+            { id: 'tasks', icon: '📋', label: 'Tasks' },
+            { id: 'messages', icon: '💬', label: 'Messages' },
+            { id: 'metrics', icon: '📈', label: 'Metrics' },
+            { id: 'context', icon: '🧠', label: 'Memory' },
+            { id: 'logs', icon: '📝', label: 'Logs' }
+        ];
+
+        return navItems.map(item => html`
+            <div
+                class="nav-item ${this.activeView === item.id ? 'active' : ''}"
+                @click=${() => this.setActiveView(item.id)}
+            >
+                <span>${item.icon}</span>
+                <span>${item.label}</span>
+            </div>
+        `);
+    }
+
+    renderMobileNavigation() {
+        const navItems = [
+            { id: 'overview', icon: '📊', label: 'Overview' },
+            { id: 'adw', icon: '🚀', label: 'ADW Monitor' },
+            { id: 'agents', icon: '🤖', label: 'Agents' },
+            { id: 'tasks', icon: '📋', label: 'Tasks' },
+            { id: 'messages', icon: '💬', label: 'Messages' },
+            { id: 'metrics', icon: '📈', label: 'Metrics' },
+            { id: 'context', icon: '🧠', label: 'Memory' },
+            { id: 'logs', icon: '📝', label: 'Logs' }
+        ];
+
+        return navItems.map(item => html`
+            <div
+                class="mobile-nav-item ${this.activeView === item.id ? 'active' : ''}"
+                @click=${() => this.handleMobileNavClick(item.id)}
+            >
+                <span>${item.icon}</span>
+                <span>${item.label}</span>
+            </div>
+        `);
+    }
+
+    renderBottomNavigation() {
+        const bottomItems = [
+            { id: 'overview', icon: '📊', label: 'Home' },
+            { id: 'agents', icon: '🤖', label: 'Agents' },
+            { id: 'tasks', icon: '📋', label: 'Tasks' },
+            { id: 'metrics', icon: '📈', label: 'Metrics' }
+        ];
+
+        return bottomItems.map(item => html`
+            <div
+                class="bottom-nav-item ${this.activeView === item.id ? 'active' : ''}"
+                @click=${() => this.handleMobileNavClick(item.id)}
+            >
+                <span>${item.icon}</span>
+                <span>${item.label}</span>
+            </div>
+        `);
+    }
+
+    initializeMobileFeatures() {
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const wasMobile = this.isMobile;
+            this.isMobile = window.innerWidth <= 768;
+
+            if (wasMobile !== this.isMobile) {
+                this.requestUpdate();
+            }
+        });
+
+        // Add touch event listeners for swipe gestures
+        const main = this.shadowRoot?.querySelector('.main');
+        if (main) {
+            main.addEventListener('touchstart', (e) => {
+                this.touchStartX = e.touches[0].clientX;
+                this.touchStartY = e.touches[0].clientY;
+            });
+
+            main.addEventListener('touchend', (e) => {
+                if (!this.touchStartX || !this.touchStartY) return;
+
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const deltaX = touchEndX - this.touchStartX;
+                const deltaY = touchEndY - this.touchStartY;
+
+                // Only handle horizontal swipes (ignore mostly vertical ones)
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                    if (deltaX > 0) {
+                        this.handleSwipeRight();
+                    } else {
+                        this.handleSwipeLeft();
+                    }
+                }
+
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+            });
+        }
+    }
+
+    handleSwipeRight() {
+        // Show swipe indicator for navigation
+        this.showSwipeIndicator('← Swipe left for menu');
+        setTimeout(() => this.hideSwipeIndicator(), 2000);
+    }
+
+    handleSwipeLeft() {
+        if (this.isMobile && !this.mobileMenuOpen) {
+            this.toggleMobileMenu();
+        }
+    }
+
+    showSwipeIndicator(message) {
+        let indicator = this.shadowRoot?.querySelector('.swipe-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'swipe-indicator';
+            indicator.textContent = message;
+            this.shadowRoot?.appendChild(indicator);
+        }
+        indicator.classList.add('show');
+    }
+
+    hideSwipeIndicator() {
+        const indicator = this.shadowRoot?.querySelector('.swipe-indicator');
+        if (indicator) {
+            indicator.classList.remove('show');
+        }
+    }
+
+    toggleMobileMenu() {
+        this.mobileMenuOpen = !this.mobileMenuOpen;
+        this.requestUpdate();
+
+        // Prevent body scroll when menu is open
+        if (this.mobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+    }
+
+    closeMobileMenu() {
+        if (this.mobileMenuOpen) {
+            this.mobileMenuOpen = false;
+            document.body.style.overflow = '';
+            this.requestUpdate();
+        }
+    }
+
+    handleMobileNavClick(view) {
+        this.setActiveView(view);
     }
 }
 

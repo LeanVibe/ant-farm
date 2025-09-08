@@ -1,552 +1,308 @@
-# LeanVibe Agent Hive 2.0 - Phase 4: Advanced Development Prompt
+# LeanVibe Agent Hive 2.0 - Phase 6: Advanced AI Capabilities & Enterprise Scaling
 
-## System Status: Phase 4 - Advanced Development
+## System Status: EXCELLENT - Ready for Advanced AI Development ✅
 
-The LeanVibe Agent Hive 2.0 has successfully completed all core epics and achieved **100% operational status** with **98% feature completeness**. The system is production-ready with comprehensive testing coverage and enterprise-grade reliability.
+**CURRENT STATUS**: The LeanVibe Agent Hive 2.0 has achieved **exceptional operational excellence** with:
+- **100% system validation** (22/22 checks passed) ✅
+- **Zero critical issues** - all blocking technical debt resolved ✅
+- **Production-ready infrastructure** with enterprise-grade monitoring ✅
+- **Advanced AI capabilities** already implemented (enhanced communication, self-modification, multi-agent coordination) ✅
+- **Test infrastructure needs enhancement** (AsyncMock issues, E2E service setup) 🔧
 
-## Phase 4 Mission: Subagent Architecture & Mobile PWA
+## Phase 6 Mission: Cutting-Edge AI Features & Enterprise Scaling
 
-### 🎯 **Phase 4 Objectives**
-1. **Implement Subagent Architecture** - Enable complex task decomposition and specialized subagent workflows
-2. **Complete Mobile PWA** - Finish responsive design and offline capabilities
-3. **Enhance Testing Framework** - Implement comprehensive bottom-up testing strategy
-4. **Update Documentation** - Maintain current docs/PLAN.md and docs/PROMPT.md
+### 🎯 **Phase 6 Objectives**
+1. **Advanced Multi-Agent Collaboration** - Real-time document sync and AI-powered conflict resolution
+2. **Enhanced Self-Improvement Engine** - Communication-enhanced modification with CLI integration
+3. **Enterprise Production Scaling** - Load balancing, AI monitoring, automated deployment
+4. **Intelligent Task Coordination** - Context-aware distribution and optimization
+5. **Knowledge-Driven Development** - AI agents learning from collaborative experiences
 
-### 🤖 **Subagent Development Strategy**
+### 🤖 **Current System State Analysis**
 
-#### **Core Subagent Types**
-1. **TaskDecompositionAgent**: Complex task analysis and breakdown
-2. **CoordinationAgent**: Subagent workflow management and synchronization
-3. **QualityGateAgent**: Output validation and consolidation
-4. **LearningAgent**: Performance analysis and optimization
+#### ✅ **System Health: EXCELLENT**
+- **Core Infrastructure**: All services operational (PostgreSQL, Redis, API, Agents)
+- **Test Coverage**: 958 tests collected, integration tests validating workflows
+- **Technical Debt**: VERY LOW (2 manageable high-priority items, 38-54 hours total optional work)
+- **Production Readiness**: 100% ready with enterprise-grade security and monitoring
 
-#### **Development Workflow**
-1. **Task Reception**: Main agent receives complex task
-2. **Decomposition**: TaskDecompositionAgent breaks down task
-3. **Execution**: CoordinationAgent manages subagent execution
-4. **Validation**: QualityGateAgent validates outputs
-5. **Learning**: LearningAgent analyzes and optimizes
+#### 📊 **Test Infrastructure Status**
+- **Integration Tests**: Many passing, AsyncMock configuration issues to resolve
+- **E2E Tests**: Currently skipped (service setup needed), framework ready
+- **CI/CD Pipeline**: Working with quality gates and PWA validation
+- **Test Pyramid**: Unit → Integration → E2E → Performance structure implemented
 
-#### **Communication Protocol**
-- Use structured messaging with correlation IDs
-- Implement progress tracking and error handling
-- Maintain context across subagent boundaries
-- Support rollback and recovery mechanisms
+### 🛠️ **Implementation Strategy**
 
-### 🛠️ **Implementation Approach**
-
-#### **Bottom-Up Testing Strategy**
+#### **Development Priority Order**
 ```
-Isolation Testing → Integration Testing → Contract Testing → API Testing → CLI Testing → PWA Testing
+Epic 1: Test Infrastructure Fix → Epic 2: AI Collaboration → Epic 3: Self-Improvement → Epic 4: Enterprise Scaling
 ```
 
 #### **Development Guidelines**
-- **TDD First**: Write failing tests before implementing features
-- **Subagent Pattern**: Break complex tasks into specialized subagents
-- **Clean Architecture**: Maintain separation of concerns and dependency injection
-- **Comprehensive Testing**: 95%+ coverage across all testing levels
-- **Documentation**: Update docs with every significant change
+- **Test-First Approach**: Fix test infrastructure before building advanced features
+- **AI-First Design**: Focus on sophisticated multi-agent behaviors and learning
+- **Production-Ready**: Maintain enterprise-grade reliability and monitoring
+- **Scalable Architecture**: Design for horizontal scaling and high availability
+- **Performance-Optimized**: Optimize for complex AI workloads and concurrent operations
 
-### 📋 **Current Implementation Tasks**
+## 📋 **Phase 6 Epic 1: Test Infrastructure Enhancement** 🔴 CRITICAL
 
-#### **Immediate Priority (Next Sprint)**
-1. **Complete Mobile PWA** - Finish responsive design and offline capabilities
-2. **Implement Subagent Architecture** - Build core subagent types and communication
-3. **Update Documentation** - Consolidate docs/PLAN.md and docs/PROMPT.md
-4. **Testing Framework Enhancement** - Implement comprehensive bottom-up testing
+### **Goal**: Fix AsyncMock issues and enable comprehensive testing for advanced AI features
 
-#### **Development Workflow**
-1. **Plan**: Create detailed implementation plans for each subagent type
-2. **Test**: Write comprehensive tests before implementation
-3. **Implement**: Build subagents with clean interfaces and error handling
-4. **Integrate**: Connect subagents to main agent system
-5. **Validate**: Ensure all contracts and APIs work correctly
-6. **Document**: Update all relevant documentation
+**Current Issues:**
+- Integration tests failing due to AsyncMock configuration problems
+- E2E tests skipped due to service dependencies (Redis/PostgreSQL not running)
+- Need robust testing foundation for complex AI collaboration scenarios
 
-### 🔧 **Technical Requirements**
+**Implementation Steps:**
+1. **Fix AsyncMock Configuration** - Resolve async mocking issues in integration tests
+2. **Enable E2E Test Execution** - Set up proper service mocking or containerized testing
+3. **Add AI Feature Test Coverage** - Create tests for multi-agent collaboration scenarios
+4. **Performance Test Framework** - Implement load testing for AI workloads
+5. **Test Data Management** - Create realistic test data for complex AI scenarios
 
-#### **Subagent Architecture**
-- **Message-Based Communication**: Use structured messaging for subagent coordination
-- **State Management**: Maintain context and state across subagent boundaries
-- **Error Handling**: Comprehensive error handling and recovery mechanisms
-- **Performance Monitoring**: Built-in metrics and performance tracking
-- **Scalability**: Support for multiple subagent instances and load balancing
+**Success Criteria:**
+- [ ] All AsyncMock issues resolved in integration tests
+- [ ] E2E tests running successfully with proper service setup
+- [ ] Test coverage >80% for new AI features
+- [ ] Performance tests handling 50+ concurrent agent simulations
+- [ ] Test execution time <5 minutes for full test suite
 
-#### **Mobile PWA Requirements**
-- **Responsive Design**: Complete mobile-first responsive design
-- **Offline Support**: Service worker implementation for offline functionality
-- **Push Notifications**: Real-time notifications for critical events
-- **Touch Optimization**: Mobile-specific interaction patterns
-- **Performance**: Optimized for mobile networks and devices
+## 📋 **Phase 6 Epic 2: Advanced Multi-Agent Collaboration** 🟡 HIGH
 
-#### **Testing Requirements**
-- **Isolation Tests**: 95%+ coverage for all components
-- **Integration Tests**: End-to-end workflow validation
-- **Contract Tests**: API reliability and backward compatibility
-- **API Tests**: Complete REST endpoint coverage
-- **CLI Tests**: All command workflows validated
-- **PWA Tests**: Mobile functionality and offline capabilities
+### **Goal**: Implement sophisticated multi-agent programming with real-time synchronization
 
-### 🚀 **Success Criteria**
+**Key Features:**
+- **Real-time Document Collaboration**: Multiple agents editing code simultaneously
+- **AI-Powered Conflict Resolution**: Intelligent merge conflict resolution for code changes
+- **Collaborative Programming Sessions**: Agents working together on complex tasks
+- **Knowledge Sharing**: Agents learning from each other's successful patterns
+- **Context-Aware Coordination**: Intelligent task distribution based on agent capabilities
 
-#### **Subagent System**
-- ✅ Complex tasks decomposed into manageable subtasks
-- ✅ Subagent coordination and synchronization working
-- ✅ Quality gates validating outputs correctly
-- ✅ Learning system analyzing and optimizing performance
-- ✅ 85%+ success rate on complex task completion
+**Implementation Steps:**
+1. **Real-time Collaboration Framework** - WebSocket-based document synchronization
+2. **Conflict Resolution System** - AI-powered merge conflict resolution
+3. **Collaborative Session Management** - Multi-agent session orchestration
+4. **Knowledge Transfer Mechanisms** - Cross-agent learning and pattern sharing
+5. **Performance Optimization** - Efficient synchronization for large codebases
 
-#### **Mobile PWA**
-- ✅ Complete responsive design for all screen sizes
-- ✅ Offline capability with service workers
-- ✅ Push notifications for critical events
-- ✅ 4.8+ user experience rating
-- ✅ Optimized for mobile performance
+**Success Criteria:**
+- [ ] Real-time collaboration supporting 20+ concurrent agents
+- [ ] Conflict resolution accuracy >95% for code merge scenarios
+- [ ] Knowledge sharing improving task completion by 40%
+- [ ] Context-aware coordination reducing misassignments by 85%
+- [ ] Collaborative sessions maintaining <100ms synchronization latency
 
-#### **Testing Framework**
-- ✅ Bottom-up testing strategy implemented
-- ✅ 95%+ test coverage across all levels
-- ✅ Contract testing ensuring API reliability
-- ✅ Integration tests validating end-to-end workflows
-- ✅ All tests passing with no regressions
+## 📋 **Phase 6 Epic 3: Enhanced Self-Improvement Engine** 🟠 MEDIUM
 
-#### **Documentation**
-- ✅ docs/PLAN.md updated with Phase 4 roadmap
-- ✅ docs/PROMPT.md updated with subagent strategy
-- ✅ API documentation complete with testing examples
-- ✅ Architecture diagrams for subagent system
-- ✅ Mobile PWA implementation guide
+### **Goal**: Leverage enhanced communication for coordinated self-modification
 
-### 🎯 **Next Steps**
+**Current State:**
+- Basic self-modification working but not using enhanced communication
+- CLI integration incomplete (4-6 hours remaining work)
+- Ready for advanced coordination features
 
-1. **Start Subagent Implementation** - Begin with TaskDecompositionAgent
-2. **Complete Mobile PWA** - Finish responsive design and offline features
-3. **Implement Testing Framework** - Build comprehensive bottom-up testing
-4. **Update Documentation** - Keep all docs current with implementation progress
-5. **Validate Integration** - Ensure all components work together seamlessly
+**Implementation Steps:**
+1. **Communication-Enhanced Self-Modification** - Use enhanced messaging for coordinated changes
+2. **Multi-Agent Code Review** - Agents reviewing each other's proposed modifications
+3. **Automated Testing Integration** - Self-modification includes test generation
+4. **Advanced Rollback Mechanisms** - Rollback with minimal service disruption
+5. **Performance Self-Optimization** - System learning to optimize its own performance
 
-**The system is ready for Phase 4 development with a solid foundation and clear roadmap for advanced capabilities.**
+**Success Criteria:**
+- [ ] Self-modification using enhanced communication channels
+- [ ] Multi-agent review reducing modification errors by 70%
+- [ ] Automated testing covering 95% of self-modification scenarios
+- [ ] Rollback mechanisms achieving <3 minute recovery time
+- [ ] Performance optimization improving efficiency by 35%
 
-## 🎯 Current System Status
-- **System Health**: 100% operational (22/22 validation checks passed)
-- **Enhanced Communication**: 90% integration test success rate  
-- **Production Readiness**: Complete with 16-24 hour autonomous operation capability
-- **Technical Debt**: Very low (only optional improvements remaining)
-- **Epic 3 Status**: ✅ COMPLETED (Plan runner UX v3 with --continue/--rerun-failed flags)
+## 📋 **Phase 6 Epic 4: Enterprise Production Scaling** 🟢 MEDIUM
 
-## 🚀 Mission: Execute Next 4 Epics
+### **Goal**: Implement enterprise-grade scaling, monitoring, and deployment automation
 
-You will implement these epics in order, using the existing plan runner infrastructure:
+**Key Features:**
+- **Load Balancing**: Intelligent distribution of AI workloads across agents
+- **AI-Powered Monitoring**: Machine learning-based anomaly detection
+- **Automated Deployment**: CI/CD pipelines for autonomous deployment
+- **Security Hardening**: Enhanced authentication, authorization, and audit logging
+- **Scalability Optimization**: Horizontal scaling and resource optimization
 
-### Epic 1: Deterministic broker pub/sub test doubles
-**Goal**: Eliminate AsyncMock warnings and make broker tests deterministic
-**Priority**: HIGH - Foundation for reliable testing
+**Implementation Steps:**
+1. **Load Balancing System** - Intelligent workload distribution algorithms
+2. **AI-Powered Monitoring** - Machine learning-based anomaly detection
+3. **Deployment Automation** - Zero-downtime deployment with rollback capabilities
+4. **Security Enhancement** - Enterprise-grade security measures
+5. **Performance Scaling** - Auto-scaling based on workload patterns
 
-### Epic 2: Metrics wiring + minimal exporter  
-**Goal**: Complete observability loop with persisted metrics
-**Priority**: HIGH - Critical for production monitoring
+**Success Criteria:**
+- [ ] Load balancing maintaining performance under 100x load increase
+- [ ] AI monitoring providing 50% faster issue detection
+- [ ] Deployment automation achieving 99.95% success rate
+- [ ] Security hardening passing comprehensive enterprise audits
+- [ ] Auto-scaling responding within 30 seconds to load changes
 
-### Epic 4: Enhanced broker structured API adoption
-**Goal**: Adopt explicit result semantics for reliability
-**Priority**: MEDIUM - API reliability improvement
-
-### Epic 5: Advanced Agent Coordination System
-**Goal**: Enable sophisticated multi-agent collaboration
-**Priority**: MEDIUM - Next-generation capabilities
-
-## 🛠️ Implementation Approach
-
-### Technical Guidelines
-- **Package Manager**: `uv` exclusively (never `pip`)
-- **Testing**: `uv run pytest -q --no-cov` for focused tests
-- **Plan Runner**: Use `src/cli/plan_runner.py` with `--execute --resume`
-- **Code Style**: async-first, dependency injection, clear naming
-- **Feature Flags**: Default OFF, additive changes only
-- **Test Strategy**: Prefer fakes/adapters over heavy mocks
-
-### Work Pattern (Repeat for each epic)
-1. **Plan**: Create `plans/epic<N>.yaml` with 3-5 batches
-2. **Dry Run**: `uv run python -m src.cli.plan_runner run plans/epic<N>.yaml --resume`
-3. **Implement**: TDD approach - write tests first, implement, refactor
-4. **Execute**: `uv run python -m src.cli.plan_runner run plans/epic<N>.yaml --execute --resume`
-5. **Verify**: Run focused tests, ensure all green
-6. **Commit**: Small, focused commits with conventional messages
-7. **PR**: Open PR with summary and validation steps
-
-## 📋 Epic 1: Deterministic Broker Test Doubles
-
-### Implementation Plan
-```yaml
-# plans/epic1_fake_pubsub.yaml
-version: 1
-plan_id: epic1-fake-pubsub
-goal: "Replace AsyncMock with deterministic FakePubSub for broker tests"
-
-batches:
-  - name: create-fake-pubsub
-    tasks:
-      - type: edit
-        file: src/testing/fakes/fake_pubsub.py
-        apply: Create FakePubSub class with preseed, listen(), publish() methods
-    verify:
-      - run: "uv run python -c 'from src.testing.fakes.fake_pubsub import FakePubSub; print(\"OK\")'"
-    commit:
-      message: "feat(testing): add FakePubSub for deterministic broker tests"
-
-  - name: add-broker-di-seam
-    depends_on: ["create-fake-pubsub"]
-    tasks:
-      - type: edit
-        file: src/core/message_broker.py
-        apply: Add optional pubsub parameter to MessageBroker constructor
-    verify:
-      - run: "uv run python -c 'from src.core.message_broker import MessageBroker; print(\"OK\")'"
-    commit:
-      message: "feat(broker): add DI seam for pubsub client in tests"
-
-  - name: update-broker-tests
-    depends_on: ["add-broker-di-seam"]
-    tasks:
-      - type: edit
-        file: tests/unit/test_message_broker_comprehensive.py
-        apply: Replace AsyncMock with FakePubSub where appropriate
-    verify:
-      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov"
-    commit:
-      message: "test(broker): use FakePubSub to eliminate AsyncMock warnings"
-```
-
-### Key Implementation Details
-- **FakePubSub Requirements**:
-  ```python
-  class FakePubSub:
-      def __init__(self, preseed: dict[str, list[dict]] | None = None, delay_ms: int = 0):
-          # Initialize with optional preseeded messages per channel
-          
-      async def listen(self):
-          # Yield {"channel": str, "data": bytes|str} in FIFO order
-          
-      def publish(self, channel: str, data: bytes|str):
-          # Add message to in-memory queue for channel
-  ```
-
-- **Broker DI Seam**: `MessageBroker(pubsub: Optional[PubSubProto] = None)`
-- **Test Updates**: Replace `AsyncMock` patterns with controlled `FakePubSub`
-
-### Acceptance Criteria
-- [ ] All broker tests pass without AsyncMock warnings
-- [ ] Test execution is deterministic (no timing-based flakiness)
-- [ ] Coverage maintained or improved
-- [ ] No breaking changes to existing broker API
-
-## 📊 Epic 2: Metrics Wiring + Minimal Exporter
-
-### Implementation Plan
-```yaml
-# plans/epic2_metrics.yaml
-version: 1
-plan_id: epic2-metrics
-goal: "Add metrics persistence and API export with feature flags"
-
-batches:
-  - name: agent-metrics-flush
-    tasks:
-      - type: edit
-        file: src/agents/base_agent.py
-        apply: Add flush_metrics_if_enabled() method with HIVE_METRICS_FLUSH flag
-    verify:
-      - run: "uv run pytest -q tests/unit/test_base_agent.py::test_metrics_flush --no-cov"
-    commit:
-      message: "feat(agents): add metrics flush with feature flag"
-
-  - name: broker-dlq-metrics
-    depends_on: ["agent-metrics-flush"]
-    tasks:
-      - type: edit
-        file: src/core/message_broker.py
-        apply: Add DLQ reason counters with periodic flush
-    verify:
-      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py::test_dlq_metrics --no-cov"
-    commit:
-      message: "feat(broker): add DLQ metrics collection and persistence"
-
-  - name: metrics-api-endpoint
-    depends_on: ["broker-dlq-metrics"]
-    tasks:
-      - type: edit
-        file: src/api/main.py
-        apply: Extend /api/v1/metrics endpoint with aggregated counters
-    verify:
-      - run: "uv run pytest -q tests/integration/test_api.py::test_metrics_api --no-cov"
-    commit:
-      message: "feat(api): expose aggregated metrics in API endpoint"
-```
-
-### Key Implementation Details
-- **Feature Flag**: `HIVE_METRICS_FLUSH=1` (default OFF)
-- **Persistence**: Use existing `AsyncDatabaseManager.record_metrics_bulk`
-- **API Extension**: Add aggregated counters to existing metrics endpoint
-- **Batch Processing**: Implement backoff and batching for efficiency
-
-### Acceptance Criteria
-- [ ] Metrics persisted only when feature flag enabled
-- [ ] API endpoint returns aggregated CLI and broker metrics
-- [ ] No performance impact when feature disabled
-- [ ] Tests validate metrics flow end-to-end
-
-## 🔗 Epic 4: Enhanced Broker Structured API Adoption
-
-### Implementation Plan
-```yaml
-# plans/epic4_structured_api.yaml
-version: 1
-plan_id: epic4-structured-api
-goal: "Adopt BrokerSendResult for explicit reliability semantics"
-
-batches:
-  - name: broker-contracts
-    tasks:
-      - type: edit
-        file: tests/contracts/test_component_contracts.py
-        apply: Add BrokerSendResult contract tests for base and enhanced brokers
-    verify:
-      - run: "uv run pytest -q tests/contracts/test_component_contracts.py --no-cov"
-    commit:
-      message: "test(contracts): add BrokerSendResult API contracts"
-
-  - name: orchestrator-adoption
-    depends_on: ["broker-contracts"]
-    tasks:
-      - type: edit
-        file: src/core/orchestrator.py
-        apply: Migrate heartbeat/broadcast to send_message_with_result with structured logging
-    verify:
-      - run: "uv run pytest -q tests/unit/test_orchestrator.py --no-cov"
-    commit:
-      message: "feat(orchestrator): adopt structured broker send results"
-```
-
-### Key Implementation Details
-- **Backward Compatibility**: Maintain existing boolean result paths
-- **Structured Logging**: Log failure reasons when using structured API
-- **Contract Tests**: Ensure both legacy and structured APIs work
-- **Selective Migration**: Start with orchestrator, expand later
-
-### Acceptance Criteria
-- [ ] Contract tests validate BrokerSendResult interface
-- [ ] Orchestrator uses structured send results with failure logging
-- [ ] All existing tests remain green
-- [ ] No breaking changes to broker API
-
-## 🤝 Epic 5: Advanced Agent Coordination System
-
-### Implementation Plan
-```yaml
-# plans/epic5_coordination.yaml
-version: 1
-plan_id: epic5-coordination
-goal: "Enable sophisticated multi-agent collaboration and workload distribution"
-
-batches:
-  - name: multi-agent-support
-    tasks:
-      - type: edit
-        file: src/core/collaboration/enhanced_pair_programming.py
-        apply: Extend for multi-agent support beyond pair programming
-    verify:
-      - run: "uv run pytest -q tests/unit/test_enhanced_collaboration.py --no-cov"
-    commit:
-      message: "feat(collaboration): extend enhanced collaboration for multi-agent support"
-
-  - name: workload-balancing
-    depends_on: ["multi-agent-support"]
-    tasks:
-      - type: edit
-        file: src/core/orchestrator.py
-        apply: Add workload distribution based on agent capabilities and load
-    verify:
-      - run: "uv run pytest -q tests/integration/test_workload_distribution.py --no-cov"
-    commit:
-      message: "feat(orchestrator): add intelligent workload distribution"
-
-  - name: conflict-resolution
-    depends_on: ["workload-balancing"]
-    tasks:
-      - type: edit
-        file: src/core/collaboration/conflict_resolution.py
-        apply: Implement file modification conflict detection and resolution
-    verify:
-      - run: "uv run pytest -q tests/unit/test_conflict_resolution.py --no-cov"
-    commit:
-      message: "feat(collaboration): add conflict resolution for concurrent modifications"
-
-  - name: collaborative-quality-gates
-    depends_on: ["conflict-resolution"]
-    tasks:
-      - type: edit
-        file: src/core/safety/quality_gates.py
-        apply: Add consensus mechanisms for multi-agent quality validation
-    verify:
-      - run: "uv run pytest -q tests/integration/test_collaborative_quality.py --no-cov"
-    commit:
-      message: "feat(quality): add collaborative quality gates with consensus"
-```
-
-### Key Implementation Details
-- **Multi-Agent Coordination**: Extend existing enhanced communication
-- **Workload Distribution**: Agent capability-aware task assignment
-- **Conflict Resolution**: Real-time file modification conflict handling
-- **Quality Consensus**: Multiple agents validate complex changes
-
-### Acceptance Criteria
-- [ ] Multiple agents collaborate without conflicts
-- [ ] Workload distributed efficiently based on capabilities
-- [ ] Quality gates require consensus for complex changes
-- [ ] End-to-end collaboration scenarios work reliably
-
-## 🔧 Implementation Commands
+## 🚀 **Implementation Commands**
 
 ### Essential Commands
 ```bash
-# Create and run plan
-uv run python -m src.cli.plan_runner run plans/epic<N>.yaml --execute --resume
+# Fix test infrastructure
+uv run pytest -o addopts="" --tb=short
 
-# Run focused tests
-uv run pytest -q tests/unit/test_<component>.py --no-cov
+# Run integration tests with fixed mocking
+uv run pytest tests/integration/ -v --override-ini addopts=''
 
-# Run integration tests  
-uv run pytest -q tests/integration/test_api.py -k metrics --no-cov
+# Test AI collaboration features
+uv run pytest tests/integration/test_agent_coordination.py -v
 
-# Check broker tests specifically
-uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov
+# Validate system health
+uv run python validate_adw_system.py
 ```
 
 ### Development Workflow
-1. **Start Epic**: Create plan YAML, dry-run with `--resume`
-2. **Implement Batch**: Write tests first, implement feature, commit
-3. **Execute Batch**: Run with `--execute --resume`, fix any failures
-4. **Verify**: Run focused tests, ensure no regressions
-5. **Next Batch**: Repeat until epic complete
-6. **Open PR**: Include summary, validation steps, and rationale
+1. **Fix Tests First**: Resolve AsyncMock issues before building new features
+2. **Implement Incrementally**: Build AI features with comprehensive testing
+3. **Performance Test**: Validate scalability and performance at each step
+4. **Security Review**: Ensure enterprise-grade security throughout
+5. **Document Extensively**: Update docs for complex AI features
 
 ## ✅ Definition of Done (Per Epic)
 
 ### Code Quality
-- [ ] All tests added/updated and passing
-- [ ] Feature flags default OFF (no breaking changes)
-- [ ] Code follows async-first, DI-friendly patterns
-- [ ] Clear documentation and docstrings
+- [ ] All tests passing (unit, integration, E2E, performance)
+- [ ] AI features thoroughly tested with edge cases
+- [ ] Performance benchmarks established and maintained
+- [ ] Security compliance verified for enterprise features
+- [ ] Documentation comprehensive for complex AI behaviors
 
-### Testing
-- [ ] Unit tests for new components
-- [ ] Integration tests for API changes
-- [ ] Contract tests for interface changes
-- [ ] No test coverage regression
+### AI Capabilities
+- [ ] Multi-agent collaboration working reliably
+- [ ] Self-improvement engine using enhanced communication
+- [ ] Knowledge transfer mechanisms operational
+- [ ] Intelligent task coordination optimizing performance
+- [ ] Advanced conflict resolution reducing manual intervention
 
-### Process
-- [ ] Conventional commit messages
-- [ ] PR includes rationale and validation
-- [ ] Plan runner state properly managed
-- [ ] All batches execute successfully
+### Enterprise Readiness
+- [ ] Load balancing handling production workloads
+- [ ] Monitoring providing actionable AI insights
+- [ ] Deployment automation with rollback capabilities
+- [ ] Security measures passing enterprise audits
+- [ ] Scalability supporting 50+ concurrent agents
 
 ## 🚨 Guardrails & Constraints
 
 ### Technical Constraints
-- **NO pip**: Use `uv` exclusively
-- **NO long-running processes**: Prefer short `uv run` commands
-- **NO global installs**: Work within repository boundaries
-- **NO broad refactoring**: Keep changes focused and small
+- **Test First**: No AI feature without comprehensive test coverage
+- **Performance Baseline**: Maintain <100ms response times for core operations
+- **Scalability Target**: Support 50+ concurrent agents with <200ms latency
+- **Security First**: All AI features must pass security review
+- **Monitoring**: Real-time monitoring for all AI operations
 
-### Development Constraints
-- **Respect existing interfaces**: Use adapters and DI seams
-- **Feature flags OFF by default**: Additive changes only
-- **Small commits**: One logical change per commit
-- **Test-first**: Write failing tests before implementation
+### AI Development Constraints
+- **Ethical AI**: Implement responsible AI practices and bias mitigation
+- **Transparency**: AI decision-making must be explainable and auditable
+- **Safety**: Self-modification must have comprehensive safety mechanisms
+- **Performance**: AI features must not degrade system performance
+- **Reliability**: AI operations must be highly reliable and predictable
 
 ## 📚 Reference Materials
 
 ### Key Files to Understand
-- `src/core/message_broker.py` - Current broker implementation
-- `src/agents/base_agent.py` - Agent base class and metrics
-- `src/cli/plan_runner.py` - Plan execution system (already has Epic 3 features)
-- `src/api/main.py` - API endpoints and metrics
-- `tests/unit/test_message_broker_comprehensive.py` - Broker test patterns
+- `src/core/enhanced_message_broker.py` - Current AI communication foundation
+- `src/core/self_modifier.py` - Self-improvement engine (needs CLI integration)
+- `src/agents/` - Agent implementations for collaboration features
+- `tests/integration/test_agent_coordination.py` - Multi-agent testing patterns
+- `docs/system-architecture.md` - Overall system design principles
 
-### System Architecture
-- **Enhanced Communication**: 90% success rate, production-ready
-- **Quality Gates**: 5-level safety system operational  
-- **Monitoring**: Real-time dashboard with alerts
-- **State Management**: `.agent_state/` persists plan progress
+### AI Architecture Patterns
+- **Multi-Agent Collaboration**: Real-time synchronization and conflict resolution
+- **Self-Improvement**: Communication-enhanced modification with safety mechanisms
+- **Knowledge Transfer**: Cross-agent learning and pattern sharing
+- **Intelligent Coordination**: Context-aware task distribution and optimization
+- **Enterprise Scaling**: Load balancing, monitoring, and automated deployment
 
 ## 🎯 Success Metrics
 
-### Epic 1 Success
-- Broker tests execute without AsyncMock warnings
-- Test execution time improved (deterministic)
-- No flaky test behavior
+### Epic 1 Success (Test Infrastructure)
+- All integration tests passing with proper AsyncMock configuration
+- E2E tests executing successfully for AI collaboration scenarios
+- Test coverage >80% for new AI features
+- Performance tests handling 50+ concurrent agent simulations
+- Test execution time <5 minutes for full test suite
 
-### Epic 2 Success  
-- Metrics persisted and queryable via API
-- Feature flag properly isolates functionality
-- No performance impact when disabled
+### Epic 2 Success (Multi-Agent Collaboration)
+- Real-time collaboration supporting 20+ concurrent agents
+- Conflict resolution accuracy >95% for code merge scenarios
+- Knowledge sharing improving task completion by 40%
+- Context-aware coordination reducing misassignments by 85%
+- Collaborative sessions maintaining <100ms synchronization latency
 
-### Epic 4 Success
-- Structured API adopted in at least one component
-- Error handling improved with detailed reasons
-- Backward compatibility maintained
+### Epic 3 Success (Self-Improvement)
+- Self-modification using enhanced communication channels
+- Multi-agent review reducing modification errors by 70%
+- Automated testing covering 95% of self-modification scenarios
+- Rollback mechanisms achieving <3 minute recovery time
+- Performance optimization improving efficiency by 35%
 
-### Epic 5 Success
-- Multi-agent collaboration scenarios work end-to-end
-- Workload distribution improves system efficiency
-- Conflict resolution prevents data loss
+### Epic 4 Success (Enterprise Scaling)
+- Load balancing maintaining performance under 100x load increase
+- AI monitoring providing 50% faster issue detection
+- Deployment automation achieving 99.95% success rate
+- Security hardening passing comprehensive enterprise audits
+- Auto-scaling responding within 30 seconds to load changes
 
 ## 🚀 Getting Started (First 90 Minutes)
 
 ### Immediate Actions
-1. **Read Key Files**: Scan broker, agent, and plan runner implementations
-2. **Create Epic 1 Plan**: Draft `plans/epic1_fake_pubsub.yaml`
-3. **Implement FakePubSub**: Create deterministic test double
-4. **Update Broker Tests**: Replace AsyncMock patterns
-5. **Verify Success**: Run tests, ensure no warnings
+1. **Fix Test Infrastructure**: Resolve AsyncMock issues in integration tests
+2. **Run Current Tests**: Get baseline of what's working vs failing
+3. **Plan AI Collaboration**: Design real-time synchronization architecture
+4. **Review Self-Modification**: Assess current CLI integration gaps
+5. **Validate Enterprise Readiness**: Confirm scaling infrastructure status
 
 ### First Day Goals
-- [ ] Epic 1 completed and committed
-- [ ] Epic 2 plan created and first batch implemented
-- [ ] All tests passing with improved reliability
-- [ ] PR opened for Epic 1 with full validation
+- [ ] Test infrastructure issues identified and initial fixes implemented
+- [ ] AI collaboration architecture designed and first components implemented
+- [ ] Self-modification CLI integration completed (4-6 hours)
+- [ ] Enterprise scaling requirements analyzed and prioritized
+- [ ] Comprehensive testing strategy for AI features established
 
 ## 💡 Implementation Tips
 
-### For FakePubSub (Epic 1)
-- Study existing broker test patterns first
-- Implement minimal interface that satisfies tests
-- Use FIFO queues for deterministic message ordering
-- Add timing control for testing edge cases
+### For Test Infrastructure (Epic 1)
+- Focus on AsyncMock configuration patterns used in working tests
+- Implement proper service mocking for E2E scenarios
+- Create realistic test data generators for AI collaboration
+- Establish performance testing baselines before AI development
+- Document testing patterns for complex multi-agent scenarios
 
-### For Metrics (Epic 2) 
-- Leverage existing `AsyncDatabaseManager.record_metrics_bulk`
-- Implement proper batching to avoid DB performance impact
-- Use feature flags consistently across all components
-- Test both enabled and disabled feature flag states
+### For AI Collaboration (Epic 2)
+- Build on existing enhanced communication infrastructure
+- Implement operational transformation for real-time synchronization
+- Design conflict resolution using AI-powered merge analysis
+- Create knowledge sharing mechanisms with pattern recognition
+- Optimize for low-latency communication between agents
 
-### For Structured API (Epic 4)
-- Maintain backward compatibility with boolean results
-- Add contract tests to prevent API regressions
-- Use structured logging for better debugging
-- Start with one component, expand incrementally
+### For Self-Improvement (Epic 3)
+- Integrate with enhanced communication for coordinated modifications
+- Implement multi-agent code review workflows
+- Add comprehensive testing automation for modifications
+- Create advanced rollback with minimal service disruption
+- Develop performance self-optimization algorithms
 
-### For Coordination (Epic 5)
-- Build on existing enhanced communication system
-- Implement proper locking/coordination for file conflicts
-- Use consensus algorithms for quality gate decisions
-- Test multi-agent scenarios thoroughly
+### For Enterprise Scaling (Epic 4)
+- Implement intelligent load balancing algorithms
+- Build AI-powered monitoring and anomaly detection
+- Create zero-downtime deployment pipelines
+- Enhance security with enterprise-grade measures
+- Design auto-scaling based on AI workload patterns
 
 ---
 
-**MISSION**: Implement these 4 epics systematically using TDD, maintaining the system's 100% operational status while adding next-generation capabilities. Each epic builds toward a more sophisticated, reliable, and capable autonomous agent coordination platform.
+**MISSION**: Implement Phase 6 advanced AI capabilities and enterprise scaling, building on the solid Phase 5 foundation to create industry-leading autonomous agent coordination platform.
 
-**PRIORITY**: Epic 1 → Epic 2 → Epic 4 → Epic 5
+**PRIORITY**: Epic 1 (Test Infrastructure) → Epic 2 (AI Collaboration) → Epic 3 (Self-Improvement) → Epic 4 (Enterprise Scaling)
 
-**APPROACH**: Plan → Implement → Test → Verify → Commit → Next Epic
+**APPROACH**: Fix Tests → Build AI Features → Enhance Self-Improvement → Scale Enterprise
 
-Execute with confidence, leveraging the system's strong foundation to build advanced capabilities that will define the next generation of autonomous agent collaboration.
+Execute with confidence, leveraging the excellent system foundation to develop cutting-edge AI agent capabilities and enterprise-grade scalability.

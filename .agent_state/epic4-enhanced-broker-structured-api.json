@@ -8,9 +8,13 @@
     "migrate-orchestrator-task-assignment"
   ],
   "failed_batches": [
-    "comprehensive-testing"
+    "comprehensive-testing",
+    "broker-contracts",
+    "add-broker-contracts"
   ],
   "failed_batch_errors": {
-    "comprehensive-testing": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py tests/unit/test_orchestrator.py --no-cov"
+    "comprehensive-testing": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py tests/unit/test_orchestrator.py --no-cov",
+    "broker-contracts": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py --override-ini addopts=\"--strict-markers --strict-config\"",
+    "add-broker-contracts": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py --override-ini addopts=\"--strict-markers --strict-config\""
   }
 }

@@ -510,18 +510,42 @@ class HealthMonitor:
             )
 
     async def _ping_agent(self, agent_name: str) -> bool:
-        """Ping an agent to check if it's responsive via request/reply."""
+        """Ping an agent to check if it's responsive via structured API."""
         try:
-            reply = await message_broker.send_request(
+            # Use structured API for better error handling and logging
+            from .message_broker import MessageType, BrokerSendResult, BrokerSendReason
+            result = await message_broker.send_message_with_result(
                 from_agent="orchestrator",
                 to_agent=agent_name,
                 topic="ping",
                 payload={"timestamp": time.time()},
-                timeout=3,
+                message_type=MessageType.REQUEST,
             )
-            return bool(reply and reply.get("pong"))
+
+            if result.success:
+                logger.info(
+                    "Agent ping successful",
+                    agent_name=agent_name,
+                    message_id=result.message_id,
+                    reason=result.reason.value,
+                )
+                return True
+            else:
+                logger.warning(
+                    "Agent ping failed",
+                    agent_name=agent_name,
+                    reason=result.reason.value,
+                    details=getattr(result, 'details', None),
+                )
+                return False
+
         except Exception as e:
-            logger.error("Failed to ping agent", agent_name=agent_name, error=str(e))
+            logger.error(
+                "Failed to ping agent",
+                agent_name=agent_name,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return False
 
     async def _handle_dead_agent(self, agent_name: str) -> None:

@@ -13,19 +13,16 @@ batches:
           - Verify structured results include success, reason, and message_id
           - Ensure backward compatibility with existing boolean paths
     verify:
-      - run: "uv run pytest -q tests/contracts/test_component_contracts.py --no-cov"
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py"
     commit:
       message: "test(contracts): add BrokerSendResult API contracts"
 
   - name: orchestrator-adoption
     depends_on: ["broker-contracts"]
     tasks:
-      - type: verify
-        description: |
-          Verify orchestrator already uses structured API:
-          - Task assignment already uses send_message_with_result (line 768)
-          - Structured logging for failure reasons already implemented
-          - Request-reply patterns appropriately use send_request
+      - type: command
+        run: "grep -n 'send_message_with_result' src/core/orchestrator.py"
+        description: "Verify orchestrator already uses structured API"
     verify:
       - run: "grep -n 'send_message_with_result' src/core/orchestrator.py"
     commit:
@@ -34,10 +31,10 @@ batches:
   - name: verify-backward-compatibility
     depends_on: ["orchestrator-adoption"]
     tasks:
-      - type: run
-        command: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov -v"
+      - type: command
+        run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --no-cov -v"
         description: "Run comprehensive broker tests to ensure no regressions"
     verify:
-      - run: "echo 'Verify all tests pass and structured API works correctly'"
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py"
     commit:
       message: "test(broker): verify structured API adoption maintains compatibility"

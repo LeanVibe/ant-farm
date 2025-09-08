@@ -14,7 +14,7 @@ batches:
           - Add collaborative decision making protocols
           - Support concurrent file modifications with coordination
     verify:
-      - run: "uv run pytest -q tests/unit/test_enhanced_collaboration.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_enhanced_collaboration.py --override-ini addopts=''"
     commit:
       message: "feat(collaboration): extend enhanced collaboration for multi-agent support"
 
@@ -30,7 +30,7 @@ batches:
           - Create agent performance tracking
           - Add dynamic scaling based on workload
     verify:
-      - run: "uv run pytest -q tests/integration/test_workload_distribution.py --no-cov"
+      - run: "uv run pytest -q tests/integration/test_workload_distribution.py --override-ini addopts=''"
     commit:
       message: "feat(orchestrator): add intelligent workload distribution"
 
@@ -46,7 +46,7 @@ batches:
           - Add version control integration for conflict handling
           - Create conflict notification system
     verify:
-      - run: "uv run pytest -q tests/unit/test_conflict_resolution.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_conflict_resolution.py --override-ini addopts=''"
     commit:
       message: "feat(collaboration): add conflict resolution for concurrent modifications"
 
@@ -62,7 +62,7 @@ batches:
           - Create consensus algorithms for complex changes
           - Add multi-agent approval workflows
     verify:
-      - run: "uv run pytest -q tests/integration/test_collaborative_quality.py --no-cov"
+      - run: "uv run pytest -q tests/integration/test_collaborative_quality.py --override-ini addopts=''"
     commit:
       message: "feat(quality): add collaborative quality gates with consensus"
 
@@ -78,6 +78,6 @@ batches:
           - Test conflict resolution scenarios
           - Validate collaborative quality gates
     verify:
-      - run: "uv run pytest -q tests/integration/test_multi_agent_coordination.py --no-cov"
+      - run: "uv run pytest -q tests/integration/test_multi_agent_coordination.py --override-ini addopts=''"
     commit:
       message: "test(integration): add end-to-end multi-agent coordination tests"

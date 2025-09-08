@@ -60,7 +60,7 @@ class TestCoreUserWorkflows:
 
         tasks_result = response.json()
         assert tasks_result["success"] is True
-        tasks = tasks_result["data"]["tasks"]
+        tasks = tasks_result["data"]
 
         # Find our task
         our_task = next((t for t in tasks if t["id"] == task_id), None)
@@ -74,7 +74,7 @@ class TestCoreUserWorkflows:
 
         task_details = response.json()
         assert task_details["success"] is True
-        task_info = task_details["data"]["task"]
+        task_info = task_details["data"]
         assert task_info["title"] == task_data["title"]
         assert task_info["description"] == task_data["description"]
 
@@ -90,7 +90,7 @@ class TestCoreUserWorkflows:
         assert response.status_code == 200
 
         final_task = response.json()
-        assert final_task["data"]["task"]["status"] == "cancelled"
+        assert final_task["data"]["status"] == "cancelled"
 
     @pytest.mark.asyncio
     async def test_agent_management_workflow(self, api_client: httpx.AsyncClient):

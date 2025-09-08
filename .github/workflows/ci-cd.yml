@@ -177,59 +177,72 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
-  # Integration Tests - Temporarily disabled to fix CI hanging
-  # TODO: Re-enable after fixing docker services and API server setup
-  # integration-test:
-  #   name: Integration Tests
-  #   runs-on: ubuntu-latest
-  #   needs: test
-  #     
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  # 
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-  # 
-  #     - name: Build test environment
-  #       run: |
-  #         docker-compose -f docker-compose.yaml up -d postgres redis
-  #         sleep 30
-  # 
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v4
-  #       with:
-  #         python-version: '3.11'
-  # 
-  #     - name: Install uv
-  #       uses: astral-sh/setup-uv@v2
-  #       with:
-  #         version: "latest"
-  # 
-  #     - name: Install dependencies
-  #       run: |
-  #         uv sync --extra dev
-  # 
-  #     - name: Run integration tests
-  #       env:
-  #         DATABASE_URL: postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive
-  #         REDIS_URL: redis://localhost:6381
-  #         ENVIRONMENT: testing
-  #       run: |
-  #         uv run pytest tests/integration/ -v
-  # 
-  #     - name: Run e2e tests
-  #       env:
-  #         DATABASE_URL: postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive
-  #         REDIS_URL: redis://localhost:6381
-  #         ENVIRONMENT: testing
-  #       run: |
-  #         uv run pytest tests/e2e/ -v
-  # 
-  #     - name: Cleanup
-  #       if: always()
-  #       run: |
-  #         docker-compose -f docker-compose.yaml down -v
+  # Integration Tests - Quality Gate
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test-fast
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test environment
+        run: |
+          docker-compose -f docker-compose.yaml up -d postgres redis
+          sleep 30
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --extra dev
+
+      - name: Run integration tests (quality gate)
+        env:
+          DATABASE_URL: postgresql://hive_user:hive_pass@localhost:5433/leanvibe_hive
+          REDIS_URL: redis://localhost:6381
+          ENVIRONMENT: testing
+        run: |
+          # Run minimal integration tests as quality gate
+          uv run pytest tests/integration/test_api.py::TestHealthEndpoints::test_health_check -v
+          uv run pytest tests/integration/test_api.py::TestAPIErrorHandling::test_404_error_handling -v
+          uv run pytest tests/integration/test_api.py::TestTaskEndpoints::test_create_valid_task_mock -v
+
+      - name: Run PWA quality checks
+        run: |
+          # Check PWA manifest exists and is valid
+          if [ ! -f "src/web/dashboard/manifest.json" ]; then
+            echo "PWA manifest missing"
+            exit 1
+          fi
+
+          # Check service worker exists
+          if [ ! -f "src/web/dashboard/sw.js" ]; then
+            echo "Service worker missing"
+            exit 1
+          fi
+
+          # Validate manifest JSON
+          python -c "import json; json.load(open('src/web/dashboard/manifest.json')); print('Manifest valid')"
+
+          echo "PWA quality checks passed"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f docker-compose.yaml down -v
 
   # Security Scan
   security:
@@ -258,7 +271,7 @@ jobs:
   build:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [test-fast]  # Removed integration-test dependency until it's fixed
+    needs: [test-fast, integration-test]  # Quality gate: require integration tests to pass
     outputs:
       image-digest: ${{ steps.build.outputs.digest }}
       image-tag: ${{ steps.meta.outputs.tags }}

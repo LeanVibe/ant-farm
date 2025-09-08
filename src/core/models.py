@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -50,6 +51,75 @@ def utc_now():
 
 
 Base = declarative_base()
+
+
+class User(Base):
+    """User model for authentication and profile management."""
+
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username = Column(String(100), nullable=False, unique=True, index=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    hashed_password = Column(String(255), nullable=False)
+
+    # Profile fields
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    bio = Column(Text)
+    avatar_url = Column(String(500))
+    preferences = Column(JSONB, default={})
+    timezone = Column(String(50), default="UTC")
+    language = Column(String(10), default="en")
+
+    # Account status
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    email_verified = Column(Boolean, default=False)
+
+    # Security
+    failed_login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime(timezone=True))
+    last_password_change = Column(DateTime(timezone=True))
+
+    # Permissions
+    permissions = Column(JSONB, default=[])
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    last_login = Column(DateTime(timezone=True))
+
+    def __repr__(self):
+        return f"<User(username='{self.username}', email='{self.email}', is_active={self.is_active})>"
+
+    def to_dict(self):
+        """Convert user to dictionary (excluding sensitive data)."""
+        return {
+            "id": str(self.id),
+            "username": self.username,
+            "email": self.email,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "bio": self.bio,
+            "avatar_url": self.avatar_url,
+            "preferences": self.preferences,
+            "timezone": self.timezone,
+            "language": self.language,
+            "is_active": self.is_active,
+            "is_admin": self.is_admin,
+            "email_verified": self.email_verified,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None,
+        }
+
+    @property
+    def full_name(self):
+        """Get user's full name."""
+        if self.first_name and self.last_name:
+            return f"{self.first_name} {self.last_name}"
+        return self.first_name or self.last_name or self.username
 
 
 class Agent(Base):

@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -414,6 +415,60 @@ class UserInfo(BaseModel):
     permissions: list[str]
     created_at: str
     last_login: str | None = None
+
+
+class UserProfile(BaseModel):
+    """Complete user profile information."""
+    id: str
+    username: str
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+    bio: str | None = None
+    avatar_url: str | None = None
+    preferences: dict = Field(default_factory=dict)
+    timezone: str = "UTC"
+    language: str = "en"
+    is_active: bool
+    is_admin: bool
+    email_verified: bool
+    permissions: list[str]
+    created_at: str
+    updated_at: str
+    last_login: str | None = None
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for updating user profile."""
+    first_name: str | None = None
+    last_name: str | None = None
+    bio: str | None = None
+    avatar_url: str | None = None
+    preferences: dict | None = None
+    timezone: str | None = None
+    language: str | None = None
+
+    class Config:
+        extra = "forbid"  # Prevent extra fields
+
+
+class UserProfileCreate(BaseModel):
+    """Schema for creating a new user with profile."""
+    username: str = Field(..., min_length=3, max_length=100)
+    email: str = Field(..., max_length=255)
+    password: str = Field(..., min_length=8)
+    first_name: str | None = None
+    last_name: str | None = None
+    bio: str | None = None
+    avatar_url: str | None = None
+    preferences: dict = Field(default_factory=dict)
+    timezone: str = "UTC"
+    language: str = "en"
+    is_admin: bool = False
+    permissions: list[str] = Field(default_factory=list)
+
+    class Config:
+        extra = "forbid"
 
 
 # Startup and shutdown events
@@ -871,6 +926,147 @@ async def create_user(
     except Exception as e:
         logger.error("User creation failed", error=str(e))
         raise HTTPException(status_code=500, detail="User creation failed") from e
+
+
+# User Profile CRUD endpoints
+@app.get("/api/v1/auth/profile", response_model=APIResponse)
+async def get_user_profile(current_user: User = Depends(get_current_user)):
+    """Get current user's profile."""
+    try:
+        # Get user from database (assuming we have database integration)
+        # For now, return the current user data
+        profile_data = UserProfile(
+            id=current_user.id,
+            username=current_user.username,
+            email=current_user.email,
+            first_name=getattr(current_user, 'first_name', None),
+            last_name=getattr(current_user, 'last_name', None),
+            bio=getattr(current_user, 'bio', None),
+            avatar_url=getattr(current_user, 'avatar_url', None),
+            preferences=getattr(current_user, 'preferences', {}),
+            timezone=getattr(current_user, 'timezone', 'UTC'),
+            language=getattr(current_user, 'language', 'en'),
+            is_active=current_user.is_active,
+            is_admin=current_user.is_admin,
+            email_verified=getattr(current_user, 'email_verified', False),
+            permissions=current_user.permissions,
+            created_at=getattr(current_user, 'created_at', datetime.now()).isoformat(),
+            updated_at=getattr(current_user, 'updated_at', datetime.now()).isoformat(),
+            last_login=getattr(current_user, 'last_login', None).isoformat() if getattr(current_user, 'last_login', None) else None,
+        )
+
+        return APIResponse(success=True, data=profile_data.dict())
+
+    except Exception as e:
+        logger.error("Failed to get user profile", error=str(e), user_id=current_user.id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve profile") from e
+
+
+@app.put("/api/v1/auth/profile", response_model=APIResponse)
+async def update_user_profile(
+    profile_update: UserProfileUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Update current user's profile."""
+    try:
+        # Validate input data
+        if profile_update.bio and len(profile_update.bio) > 1000:
+            raise HTTPException(status_code=400, detail="Bio must be less than 1000 characters")
+
+        if profile_update.first_name and len(profile_update.first_name) > 100:
+            raise HTTPException(status_code=400, detail="First name must be less than 100 characters")
+
+        if profile_update.last_name and len(profile_update.last_name) > 100:
+            raise HTTPException(status_code=400, detail="Last name must be less than 100 characters")
+
+        # Update user profile (in database)
+        # For now, this is a placeholder - actual implementation would update the database
+        updated_profile = UserProfile(
+            id=current_user.id,
+            username=current_user.username,
+            email=current_user.email,
+            first_name=profile_update.first_name,
+            last_name=profile_update.last_name,
+            bio=profile_update.bio,
+            avatar_url=profile_update.avatar_url,
+            preferences=profile_update.preferences or getattr(current_user, 'preferences', {}),
+            timezone=profile_update.timezone or getattr(current_user, 'timezone', 'UTC'),
+            language=profile_update.language or getattr(current_user, 'language', 'en'),
+            is_active=current_user.is_active,
+            is_admin=current_user.is_admin,
+            email_verified=getattr(current_user, 'email_verified', False),
+            permissions=current_user.permissions,
+            created_at=getattr(current_user, 'created_at', datetime.now()).isoformat(),
+            updated_at=datetime.now().isoformat(),
+            last_login=getattr(current_user, 'last_login', None).isoformat() if getattr(current_user, 'last_login', None) else None,
+        )
+
+        return APIResponse(success=True, data=updated_profile.dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update user profile", error=str(e), user_id=current_user.id)
+        raise HTTPException(status_code=500, detail="Failed to update profile") from e
+
+
+@app.get("/api/v1/auth/users/{user_id}/profile", response_model=APIResponse)
+@Permissions.system_read()
+async def get_user_profile_by_id(
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get user profile by ID (admin only)."""
+    try:
+        # Check if user exists (placeholder - would query database)
+        if user_id not in security_manager.users:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        target_user = security_manager.users[user_id]
+
+        profile_data = UserProfile(
+            id=target_user.id,
+            username=target_user.username,
+            email=target_user.email,
+            first_name=getattr(target_user, 'first_name', None),
+            last_name=getattr(target_user, 'last_name', None),
+            bio=getattr(target_user, 'bio', None),
+            avatar_url=getattr(target_user, 'avatar_url', None),
+            preferences=getattr(target_user, 'preferences', {}),
+            timezone=getattr(target_user, 'timezone', 'UTC'),
+            language=getattr(target_user, 'language', 'en'),
+            is_active=target_user.is_active,
+            is_admin=target_user.is_admin,
+            email_verified=getattr(target_user, 'email_verified', False),
+            permissions=target_user.permissions,
+            created_at=getattr(target_user, 'created_at', datetime.now()).isoformat(),
+            updated_at=getattr(target_user, 'updated_at', datetime.now()).isoformat(),
+            last_login=getattr(target_user, 'last_login', None).isoformat() if getattr(target_user, 'last_login', None) else None,
+        )
+
+        return APIResponse(success=True, data=profile_data.dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get user profile by ID", error=str(e), user_id=user_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve profile") from e
+
+
+@app.delete("/api/v1/auth/profile", response_model=APIResponse)
+async def delete_user_profile(current_user: User = Depends(get_current_user)):
+    """Delete current user's profile (deactivate account)."""
+    try:
+        # Deactivate user account (placeholder - would update database)
+        # In a real implementation, this might mark as deleted rather than hard delete
+
+        logger.warning("User profile deletion requested", user_id=current_user.id, username=current_user.username)
+
+        return APIResponse(success=True, data={"message": "Profile deletion requested. Account will be deactivated."})
+
+    except Exception as e:
+        logger.error("Failed to delete user profile", error=str(e), user_id=current_user.id)
+        raise HTTPException(status_code=500, detail="Failed to delete profile") from e
 
 
 # Health check endpoints

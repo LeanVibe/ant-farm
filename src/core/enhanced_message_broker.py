@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Set
 import redis.asyncio as redis
 import structlog
 
+from .circuit_breaker import get_message_broker_breaker
 from .communication_monitor import get_communication_monitor
 from .context_engine import ContextEngine
 from .enums import TaskPriority
@@ -214,7 +215,7 @@ class EnhancedMessageBroker(MessageBroker):
         # Don't call super().__init__ immediately - set up attributes first
         self.redis_client = None  # Will be set in initialize()
         self.pubsub = None
-        self.message_handlers: dict[str, MessageHandler] = {}
+        self.message_handlers: dict[str, Any] = {}  # Use Any for MessageHandler type
         self.pending_requests: dict[str, asyncio.Future] = {}
         self.subscriptions: set[str] = set()
         self.running = False
@@ -229,6 +230,9 @@ class EnhancedMessageBroker(MessageBroker):
         self._dlq_reasons: dict[str, int] = {}
         self._last_dlq_flush = 0.0
         self._dlq_flush_interval = 60.0
+
+        # Initialize circuit breaker for Redis operations
+        self.redis_breaker = get_message_broker_breaker()
 
         # Store redis_url for later use
         self._redis_url = redis_url

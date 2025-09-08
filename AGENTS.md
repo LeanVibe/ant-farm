@@ -1,82 +1,47 @@
 # AGENTS.md
 
-## LeanVibe Hive CLI Commands (Primary Interface)
+# Repository Guidelines
 
-**🎯 Always use the `hive` CLI - it's the proper way to manage the system!**
+## Project Structure & Modules
+- `src/`: application code
+  - `src/cli/`: `hive` CLI entrypoint and commands
+  - `src/api/`: FastAPI app, middleware, handlers
+  - `src/agents/`: meta/architect/qa/devops agents
+  - `src/core/`: broker, orchestration, coordination, monitoring
+  - `src/web/`: dashboard static assets
+- `tests/`: unit and integration tests (`pytest` configured in `pyproject.toml`)
+- `docker/`, `scripts/`, `plans/`, `logs/`: infra, helpers, plans, runtime logs
 
-**Initialize & Start System:**
-- Setup: `hive init` (initializes DB, migrations, Docker services)
-- Start system: `hive system start` (API server, core services)
-- System status: `hive system status` (health check all services)
-- Stop system: `hive system stop` (graceful shutdown)
+## Build, Test, and Development
+- Prefer `hive` CLI:
+  - Init: `hive init`
+  - Start/Status/Stop: `hive system start | status | stop`
+  - Agents: `hive agent spawn meta`, `hive agent list`
+  - Tasks: `hive task submit "Analyze module X"`
+- Python tools:
+  - Tests: `pytest -q` (or `pytest -q tests/unit`)
+  - Coverage: `pytest --cov=src --cov-report=term-missing`
+  - Lint/Format: `ruff check .`; `ruff format .`
+  - Types: `mypy .`
+- Docker infra (dev): `docker compose up -d postgres redis`; logs: `docker compose logs -f`
 
-**Agent Management:**
-- Spawn agent: `hive agent spawn meta` (or architect, qa, devops)
-- List agents: `hive agent list`
-- Agent details: `hive agent describe <name>`
-- Stop agent: `hive agent stop <name>`
-- Bootstrap system: `hive agent bootstrap`
+## Coding Style & Naming
+- Python 3.11, line length 88. Use absolute imports, no wildcards.
+- Naming: snake_case (funcs/vars), PascalCase (classes), UPPER_SNAKE (consts).
+- Keep modules small, focused; prefer typed `async` boundaries; avoid blocking.
+- Secrets/config only via `.env`; never commit or log secrets.
 
-**Task Management:**
-- Submit task: `hive task submit "description"`
-- List tasks: `hive task list`
-- Task status: `hive task status <id>`
+## Testing Guidelines
+- Framework: `pytest` with `tests/` discovery (`test_*.py`, `Test*`, `test_*`).
+- Coverage target: configured at 50% minimum (raise with stability).
+- Write unit tests first; use HTTPX for API tests; provide fakes over mocks where possible.
+- Run: `pytest -q` locally; for APIs, verify `/api/v1/health` when system runs.
 
-**Context & Memory:**
-- Populate context: `hive context populate`
-- Search context: `hive context search "query"`
+## Commit & Pull Requests
+- Use Conventional Commits: `feat(scope): summary`, `fix`, `docs`, `test`, `refactor`, `chore`.
+- PRs: clear description, linked issues, test coverage for changes, and notes on migrations/infra.
+- Keep changes scoped; update docs where relevant (e.g., `README.md`, `docs/`).
 
-## 🔧 Service Ports Configuration
-
-**Current service port configuration (non-standard to avoid conflicts):**
-- **API**: 9001 (FastAPI server)
-- **PostgreSQL**: 5433 (Docker mapped from 5432)
-- **Redis**: 6381 (Docker mapped from 6379)
-- **pgAdmin**: 9050 (development only)
-- **Redis Commander**: 9081 (development only)
-
-**Docker Infrastructure:**
-- All services run in Docker with health checks
-- Non-standard ports prevent conflicts with local services
-- Persistent volumes for data retention
-- Health check endpoints for monitoring
-
-## CLI Agentic Coding Tools
-
-- Auto-detection: system checks for opencode, claude, gemini CLI tools
-- Priority order: opencode (preferred) → claude → gemini → API fallback
-- Check tools: `hive agent tools` (or `make tools`)
-- Force specific: export PREFERRED_CLI_TOOL=opencode
-
-## Development Commands (Alternative)
-
-- Setup: make setup (auto-detects CLI tools); env: .env (API keys optional)
-- Dev API: `hive system start-api --port 9001 --reload`
-- Tests (all): pytest -q
-- Single test: pytest -q path/to/test_file.py::TestClass::test_case -k "expr"
-- Coverage: pytest --cov --cov-report=term-missing
-- Lint/format: ruff check .; ruff format .
-- Typecheck: mypy . (if configured) or pyright
-- DB/infra: docker compose up -d postgres redis; alembic upgrade head
-- Full stack: docker compose up -d (starts all infrastructure services)
-- Check services: docker compose ps
-- View logs: docker compose logs -f [service_name]
-- Stop all: docker compose down
-
-## Code style
-
-- Imports: stdlib, third-party, local; absolute imports preferred; no wildcard
-- Formatting: ruff format (PEP 8/black-like); max line length per ruff config
-- Types: Python 3.11+ typing, strict where feasible; no Any unless necessary
-- Naming: snake_case for funcs/vars, PascalCase for classes, UPPER_SNAKE for consts
-- Errors: raise domain-specific exceptions; never swallow; log with context; no bare except
-- FastAPI: pydantic models for IO; validate at boundaries; return typed responses
-- Concurrency: use async/await patterns; prefer async def; avoid blocking calls
-- Config/secrets: only from .env; never hardcode or log secrets
-- Tests: TDD; >90% coverage; use HTTPX for API; unit before integration; deterministic
-- Docs: update docs/INDEX.md references; scratch work only in /scratchpad
-- Git: feature branches; commit small, tested changes; PRs include rationale
-
-## Cursor/Copilot rules
-
-- If .cursor/rules or .cursorrules or .github/copilot-instructions.md exist, follow them; include import/order, formatting, and review gates accordingly.
+## Security & Configuration
+- Default ports: API `9001`, Postgres `5433`, Redis `6381` (via Docker). Optional tools: pgAdmin `9050`, Redis Commander `9081`.
+- Validate environment via `hive init`; review `.env.example` to configure credentials.

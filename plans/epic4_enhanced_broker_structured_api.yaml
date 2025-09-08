@@ -1,33 +1,78 @@
 version: 1
 plan_id: epic4-enhanced-broker-structured-api
-goal: "Enhanced broker structured API adoption"
+goal: "Adopt BrokerSendResult for explicit reliability semantics"
 
 batches:
-  - name: add-contract-tests
+  - name: add-broker-contracts
     tasks:
-      - type: command
-        run: echo "Add contract tests for BrokerSendResult"
+      - type: edit
+        file: tests/contracts/test_component_contracts.py
+        apply: |
+          Add BrokerSendResult contract tests for base and enhanced brokers:
+          - Test that both boolean and structured result paths work
+          - Validate BrokerSendResult interface compliance
+          - Ensure backward compatibility is maintained
     verify:
-      - run: "uv run pytest -q tests/contracts/test_component_contracts.py::TestBrokerSendResultContract::test_broker_send_result_success_contract --no-cov"
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
-      message: "test(contracts): add BrokerSendResult contract tests"
+      message: "test(contracts): add BrokerSendResult API contracts"
 
-  - name: migrate-orchestrator-task-assignment
-    depends_on: ["add-contract-tests"]
+  - name: create-structured-result-types
+    depends_on: ["add-broker-contracts"]
     tasks:
-      - type: command
-        run: echo "Migrate orchestrator task assignment to use send_message_with_result"
+      - type: edit
+        file: src/core/contracts.py
+        apply: |
+          Define BrokerSendResult and BrokerSendReason types:
+          - BrokerSendResult: success, message_id, reason, details
+          - BrokerSendReason: OK, IDEMPOTENT_DUPLICATE, PUBLISH_ERROR, INVALID
+          - Ensure compatibility with existing boolean returns
     verify:
-      - run: "uv run pytest -q tests/unit/test_orchestrator.py::TestAgentOrchestrator::test_orchestrator_task_assignment_structured_result --no-cov"
+      - run: "uv run python -c 'from src.core.contracts import BrokerSendResult, BrokerSendReason; print(\"OK\")'"
     commit:
-      message: "feat(orchestrator): adopt structured send result for task assignment"
+      message: "feat(contracts): define BrokerSendResult and BrokerSendReason types"
 
-  - name: comprehensive-testing
-    depends_on: ["migrate-orchestrator-task-assignment"]
+  - name: enhance-message-broker-api
+    depends_on: ["create-structured-result-types"]
     tasks:
-      - type: command
-        run: echo "Run comprehensive broker structured API tests"
+      - type: edit
+        file: src/core/message_broker.py
+        apply: |
+          Add send_message_with_result method:
+          - Returns BrokerSendResult instead of boolean
+          - Provides detailed error information
+          - Maintains backward compatibility with send_message
     verify:
-      - run: "uv run pytest -q tests/contracts/test_component_contracts.py tests/unit/test_orchestrator.py --no-cov"
+      - run: "uv run pytest -q tests/unit/test_message_broker_comprehensive.py --override-ini addopts=\"--strict-markers --strict-config\""
     commit:
-      message: "test(broker): comprehensive structured API adoption coverage"
+      message: "feat(broker): add send_message_with_result method"
+
+  - name: migrate-orchestrator-to-structured-api
+    depends_on: ["enhance-message-broker-api"]
+    tasks:
+      - type: edit
+        file: src/core/orchestrator.py
+        apply: |
+          Migrate heartbeat/broadcast to send_message_with_result:
+          - Update heartbeat and broadcast methods
+          - Add structured logging for failures
+          - Handle BrokerSendResult responses appropriately
+    verify:
+      - run: "uv run pytest -q tests/unit/test_orchestrator.py --override-ini addopts=\"--strict-markers --strict-config\""
+    commit:
+      message: "feat(orchestrator): adopt structured broker send results"
+
+  - name: add-structured-api-tests
+    depends_on: ["migrate-orchestrator-to-structured-api"]
+    tasks:
+      - type: edit
+        file: tests/unit/test_broker_structured_api.py
+        apply: |
+          Add comprehensive tests for structured API:
+          - Test send_message_with_result functionality
+          - Test error handling and detailed reasons
+          - Test backward compatibility
+    verify:
+      - run: "uv run pytest -q tests/unit/test_broker_structured_api.py --override-ini addopts=\"--strict-markers --strict-config\""
+    commit:
+      message: "test(broker): add structured API tests"
