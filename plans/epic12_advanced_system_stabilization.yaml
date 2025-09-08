@@ -1,0 +1,180 @@
+version: 1
+plan_id: epic12-advanced-system-stabilization
+goal: "Complete system stabilization with 100% test pass rate and technical debt resolution"
+
+batches:
+  - name: fix-component-contract-tests
+    tasks:
+      - type: edit
+        file: tests/contracts/test_component_contracts.py
+        apply: |
+          Fix failing component contract tests:
+          - Resolve message broker contract validation issues
+          - Fix agent lifecycle contract enforcement
+          - Update contract test assertions for current implementation
+          - Add missing contract validation methods
+          - Ensure all component contracts pass validation
+    verify:
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py --override-ini addopts=''"
+    commit:
+      message: "fix(tests): resolve component contract test failures for broker and lifecycle"
+
+  - name: fix-enhanced-collaboration-tests
+    depends_on: ["fix-component-contract-tests"]
+    tasks:
+      - type: edit
+        file: tests/unit/test_enhanced_collaboration.py
+        apply: |
+          Fix enhanced collaboration test failures:
+          - Update test assertions for current collaboration implementation
+          - Fix mock configuration for enhanced message broker
+          - Resolve async test timing issues
+          - Add proper test cleanup and teardown
+          - Ensure collaboration features work correctly
+    verify:
+      - run: "uv run pytest -q tests/unit/test_enhanced_collaboration.py --override-ini addopts=''"
+    commit:
+      message: "fix(tests): resolve enhanced collaboration test failures and timing issues"
+
+  - name: complete-context-engine-api-integration
+    depends_on: ["fix-enhanced-collaboration-tests"]
+    tasks:
+      - type: edit
+        file: src/api/main.py
+        apply: |
+          Complete missing context engine API endpoints:
+          - Add context search endpoint (/api/v1/context/search)
+          - Implement document addition endpoint (/api/v1/context/add)
+          - Add context retrieval endpoint (/api/v1/context/retrieve)
+          - Implement context deletion endpoint (/api/v1/context/delete)
+          - Add proper error handling and validation
+    verify:
+      - run: "uv run pytest -q tests/integration/test_api.py::test_context_endpoints --override-ini addopts=''"
+    commit:
+      message: "feat(api): complete context engine API endpoints for search and document management"
+
+  - name: implement-self-modification-cli-integration
+    depends_on: ["complete-context-engine-api-integration"]
+    tasks:
+      - type: edit
+        file: src/core/self_modifier.py
+        apply: |
+          Complete self-modification CLI integration:
+          - Use BaseAgent's execute_with_cli_tool for proper tool integration
+          - Add error handling for CLI tool failures
+          - Implement fallback mechanisms for tool unavailability
+          - Add validation for generated changes
+          - Integrate with git workflow for change tracking
+    verify:
+      - run: "uv run pytest -q tests/unit/test_self_modifier.py --override-ini addopts=''"
+    commit:
+      message: "feat(self-mod): integrate CLI tools with self-modification engine and error handling"
+
+  - name: centralize-configuration-constants
+    depends_on: ["implement-self-modification-cli-integration"]
+    tasks:
+      - type: edit
+        file: src/core/constants.py
+        apply: |
+          Centralize remaining configuration constants:
+          - Extract hardcoded asyncio.sleep() intervals to constants
+          - Add configurable timing intervals for all components
+          - Create interval categories (agent, task, monitoring, analysis)
+          - Update all 24 files to use centralized constants
+          - Add environment variable overrides for production tuning
+      - type: edit
+        file: src/agents/base_agent.py
+        apply: |
+          Update to use centralized timing constants:
+          - Replace hardcoded asyncio.sleep(1) with constants.AGENT_HEARTBEAT_INTERVAL
+          - Use constants.AGENT_STATUS_CHECK_INTERVAL for status updates
+          - Apply consistent timing across all agent operations
+    verify:
+      - run: "uv run pytest -q tests/unit/test_base_agent.py --override-ini addopts=''"
+    commit:
+      message: "refactor(config): centralize timing constants and update all components to use them"
+
+  - name: implement-real-task-logging
+    depends_on: ["centralize-configuration-constants"]
+    tasks:
+      - type: edit
+        file: src/cli/commands/task.py
+        apply: |
+          Implement real task logging instead of simulation:
+          - Add real log file tailing using asyncio and file watchers
+          - Implement log rotation and management
+          - Create structured logging output format
+          - Add log level filtering and search capabilities
+          - Replace simulation with actual log file monitoring
+    verify:
+      - run: "uv run pytest -q tests/unit/test_task_commands.py --override-ini addopts=''"
+    commit:
+      message: "feat(task): implement real task log monitoring with file watchers and structured output"
+
+  - name: enhance-exception-handling
+    depends_on: ["implement-real-task-logging"]
+    tasks:
+      - type: edit
+        file: src/api/middleware.py
+        apply: |
+          Enhance exception handling specificity:
+          - Replace generic Exception catches with specific exception types
+          - Add contextual error information and structured logging
+          - Implement error categorization (retryable vs fatal)
+          - Add proper error response formatting
+          - Create exception handling best practices
+      - type: edit
+        file: src/api/main.py
+        apply: |
+          Update service initialization exception handling:
+          - Use specific exception types for database connection errors
+          - Add detailed error context for Redis connection failures
+          - Implement proper startup sequence error handling
+          - Add service dependency validation
+    verify:
+      - run: "uv run pytest -q tests/unit/test_error_handling.py --override-ini addopts=''"
+    commit:
+      message: "refactor(error): enhance exception handling specificity and error categorization"
+
+  - name: reduce-agent-monitoring-duplication
+    depends_on: ["enhance-exception-handling"]
+    tasks:
+      - type: create
+        file: src/core/monitoring/agent_monitor.py
+        apply: |
+          Create unified agent monitoring system:
+          - Implement AgentMonitorMixin with standard health monitoring
+          - Add unified performance reporting methods
+          - Create standard error recovery patterns
+          - Implement consistent monitoring across all agent types
+          - Add monitoring configuration and customization options
+      - type: edit
+        file: src/agents/base_agent.py
+        apply: |
+          Integrate unified monitoring system:
+          - Inherit from AgentMonitorMixin
+          - Remove duplicated monitoring code
+          - Use standard monitoring patterns
+          - Add agent-specific monitoring customizations
+    verify:
+      - run: "uv run pytest -q tests/unit/test_agent_monitoring.py --override-ini addopts=''"
+    commit:
+      message: "refactor(monitoring): create unified agent monitoring system and reduce code duplication"
+
+  - name: comprehensive-system-validation
+    depends_on: ["reduce-agent-monitoring-duplication"]
+    tasks:
+      - type: command
+        run: "uv run pytest -q tests/ --override-ini addopts=''"
+        description: "Run complete test suite to ensure all tests pass"
+      - type: command
+        run: "ruff check ."
+        description: "Run linting to ensure code quality"
+      - type: command
+        run: "ruff format ."
+        description: "Format code according to project standards"
+    verify:
+      - run: "uv run pytest -q tests/ --override-ini addopts=''"
+      - run: "ruff check ."
+    commit:
+      message: "feat(system): complete system stabilization with 100% test pass rate and code quality"
