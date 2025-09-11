@@ -8,21 +8,21 @@ from typing import Optional
 
 import httpx
 import typer
+from rich import box
 from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
-from rich import box
 
 from ..utils import (
     API_BASE_URL,
     create_status_table,
     create_system_status_table,
     error_handler,
+    get_api_headers,
     info_message,
     success_message,
-    get_api_headers,
 )
 
 app = typer.Typer(help="Real-time monitoring commands")
@@ -116,7 +116,7 @@ def metrics(
 
 
 async def _monitor_agents_live(
-    refresh_interval: int, filter_type: Optional[str], filter_status: Optional[str]
+    refresh_interval: int, filter_type: str | None, filter_status: str | None
 ):
     """Live monitoring of agents"""
     try:
@@ -236,7 +236,7 @@ async def _monitor_agents_live(
 
                 layout["summary"].update(
                     Panel(
-                        f"[bold red]Agent Monitor - Error[/bold red]",
+                        "[bold red]Agent Monitor - Error[/bold red]",
                         border_style="red",
                     )
                 )
@@ -265,7 +265,7 @@ async def _monitor_agents_live(
         error_handler(e)
 
 
-async def _list_agents_snapshot(filter_type: Optional[str] = None, filter_status: Optional[str] = None):
+async def _list_agents_snapshot(filter_type: str | None = None, filter_status: str | None = None):
     """Show snapshot of agents"""
     try:
         headers = get_api_headers()
@@ -340,7 +340,7 @@ async def _list_agents_snapshot(filter_type: Optional[str] = None, filter_status
 
 
 async def _monitor_tasks_live(
-    refresh_interval: int, filter_status: Optional[str], filter_type: Optional[str]
+    refresh_interval: int, filter_status: str | None, filter_type: str | None
 ):
     """Live monitoring of tasks"""
     try:
@@ -460,7 +460,7 @@ async def _monitor_tasks_live(
 
                 layout["summary"].update(
                     Panel(
-                        f"[bold red]Task Monitor - Error[/bold red]",
+                        "[bold red]Task Monitor - Error[/bold red]",
                         border_style="red",
                     )
                 )
@@ -489,7 +489,7 @@ async def _monitor_tasks_live(
         error_handler(e)
 
 
-async def _list_tasks_snapshot(filter_status: Optional[str] = None, filter_type: Optional[str] = None):
+async def _list_tasks_snapshot(filter_status: str | None = None, filter_type: str | None = None):
     """Show snapshot of tasks"""
     try:
         headers = get_api_headers()
@@ -621,7 +621,7 @@ async def _monitor_system_live(refresh_interval: int):
 
                     # API status
                     api_status = "✅ Online" if health_data.get("status") == "healthy" else "❌ Offline"
-                    system_table.add_row("API Server", api_status, f"Port 9001")
+                    system_table.add_row("API Server", api_status, "Port 9001")
 
                     # Database status
                     db_status = health_data.get("database", {}).get("status", "unknown")
@@ -674,7 +674,7 @@ async def _monitor_system_live(refresh_interval: int):
 
                 layout["summary"].update(
                     Panel(
-                        f"[bold red]System Monitor - Error[/bold red]",
+                        "[bold red]System Monitor - Error[/bold red]",
                         border_style="red",
                     )
                 )
@@ -855,7 +855,7 @@ async def _monitor_resources_live(refresh_interval: int):
 
                 layout["summary"].update(
                     Panel(
-                        f"[bold red]Resource Monitor - Error[/bold red]",
+                        "[bold red]Resource Monitor - Error[/bold red]",
                         border_style="red",
                     )
                 )
