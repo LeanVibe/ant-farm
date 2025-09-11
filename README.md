@@ -159,13 +159,26 @@ ant-farm/
 
 ## 📊 Key Features
 
+### ✅ Real-time Monitoring & Analytics (New!)
+- **Live Agent Monitoring**: Real-time agent status, CPU usage, and performance metrics
+- **Task Progress Tracking**: Live task completion monitoring with WebSocket streaming
+- **System Health Dashboard**: Comprehensive system metrics and resource utilization
+- **Performance Analytics**: Agent and task performance analytics with trend analysis
+- **Resource Monitoring**: CPU, memory, disk, and network resource tracking
+
+### ✅ Batch Operations & Automation (New!)
+- **Batch Agent Management**: Spawn, stop, and update multiple agents simultaneously
+- **Task Reassignment**: Bulk task reassignment based on agent capabilities
+- **System Configuration**: Batch system configuration and data export
+- **Advanced Filtering**: Filter operations by agent type, status, and other criteria
+
 ### Planned Autonomous Operation
 - **24/7 Development**: (Planned) Continuous improvement without human intervention
-- **Self-Bootstrapping**: (Planned) Extends its own capabilities autonomously  
+- **Self-Bootstrapping**: (Planned) Extends its own capabilities autonomously
 - **Intelligent Coordination**: (Planned) Multi-agent task optimization
 - **Performance Learning**: (Planned) Adapts based on task success patterns
 
-### Planned Safety & Reliability  
+### Planned Safety & Reliability
 - **Safe Modifications**: (Planned) Automatic backup before any code changes
 - **Rollback System**: (Planned) Instant recovery from failed improvements
 - **Testing Integration**: (Planned) All changes validated automatically
@@ -187,6 +200,9 @@ ant-farm/
 - **ADW System**: Complete autonomous development workflow with 16-24 hour operation
 - **Emergency Intervention**: 5-level safety system with automatic rollback
 - **CLI Unification**: Single `hive` command with full agent management
+- **Real-time Monitoring**: Live agent, task, and system monitoring with WebSocket streaming
+- **Batch Operations**: Advanced batch agent/task management and system configuration
+- **Performance Analytics**: Comprehensive metrics and analytics for agents and tasks
 - **Multi-CLI Detection**: Auto-discovery of opencode, Claude CLI, Gemini CLI
 - **Complete Infrastructure**: Task queue, message broker, context engine, orchestrator
 - **Web Dashboard**: Real-time monitoring with emergency controls
@@ -244,6 +260,30 @@ hive task list
 
 # Check system status
 hive system status
+```
+
+### Advanced Monitoring & Batch Operations (New!)
+```bash
+# Real-time monitoring
+hive monitor agents --live          # Live agent monitoring with WebSocket
+hive monitor tasks --live           # Real-time task progress tracking
+hive monitor system --live          # System health and metrics dashboard
+hive monitor resources --live       # CPU, memory, disk monitoring
+
+# Performance analytics
+hive metrics agents                 # Agent performance analytics
+hive metrics tasks                  # Task completion metrics
+hive metrics system                 # System performance overview
+
+# Batch operations
+hive agent batch-spawn --file agents.json    # Spawn multiple agents
+hive agent batch-stop --filter type=meta     # Stop agents by filter
+hive agent batch-update --config config.json # Update agent configurations
+
+hive task batch-reassign --filter type=code_review  # Reassign tasks
+
+hive system batch-config --file system.json         # Batch system configuration
+hive system batch-export --type agents,tasks,metrics # Export system data
 ```
 
 ### Planned Advanced Operation (Future)

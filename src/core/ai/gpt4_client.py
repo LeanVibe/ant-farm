@@ -249,6 +249,10 @@ class GPT4Client(AIModelInterface):
     
     def _calculate_response_quality(self, response: str) -> float:
         """Calculate quality score for response"""
+        # Handle None response from function calls
+        if response is None:
+            response = ""
+            
         if len(response) < 10:
             return 0.1
         

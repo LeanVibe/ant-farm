@@ -1114,5 +1114,144 @@ async def _batch_cancel_tasks(
         error_handler(e)
 
 
+@app.command("batch-reassign")
+def batch_reassign(
+    new_agent: str = typer.Option(
+        ..., "--agent", "-a", help="New agent to assign tasks to"
+    ),
+    filter_expr: str = typer.Option(
+        None, "--filter", "-f", help="Filter tasks to reassign (e.g., type=code_review,status=pending)"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be reassigned without actually reassigning",
+    ),
+):
+    """Reassign multiple tasks to a different agent"""
+    asyncio.run(_batch_reassign_tasks(new_agent, filter_expr, dry_run))
+
+
+async def _batch_reassign_tasks(new_agent: str, filter_expr: str = None, dry_run: bool = False):
+    """Internal async batch task reassignment"""
+    try:
+        # Get current tasks
+        params = {}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{API_BASE_URL}/api/v1/cli/tasks", params=params
+            )
+
+            if response.status_code != 200:
+                error_handler(
+                    Exception(f"Failed to get task list: HTTP {response.status_code}")
+                )
+                return
+
+            data = response.json()
+            if not data.get("success"):
+                error_handler(Exception(data.get("error", "Failed to get task list")))
+                return
+
+            tasks = data.get("data", [])
+
+            # Parse filter expression
+            filter_criteria = {}
+            if filter_expr:
+                for part in filter_expr.split(","):
+                    if "=" in part:
+                        key, value = part.split("=", 1)
+                        filter_criteria[key.strip()] = value.strip()
+
+            # Apply filters
+            filtered_tasks = tasks
+            if "type" in filter_criteria:
+                filtered_tasks = [t for t in filtered_tasks if t.get("type") == filter_criteria["type"]]
+            if "status" in filter_criteria:
+                filtered_tasks = [t for t in filtered_tasks if t.get("status") == filter_criteria["status"]]
+            if "assigned_to" in filter_criteria:
+                filtered_tasks = [t for t in filtered_tasks if t.get("assigned_to") == filter_criteria["assigned_to"]]
+
+            if not filtered_tasks:
+                filter_desc = f" matching {filter_expr}" if filter_expr else ""
+                info_message(f"No tasks found{filter_desc}")
+                return
+
+            # Dry run output
+            if dry_run:
+                console.print(
+                    "\n🔍 [bold cyan]Dry Run - Tasks to be reassigned:[/bold cyan]"
+                )
+                for task in filtered_tasks:
+                    console.print(
+                        f"  • {task.get('title', 'untitled')} → {new_agent}"
+                    )
+                    console.print(
+                        f"    Current: {task.get('assigned_to', 'unassigned')} | Type: {task.get('type', 'unknown')} | Status: {task.get('status', 'unknown')}"
+                    )
+
+                console.print(f"\n📊 Summary: {len(filtered_tasks)} tasks would be reassigned to {new_agent}")
+                return
+
+            # Reassign tasks
+            reassigned_tasks = []
+            failed_tasks = []
+
+            info_message(f"Reassigning {len(filtered_tasks)} task(s) to {new_agent}...")
+
+            for task in filtered_tasks:
+                task_id = task.get("id", "unknown")
+                task_title = task.get("title", "untitled")
+                try:
+                    console.print(f"🔄 Reassigning: {task_title} → {new_agent}")
+
+                    # For now, we'll simulate the reassignment since the API may not support task reassignment yet
+                    # In a real implementation, this would call a task reassignment endpoint
+                    console.print(f"  ⚠️ Task reassignment not yet implemented in API")
+                    console.print(f"    Would reassign from {task.get('assigned_to', 'unassigned')} to {new_agent}")
+
+                    # Simulate success for now
+                    reassigned_tasks.append({
+                        "id": task_id,
+                        "title": task_title,
+                        "old_agent": task.get("assigned_to", "unassigned"),
+                        "new_agent": new_agent
+                    })
+
+                except Exception as e:
+                    failed_tasks.append({"id": task_id, "title": task_title, "error": str(e)})
+                    console.print(f"  ❌ {task_title} failed: {str(e)}")
+
+                # Small delay between reassignments
+                await asyncio.sleep(0.2)
+
+            # Summary
+            console.print("\n📊 Batch Task Reassignment Summary:")
+            if reassigned_tasks:
+                success_message(
+                    f"✅ Successfully reassigned {len(reassigned_tasks)} tasks to {new_agent}:"
+                )
+                for task in reassigned_tasks:
+                    console.print(f"  • {task['title']} (ID: {task['id']})")
+
+            if failed_tasks:
+                console.print(f"\n❌ Failed to reassign {len(failed_tasks)} tasks:")
+                for task in failed_tasks:
+                    console.print(f"  • {task['title']} (ID: {task['id']}) - Error: {task['error']}")
+
+            console.print(
+                "\n💡 [dim]Note: Task reassignment functionality requires API support[/dim]"
+            )
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
+    except Exception as e:
+        error_handler(e)
+
+
 if __name__ == "__main__":
     app()

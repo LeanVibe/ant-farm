@@ -1,0 +1,124 @@
+version: 1
+plan_id: epic7-testing-framework
+goal: "Implement comprehensive bottom-up testing strategy for reliability"
+
+batches:
+  - name: expand-isolation-tests
+    tasks:
+      - type: edit
+        file: tests/unit/test_message_broker_isolation.py
+        apply: |
+          Add comprehensive isolation tests for message broker:
+          - Test message broker in complete isolation
+          - Mock all external dependencies
+          - Test edge cases and error conditions
+          - Validate message routing logic
+    verify:
+      - run: "uv run pytest -q tests/unit/test_message_broker_isolation.py --override-ini addopts=''"
+    commit:
+      message: "feat(testing): add comprehensive isolation tests for message broker"
+
+  - name: enhance-integration-tests
+    tasks:
+      - type: edit
+        file: tests/integration/test_api.py
+        apply: |
+          Enhance API integration tests:
+          - Add comprehensive endpoint coverage
+          - Test authentication and authorization
+          - Validate error responses and edge cases
+          - Test concurrent request handling
+    verify:
+      - run: "uv run pytest -q tests/integration/test_api.py --override-ini addopts=''"
+    commit:
+      message: "feat(testing): enhance API integration tests with full coverage"
+
+  - name: implement-contract-tests
+    tasks:
+      - type: edit
+        file: tests/contracts/test_component_contracts.py
+        apply: |
+          Expand contract tests for all major components:
+          - Add contract tests for orchestrator
+          - Add contract tests for agent factory
+          - Add contract tests for task queue
+          - Validate interface compliance
+    verify:
+      - run: "uv run pytest -q tests/contracts/test_component_contracts.py --override-ini addopts=''"
+    commit:
+      message: "feat(testing): implement comprehensive contract tests"
+
+  - name: add-cli-testing
+    tasks:
+      - type: edit
+        file: tests/cli/test_cli_commands.py
+        apply: |
+          Add CLI command workflow testing:
+          - Test all CLI commands end-to-end
+          - Validate command outputs and error handling
+          - Test CLI argument parsing and validation
+          - Test interactive CLI features
+    verify:
+      - run: "uv run pytest -q tests/cli/test_cli_commands.py --override-ini addopts=''"
+    commit:
+      message: "feat(testing): add comprehensive CLI testing framework"
+
+  - name: implement-pwa-testing
+    tasks:
+      - type: edit
+        file: tests/integration/test_pwa_functionality.py
+        apply: |
+          Add PWA functionality testing:
+          - Test service worker registration and caching
+          - Test offline functionality and fallbacks
+          - Test push notification handling
+          - Test mobile responsiveness and gestures
+    verify:
+      - run: "uv run pytest -q tests/integration/test_pwa_functionality.py --override-ini addopts=''"
+    commit:
+      message: "feat(testing): implement PWA functionality testing"
+
+  - name: add-performance-testing
+    tasks:
+      - type: edit
+        file: tests/performance/test_system_performance.py
+        apply: |
+          Add system performance testing:
+          - Test API response times under load
+          - Test message broker throughput
+          - Test agent coordination performance
+          - Test database query performance
+    verify:
+      - run: "uv run pytest -q tests/performance/test_system_performance.py --override-ini addopts=''"
+    commit:
+      message: "feat(testing): add performance testing framework"
+
+  - name: implement-test-automation
+    tasks:
+      - type: edit
+        file: scripts/test_automation.py
+        apply: |
+          Create test automation framework:
+          - Automated test execution and reporting
+          - Test result aggregation and analysis
+          - CI/CD integration for automated testing
+          - Test coverage reporting and tracking
+    verify:
+      - run: "python scripts/test_automation.py --dry-run"
+    commit:
+      message: "feat(testing): implement test automation and CI/CD integration"
+
+  - name: add-test-coverage-analysis
+    tasks:
+      - type: edit
+        file: scripts/coverage_analysis.py
+        apply: |
+          Add test coverage analysis tools:
+          - Generate detailed coverage reports
+          - Identify untested code paths
+          - Track coverage trends over time
+          - Generate coverage improvement recommendations
+    verify:
+      - run: "python scripts/coverage_analysis.py --analyze"
+    commit:
+      message: "feat(testing): add test coverage analysis and reporting"

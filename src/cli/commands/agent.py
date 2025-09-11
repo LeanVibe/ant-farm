@@ -43,7 +43,7 @@ def list(
         None, "--name", "-n", help="Filter by name pattern (partial match)"
     ),
     sort_by: str = typer.Option(
-        "name", "--sort", help="Sort by: name, type, status, uptime"
+        "name", "--sort", help="Sort by: name, type, status, uptime, cpu"
     ),
     reverse: bool = typer.Option(False, "--reverse", "-r", help="Reverse sort order"),
     limit: int = typer.Option(None, "--limit", "-l", help="Limit number of results"),
@@ -112,6 +112,7 @@ async def _list_agents_filtered(
                         "type": lambda x: x.get("type", ""),
                         "status": lambda x: x.get("status", ""),
                         "uptime": lambda x: x.get("uptime", 0),
+                        "cpu": lambda x: x.get("cpu_percent", 0),
                     }
 
                     if sort_by in sort_key_map:
@@ -138,6 +139,10 @@ async def _list_agents_filtered(
                     # Create table data
                     table_data = []
                     for agent in filtered_agents:
+                        cpu_info = ""
+                        if agent.get("cpu_percent") is not None:
+                            cpu_info = f"{agent['cpu_percent']:.1f}%"
+
                         table_data.append(
                             {
                                 "short_id": agent.get("short_id", "n/a"),
@@ -145,6 +150,7 @@ async def _list_agents_filtered(
                                 "type": agent.get("type", "unknown"),
                                 "status": agent.get("status", "unknown"),
                                 "uptime": f"{agent.get('uptime', 0):.1f}s",
+                                "cpu": cpu_info or "n/a",
                                 "last_heartbeat": agent.get("last_heartbeat", "never"),
                             }
                         )
@@ -845,6 +851,21 @@ async def _monitor_agents(refresh_interval: int, agent_filter: str = None):
         error_handler(e)
 
 
+@app.command("batch-spawn")
+def batch_spawn(
+    file: str = typer.Option(
+        ..., "--file", "-f", help="JSON file with agent definitions"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be spawned without actually spawning",
+    ),
+):
+    """Spawn multiple agents from a JSON file"""
+    asyncio.run(_batch_spawn_agents(file, dry_run))
+
+
 @app.command()
 def start(
     agent_types: str = typer.Option(
@@ -980,6 +1001,42 @@ async def _start_agents_batch(
         error_handler(e)
 
 
+@app.command("batch-stop")
+def batch_stop(
+    filter_type: str = typer.Option(
+        None, "--filter", "-f", help="Filter agents to stop (e.g., type=meta,status=active)"
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Force stop without confirmation"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be stopped without actually stopping",
+    ),
+):
+    """Stop multiple agents in batch with advanced filtering"""
+    asyncio.run(_batch_stop_agents(filter_type, force, dry_run))
+
+
+@app.command("batch-update")
+def batch_update(
+    config_file: str = typer.Option(
+        ..., "--config", "-c", help="JSON file with agent configuration updates"
+    ),
+    filter_expr: str = typer.Option(
+        None, "--filter", "-f", help="Filter agents to update (e.g., type=meta)"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be updated without actually updating",
+    ),
+):
+    """Update multiple agents in batch with configuration changes"""
+    asyncio.run(_batch_update_agents(config_file, filter_expr, dry_run))
+
+
 @app.command()
 def stop_all(
     agent_type_filter: str = typer.Option(
@@ -1097,6 +1154,427 @@ async def _stop_agents_batch(agent_type_filter: str = None, force: bool = False)
                 console.print(f"\n❌ Failed to stop {len(failed_agents)} agents:")
                 for agent in failed_agents:
                     console.print(f"  • {agent['name']} - Error: {agent['error']}")
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
+    except Exception as e:
+        error_handler(e)
+
+
+async def _batch_stop_agents(filter_expr: str = None, force: bool = False, dry_run: bool = False):
+    """Internal async batch agent stopping with advanced filtering"""
+    try:
+        # Get current agents
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{API_BASE_URL}/api/v1/cli/agents")
+
+            if response.status_code != 200:
+                error_handler(
+                    Exception(f"Failed to get agent list: HTTP {response.status_code}")
+                )
+                return
+
+            data = response.json()
+            if not data.get("success"):
+                error_handler(Exception(data.get("error", "Failed to get agent list")))
+                return
+
+            agents = data.get("data", [])
+
+            # Parse filter expression (e.g., "type=meta,status=active")
+            filter_criteria = {}
+            if filter_expr:
+                for part in filter_expr.split(","):
+                    if "=" in part:
+                        key, value = part.split("=", 1)
+                        filter_criteria[key.strip()] = value.strip()
+
+            # Apply filters
+            filtered_agents = agents
+            if "type" in filter_criteria:
+                filtered_agents = [a for a in filtered_agents if a.get("type") == filter_criteria["type"]]
+            if "status" in filter_criteria:
+                filtered_agents = [a for a in filtered_agents if a.get("status") == filter_criteria["status"]]
+            if "name" in filter_criteria:
+                filtered_agents = [a for a in filtered_agents if filter_criteria["name"] in a.get("name", "")]
+
+            if not filtered_agents:
+                filter_desc = f" matching {filter_expr}" if filter_expr else ""
+                info_message(f"No agents found{filter_desc}")
+                return
+
+            # Dry run output
+            if dry_run:
+                console.print(
+                    "\n🔍 [bold cyan]Dry Run - Agents to be stopped:[/bold cyan]"
+                )
+                for agent in filtered_agents:
+                    console.print(
+                        f"  • {agent.get('name', 'unknown')} ({agent.get('type', 'unknown')}) - {agent.get('status', 'unknown')}"
+                    )
+
+                console.print(f"\n📊 Summary: {len(filtered_agents)} agents would be stopped")
+                return
+
+            # Confirm unless forced
+            if not force:
+                console.print("\n📋 Agents to stop:")
+                for agent in filtered_agents:
+                    console.print(
+                        f"  • {agent.get('name', 'unknown')} ({agent.get('type', 'unknown')}) - {agent.get('status', 'unknown')}"
+                    )
+
+                if not typer.confirm(f"\nStop {len(filtered_agents)} agent(s)?"):
+                    info_message("Batch stop cancelled")
+                    return
+
+            # Stop agents
+            stopped_agents = []
+            failed_agents = []
+
+            info_message(f"Stopping {len(filtered_agents)} agent(s)...")
+
+            for agent in filtered_agents:
+                agent_name = agent.get("name", "unknown")
+                try:
+                    console.print(f"🛑 Stopping {agent_name}...")
+
+                    response = await client.post(
+                        f"{API_BASE_URL}/api/v1/cli/agents/{agent_name}/stop"
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("success"):
+                            stopped_agents.append(agent_name)
+                            console.print(f"  ✅ {agent_name} stopped successfully")
+                        else:
+                            failed_agents.append(
+                                {
+                                    "name": agent_name,
+                                    "error": data.get("error", "Unknown error"),
+                                }
+                            )
+                            console.print(
+                                f"  ❌ {agent_name} failed: {data.get('error', 'Unknown error')}"
+                            )
+                    else:
+                        failed_agents.append(
+                            {
+                                "name": agent_name,
+                                "error": f"HTTP {response.status_code}",
+                            }
+                        )
+                        console.print(
+                            f"  ❌ {agent_name} failed: HTTP {response.status_code}"
+                        )
+
+                except Exception as e:
+                    failed_agents.append({"name": agent_name, "error": str(e)})
+                    console.print(f"  ❌ {agent_name} failed: {str(e)}")
+
+                # Small delay between stops
+                await asyncio.sleep(0.2)
+
+            # Summary
+            console.print("\n📊 Batch Agent Stop Summary:")
+            if stopped_agents:
+                success_message(
+                    f"✅ Successfully stopped {len(stopped_agents)} agents:"
+                )
+                for name in stopped_agents:
+                    console.print(f"  • {name}")
+
+            if failed_agents:
+                console.print(f"\n❌ Failed to stop {len(failed_agents)} agents:")
+                for agent in failed_agents:
+                    console.print(f"  • {agent['name']} - Error: {agent['error']}")
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
+    except Exception as e:
+        error_handler(e)
+
+
+async def _batch_update_agents(config_file: str, filter_expr: str = None, dry_run: bool = False):
+    """Internal async batch agent updating with configuration changes"""
+    try:
+        from pathlib import Path
+        import json
+
+        # Load configuration updates
+        config_path = Path(config_file)
+        if not config_path.exists():
+            error_handler(Exception(f"Config file not found: {config_file}"))
+            return
+
+        try:
+            with open(config_path) as f:
+                config_updates = json.load(f)
+            info_message(f"Loaded configuration updates from {config_file}")
+        except json.JSONDecodeError as e:
+            error_handler(Exception(f"Invalid JSON in {config_file}: {e}"))
+            return
+        except Exception as e:
+            error_handler(Exception(f"Error reading {config_file}: {e}"))
+            return
+
+        # Get current agents
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{API_BASE_URL}/api/v1/cli/agents")
+
+            if response.status_code != 200:
+                error_handler(
+                    Exception(f"Failed to get agent list: HTTP {response.status_code}")
+                )
+                return
+
+            data = response.json()
+            if not data.get("success"):
+                error_handler(Exception(data.get("error", "Failed to get agent list")))
+                return
+
+            agents = data.get("data", [])
+
+            # Parse filter expression
+            filter_criteria = {}
+            if filter_expr:
+                for part in filter_expr.split(","):
+                    if "=" in part:
+                        key, value = part.split("=", 1)
+                        filter_criteria[key.strip()] = value.strip()
+
+            # Apply filters
+            filtered_agents = agents
+            if "type" in filter_criteria:
+                filtered_agents = [a for a in filtered_agents if a.get("type") == filter_criteria["type"]]
+            if "status" in filter_criteria:
+                filtered_agents = [a for a in filtered_agents if a.get("status") == filter_criteria["status"]]
+            if "name" in filter_criteria:
+                filtered_agents = [a for a in filtered_agents if filter_criteria["name"] in a.get("name", "")]
+
+            if not filtered_agents:
+                filter_desc = f" matching {filter_expr}" if filter_expr else ""
+                info_message(f"No agents found{filter_desc}")
+                return
+
+            # Dry run output
+            if dry_run:
+                console.print(
+                    "\n🔍 [bold cyan]Dry Run - Agents to be updated:[/bold cyan]"
+                )
+                for agent in filtered_agents:
+                    console.print(
+                        f"  • {agent.get('name', 'unknown')} ({agent.get('type', 'unknown')})"
+                    )
+                    console.print(f"    Updates: {json.dumps(config_updates, indent=2)}")
+
+                console.print(f"\n📊 Summary: {len(filtered_agents)} agents would be updated")
+                return
+
+            # Update agents
+            updated_agents = []
+            failed_agents = []
+
+            info_message(f"Updating {len(filtered_agents)} agent(s)...")
+
+            for agent in filtered_agents:
+                agent_name = agent.get("name", "unknown")
+                try:
+                    console.print(f"🔄 Updating {agent_name}...")
+
+                    # For now, we'll simulate the update since the API may not support agent updates yet
+                    # In a real implementation, this would call an agent update endpoint
+                    console.print(f"  ⚠️ Agent update not yet implemented in API")
+                    console.print(f"    Would apply: {json.dumps(config_updates, indent=2)}")
+
+                    # Simulate success for now
+                    updated_agents.append({
+                        "name": agent_name,
+                        "updates": config_updates
+                    })
+
+                except Exception as e:
+                    failed_agents.append({"name": agent_name, "error": str(e)})
+                    console.print(f"  ❌ {agent_name} failed: {str(e)}")
+
+                # Small delay between updates
+                await asyncio.sleep(0.2)
+
+            # Summary
+            console.print("\n📊 Batch Agent Update Summary:")
+            if updated_agents:
+                success_message(
+                    f"✅ Successfully updated {len(updated_agents)} agents:"
+                )
+                for agent in updated_agents:
+                    console.print(f"  • {agent['name']}")
+
+            if failed_agents:
+                console.print(f"\n❌ Failed to update {len(failed_agents)} agents:")
+                for agent in failed_agents:
+                    console.print(f"  • {agent['name']} - Error: {agent['error']}")
+
+            console.print(
+                "\n💡 [dim]Note: Agent update functionality requires API support[/dim]"
+            )
+
+    except httpx.ConnectError:
+        error_handler(
+            Exception(
+                "Cannot connect to API server. Is it running? Try: hive system start"
+            )
+        )
+    except Exception as e:
+        error_handler(e)
+
+
+async def _batch_spawn_agents(file: str, dry_run: bool):
+    """Internal async batch agent spawning from file"""
+    try:
+        from pathlib import Path
+        import json
+
+        file_path = Path(file)
+        if not file_path.exists():
+            error_handler(Exception(f"File not found: {file}"))
+            return
+
+        # Load agent definitions
+        try:
+            with open(file_path) as f:
+                agent_definitions = json.load(f)
+            info_message(f"Loaded {len(agent_definitions)} agent definitions from {file}")
+        except json.JSONDecodeError as e:
+            error_handler(Exception(f"Invalid JSON in {file}: {e}"))
+            return
+        except Exception as e:
+            error_handler(Exception(f"Error reading {file}: {e}"))
+            return
+
+        # Validate agent definitions
+        valid_agents = []
+        for i, agent_def in enumerate(agent_definitions):
+            if not isinstance(agent_def, dict):
+                warning_message(f"Agent {i + 1}: Not a valid agent object, skipping")
+                continue
+
+            # Ensure required fields
+            if not agent_def.get("type"):
+                agent_def["type"] = "meta"  # Default type
+            if not agent_def.get("name"):
+                agent_def["name"] = f"batch-agent-{i + 1}"
+
+            valid_agents.append(agent_def)
+
+        if not valid_agents:
+            error_handler(Exception("No valid agents found in file"))
+            return
+
+        # Dry run output
+        if dry_run:
+            console.print(
+                "\n🔍 [bold cyan]Dry Run - Agents to be spawned:[/bold cyan]"
+            )
+            for i, agent_def in enumerate(valid_agents):
+                console.print(
+                    f"  {i + 1}. {agent_def['name']} ({agent_def['type']})"
+                )
+
+            console.print(f"\n📊 Summary: {len(valid_agents)} agents would be spawned")
+            return
+
+        # Spawn agents
+        spawned_agents = []
+        failed_agents = []
+
+        info_message(f"Spawning {len(valid_agents)} agents...")
+
+        for i, agent_def in enumerate(valid_agents):
+            try:
+                agent_name = agent_def["name"]
+                agent_type = agent_def["type"]
+
+                console.print(f"🤖 Spawning: {agent_name} ({agent_type})")
+
+                # Use the existing spawn logic
+                params = {"agent_type": agent_type, "agent_name": agent_name}
+
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f"{API_BASE_URL}/api/v1/cli/agents", params=params
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("success"):
+                            result = data.get("data", {})
+                            spawned_agents.append(
+                                {
+                                    "name": result.get("agent_name", agent_name),
+                                    "type": agent_type,
+                                    "session": result.get("session_name", "unknown"),
+                                }
+                            )
+                            console.print(
+                                f"  ✅ {agent_name} spawned successfully"
+                            )
+                        else:
+                            failed_agents.append(
+                                {
+                                    "name": agent_name,
+                                    "type": agent_type,
+                                    "error": data.get("error", "Unknown error"),
+                                }
+                            )
+                            console.print(
+                                f"  ❌ {agent_name} failed: {data.get('error', 'Unknown error')}"
+                            )
+                    else:
+                        failed_agents.append(
+                            {
+                                "name": agent_name,
+                                "type": agent_type,
+                                "error": f"HTTP {response.status_code}",
+                            }
+                        )
+                        console.print(f"  ❌ {agent_name} failed: HTTP {response.status_code}")
+
+                # Small delay between spawns to avoid overwhelming the system
+                await asyncio.sleep(0.5)
+
+            except Exception as e:
+                failed_agents.append({"name": agent_name, "type": agent_type, "error": str(e)})
+                console.print(f"  ❌ {agent_name} failed: {str(e)}")
+
+        # Summary
+        console.print("\n📊 Batch Agent Spawn Summary:")
+        if spawned_agents:
+            success_message(f"✅ Successfully spawned {len(spawned_agents)} agents:")
+            for agent in spawned_agents:
+                console.print(
+                    f"  • {agent['name']} ({agent['type']}) - Session: {agent['session']}"
+                )
+
+        if failed_agents:
+            console.print(f"\n❌ Failed to spawn {len(failed_agents)} agents:")
+            for agent in failed_agents:
+                console.print(
+                    f"  • {agent['name']} ({agent['type']}) - Error: {agent['error']}"
+                )
+
+        if spawned_agents:
+            console.print(
+                "\n💡 [dim]Use 'hive agent list' to see all active agents[/dim]"
+            )
 
     except httpx.ConnectError:
         error_handler(

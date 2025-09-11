@@ -1,0 +1,13 @@
+{
+  "plan_id": "epic4-structured-api",
+  "last_completed_batch": null,
+  "created_by": "plan_runner",
+  "version": 1,
+  "completed_batches": [],
+  "failed_batches": [
+    "broker-contracts"
+  ],
+  "failed_batch_errors": {
+    "broker-contracts": "verify failed: uv run pytest -q tests/contracts/test_component_contracts.py"
+  }
+}

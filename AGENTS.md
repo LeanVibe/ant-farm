@@ -18,6 +18,9 @@
   - Start/Status/Stop: `hive system start | status | stop`
   - Agents: `hive agent spawn meta`, `hive agent list`
   - Tasks: `hive task submit "Analyze module X"`
+  - Monitoring: `hive monitor agents --live`, `hive monitor tasks --live`
+  - Batch Ops: `hive agent batch-spawn --file agents.json`
+  - Metrics: `hive metrics agents`, `hive metrics tasks`
 - Python tools:
   - Tests: `pytest -q` (or `pytest -q tests/unit`)
   - Coverage: `pytest --cov=src --cov-report=term-missing`

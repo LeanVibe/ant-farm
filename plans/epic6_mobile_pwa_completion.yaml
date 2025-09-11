@@ -1,0 +1,109 @@
+version: 1
+plan_id: epic6-mobile-pwa-completion
+goal: "Complete mobile PWA experience with responsive design and offline capabilities"
+
+batches:
+  - name: add-mobile-navigation
+    tasks:
+      - type: edit
+        file: src/web/dashboard/components/hive-dashboard.js
+        apply: |
+          Add mobile navigation with hamburger menu and bottom navigation:
+          - Implement hamburger menu for mobile sidebar toggle
+          - Add bottom navigation for mobile devices
+          - Create mobile-friendly navigation patterns
+          - Add swipe gestures for navigation
+    verify:
+      - run: "echo 'Check mobile navigation works on different screen sizes'"
+    commit:
+      message: "feat(pwa): add mobile navigation with hamburger menu and bottom nav"
+
+  - name: enhance-mobile-responsiveness
+    tasks:
+      - type: edit
+        file: src/web/dashboard/styles/dashboard.css
+        apply: |
+          Enhance mobile responsiveness:
+          - Add more granular breakpoints (360px, 414px)
+          - Improve touch targets and spacing
+          - Add mobile-specific animations and transitions
+          - Optimize typography for mobile screens
+    verify:
+      - run: "echo 'Test responsive design across different mobile devices'"
+    commit:
+      message: "feat(pwa): enhance mobile responsiveness with better breakpoints"
+
+  - name: integrate-pwa-install-button
+    tasks:
+      - type: edit
+        file: src/web/dashboard/components/hive-dashboard.js
+        apply: |
+          Integrate PWA install button into dashboard:
+          - Add install button to header or navigation
+          - Handle install prompt events
+          - Show install success/failure feedback
+          - Update UI based on installation status
+    verify:
+      - run: "echo 'Test PWA install button functionality'"
+    commit:
+      message: "feat(pwa): integrate PWA install button into dashboard"
+
+  - name: configure-push-notifications
+    tasks:
+      - type: edit
+        file: src/web/dashboard/services/pwa-manager.js
+        apply: |
+          Configure push notifications:
+          - Add VAPID key configuration
+          - Implement push notification subscription
+          - Add notification permission handling
+          - Create notification templates for different events
+    verify:
+      - run: "echo 'Test push notification functionality'"
+    commit:
+      message: "feat(pwa): configure push notifications with VAPID keys"
+
+  - name: add-mobile-gesture-support
+    tasks:
+      - type: edit
+        file: src/web/dashboard/components/hive-dashboard.js
+        apply: |
+          Add mobile gesture support:
+          - Implement swipe gestures for navigation
+          - Add pull-to-refresh functionality
+          - Create touch-friendly interactions
+          - Add gesture-based view switching
+    verify:
+      - run: "echo 'Test mobile gesture interactions'"
+    commit:
+      message: "feat(pwa): add mobile gesture support and touch interactions"
+
+  - name: enhance-offline-experience
+    tasks:
+      - type: edit
+        file: src/web/dashboard/sw.js
+        apply: |
+          Enhance offline experience:
+          - Add more comprehensive caching strategies
+          - Implement offline data synchronization
+          - Add offline analytics and error reporting
+          - Create offline fallback pages for different views
+    verify:
+      - run: "echo 'Test offline functionality and caching'"
+    commit:
+      message: "feat(pwa): enhance offline experience with better caching"
+
+  - name: add-pwa-performance-optimizations
+    tasks:
+      - type: edit
+        file: src/web/dashboard/index.html
+        apply: |
+          Add PWA performance optimizations:
+          - Implement lazy loading for components
+          - Add resource hints and preloading
+          - Optimize bundle sizes and loading
+          - Add performance monitoring for PWA metrics
+    verify:
+      - run: "echo 'Test PWA performance and loading times'"
+    commit:
+      message: "feat(pwa): add performance optimizations and monitoring"

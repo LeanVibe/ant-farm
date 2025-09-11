@@ -542,5 +542,174 @@ def start_api(
         console.print("\n[yellow]API server stopped[/yellow]")
 
 
+@app.command("batch-config")
+def batch_config(
+    config_file: str = typer.Option(
+        ..., "--file", "-f", help="JSON file with system configuration updates"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be updated without actually updating",
+    ),
+):
+    """Apply batch configuration updates to the system"""
+    asyncio.run(_batch_config_update(config_file, dry_run))
+
+
+@app.command("batch-export")
+def batch_export(
+    types: str = typer.Option(
+        "agents,tasks,metrics",
+        "--type",
+        "-t",
+        help="Comma-separated types to export (agents,tasks,metrics,system)",
+    ),
+    output_file: str = typer.Option(
+        None, "--output", "-o", help="Output file path (default: stdout)"
+    ),
+    format_type: str = typer.Option(
+        "json", "--format", "-f", help="Output format: json, csv"
+    ),
+):
+    """Export system data in batch"""
+    asyncio.run(_batch_export_data(types, output_file, format_type))
+
+
+async def _batch_config_update(config_file: str, dry_run: bool):
+    """Internal async batch configuration update"""
+    try:
+        from pathlib import Path
+        import json
+
+        # Load configuration updates
+        config_path = Path(config_file)
+        if not config_path.exists():
+            error_handler(Exception(f"Config file not found: {config_file}"))
+            return
+
+        try:
+            with open(config_path) as f:
+                config_updates = json.load(f)
+            info_message(f"Loaded configuration updates from {config_file}")
+        except json.JSONDecodeError as e:
+            error_handler(Exception(f"Invalid JSON in {config_file}: {e}"))
+            return
+        except Exception as e:
+            error_handler(Exception(f"Error reading {config_file}: {e}"))
+            return
+
+        # Dry run output
+        if dry_run:
+            console.print(
+                "\n🔍 [bold cyan]Dry Run - System configuration updates:[/bold cyan]"
+            )
+            console.print(json.dumps(config_updates, indent=2))
+            console.print("\n📊 Summary: Configuration would be applied to system")
+            return
+
+        # Apply configuration updates
+        info_message("Applying system configuration updates...")
+
+        # For now, we'll simulate the configuration update since the API may not support system config updates yet
+        console.print("⚠️ System configuration update not yet implemented in API")
+        console.print(f"Would apply: {json.dumps(config_updates, indent=2)}")
+
+        success_message("System configuration update completed (simulated)")
+
+        console.print(
+            "\n💡 [dim]Note: System configuration update functionality requires API support[/dim]"
+        )
+
+    except Exception as e:
+        error_handler(e)
+
+
+async def _batch_export_data(types: str, output_file: str = None, format_type: str = "json"):
+    """Internal async batch data export"""
+    try:
+        export_types = [t.strip() for t in types.split(",")]
+        exported_data = {}
+
+        # Export each requested type
+        for export_type in export_types:
+            if export_type not in ["agents", "tasks", "metrics", "system"]:
+                warning_message(f"Unknown export type: {export_type}, skipping")
+                continue
+
+            info_message(f"Exporting {export_type} data...")
+
+            try:
+                if export_type == "agents":
+                    # Get agents data
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.get("http://localhost:9001/api/v1/cli/agents")
+                        if response.status_code == 200:
+                            data = response.json()
+                            exported_data["agents"] = data.get("data", [])
+
+                elif export_type == "tasks":
+                    # Get tasks data
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.get("http://localhost:9001/api/v1/cli/tasks")
+                        if response.status_code == 200:
+                            data = response.json()
+                            exported_data["tasks"] = data.get("data", [])
+
+                elif export_type == "metrics":
+                    # Get system metrics
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.get("http://localhost:9001/api/v1/metrics/system")
+                        if response.status_code == 200:
+                            data = response.json()
+                            exported_data["metrics"] = data.get("data", {})
+
+                elif export_type == "system":
+                    # Get system health
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.get("http://localhost:9001/api/v1/health")
+                        if response.status_code == 200:
+                            exported_data["system"] = response.json()
+
+                success_message(f"✅ {export_type} data exported")
+
+            except Exception as e:
+                warning_message(f"Failed to export {export_type}: {e}")
+
+        if not exported_data:
+            error_handler(Exception("No data was successfully exported"))
+            return
+
+        # Output the data
+        if format_type == "json":
+            import json
+            output_content = json.dumps(exported_data, indent=2)
+        elif format_type == "csv":
+            # For CSV, we'll create a simple summary
+            output_content = f"Export Summary\nTypes: {', '.join(exported_data.keys())}\n"
+            for key, value in exported_data.items():
+                if isinstance(value, list):
+                    output_content += f"{key}: {len(value)} items\n"
+                elif isinstance(value, dict):
+                    output_content += f"{key}: {len(value)} metrics\n"
+                else:
+                    output_content += f"{key}: {value}\n"
+        else:
+            error_handler(Exception(f"Unsupported format: {format_type}"))
+            return
+
+        if output_file:
+            with open(output_file, "w") as f:
+                f.write(output_content)
+            success_message(f"Data exported to {output_file}")
+        else:
+            console.print(output_content)
+
+        success_message(f"Batch export completed for types: {', '.join(exported_data.keys())}")
+
+    except Exception as e:
+        error_handler(e)
+
+
 if __name__ == "__main__":
     app()

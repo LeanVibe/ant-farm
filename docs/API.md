@@ -241,6 +241,73 @@ Trigger system analysis by meta-agent (requires `system:write`).
 #### POST /api/v1/system/shutdown
 Gracefully shutdown system (requires admin privileges).
 
+#### POST /api/v1/system/batch/config
+Apply batch configuration changes to system components (requires `system:write`).
+
+**Request Body:**
+```json
+{
+  "configurations": {
+    "agents": {
+      "default_timeout": 300,
+      "max_concurrent_tasks": 5
+    },
+    "tasks": {
+      "priority_levels": ["low", "medium", "high", "critical"],
+      "auto_reassignment": true
+    },
+    "monitoring": {
+      "metrics_interval": 30,
+      "alert_thresholds": {
+        "cpu_usage": 80,
+        "memory_usage": 85
+      }
+    }
+  }
+}
+```
+
+#### POST /api/v1/system/batch/export
+Export system data for backup or analysis (requires `system:read`).
+
+**Request Body:**
+```json
+{
+  "export_types": ["agents", "tasks", "metrics"],
+  "date_range": {
+    "start": "2024-01-01T00:00:00Z",
+    "end": "2024-01-31T23:59:59Z"
+  },
+  "format": "json"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "export_id": "export_12345",
+    "files": [
+      {
+        "type": "agents",
+        "filename": "agents_export_20240101_20240131.json",
+        "size_bytes": 2048000
+      },
+      {
+        "type": "tasks",
+        "filename": "tasks_export_20240101_20240131.json",
+        "size_bytes": 5120000
+      }
+    ],
+    "download_urls": {
+      "agents": "/api/v1/downloads/export_12345_agents.json",
+      "tasks": "/api/v1/downloads/export_12345_tasks.json"
+    }
+  }
+}
+```
+
 #### GET /api/v1/emergency/status
 Get emergency intervention system status (requires `system:read`).
 
@@ -312,6 +379,62 @@ Stop a specific agent (requires `agent:terminate`).
 #### POST /api/v1/agents/{agent_name}/health
 Check agent health.
 
+#### POST /api/v1/agents/batch/spawn
+Spawn multiple agents from configuration file (requires `agent:spawn`).
+
+**Request Body:**
+```json
+{
+  "agents": [
+    {
+      "name": "dev-agent-001",
+      "type": "developer",
+      "config": {
+        "max_concurrent_tasks": 3,
+        "specialization": "backend"
+      }
+    },
+    {
+      "name": "qa-agent-001",
+      "type": "qa",
+      "config": {
+        "test_types": ["unit", "integration"],
+        "coverage_target": 90
+      }
+    }
+  ]
+}
+```
+
+#### POST /api/v1/agents/batch/stop
+Stop multiple agents based on filter criteria (requires `agent:terminate`).
+
+**Request Body:**
+```json
+{
+  "filter": {
+    "type": "meta",
+    "status": "idle"
+  }
+}
+```
+
+#### POST /api/v1/agents/batch/update
+Update configuration for multiple agents (requires `agent:write`).
+
+**Request Body:**
+```json
+{
+  "filter": {
+    "type": "developer"
+  },
+  "config": {
+    "max_concurrent_tasks": 5,
+    "timeout": 300
+  }
+}
+```
+
 ### Task Management
 
 #### GET /api/v1/tasks
@@ -346,6 +469,38 @@ Get specific task information.
 #### POST /api/v1/tasks/{task_id}/cancel
 Cancel a task (requires `task:cancel`).
 
+#### POST /api/v1/tasks/batch/reassign
+Reassign multiple tasks based on filter criteria (requires `task:write`).
+
+**Request Body:**
+```json
+{
+  "filter": {
+    "status": "pending",
+    "type": "code_review"
+  },
+  "new_assignee": "qa-agent-001",
+  "reassignment_reason": "Load balancing optimization"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "reassigned_count": 5,
+    "tasks": [
+      {
+        "task_id": "task_123",
+        "old_assignee": "dev-agent-001",
+        "new_assignee": "qa-agent-001"
+      }
+    ]
+  }
+}
+```
+
 ### Messaging
 
 #### POST /api/v1/messages
@@ -358,6 +513,105 @@ Broadcast a message to all agents (requires `message:broadcast`).
 
 #### GET /api/v1/metrics
 Get system metrics (requires `metrics:read`).
+
+#### GET /api/v1/metrics/agents
+Get agent performance metrics and analytics (requires `metrics:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_agents": 5,
+    "active_agents": 4,
+    "avg_cpu_usage": 45.2,
+    "avg_memory_usage": 67.8,
+    "top_performers": [
+      {
+        "agent_name": "meta-agent-001",
+        "tasks_completed": 25,
+        "success_rate": 0.96,
+        "avg_response_time": 2.3
+      }
+    ],
+    "performance_trends": {
+      "cpu_trend": "stable",
+      "memory_trend": "increasing",
+      "task_completion_trend": "improving"
+    }
+  }
+}
+```
+
+#### GET /api/v1/metrics/tasks
+Get task performance metrics and completion statistics (requires `metrics:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_tasks": 150,
+    "completed_tasks": 142,
+    "failed_tasks": 3,
+    "pending_tasks": 5,
+    "avg_completion_time": 45.6,
+    "success_rate": 0.947,
+    "task_distribution": {
+      "development": 45,
+      "analysis": 30,
+      "review": 25,
+      "testing": 20
+    },
+    "performance_trends": {
+      "completion_rate_trend": "improving",
+      "failure_rate_trend": "stable"
+    }
+  }
+}
+```
+
+#### GET /api/v1/monitoring/agents
+Real-time agent monitoring data (requires `metrics:read`).
+
+**Query Parameters:**
+- `live`: Enable WebSocket streaming for real-time updates
+- `filter`: Filter by agent type, status, or name
+
+#### GET /api/v1/monitoring/tasks
+Real-time task monitoring data (requires `metrics:read`).
+
+**Query Parameters:**
+- `live`: Enable WebSocket streaming for real-time updates
+- `status`: Filter by task status
+- `assigned_to`: Filter by assigned agent
+
+#### GET /api/v1/monitoring/system
+Real-time system health and resource monitoring (requires `metrics:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "health_score": 0.95,
+    "cpu_usage": 45.2,
+    "memory_usage": 67.8,
+    "disk_usage": 23.4,
+    "network_io": {
+      "bytes_sent": 1024000,
+      "bytes_received": 2048000
+    },
+    "active_connections": 12,
+    "uptime_seconds": 86400,
+    "system_load": {
+      "1min": 1.2,
+      "5min": 1.1,
+      "15min": 1.0
+    }
+  }
+}
+```
 
 #### GET /api/v1/performance
 Get performance optimization statistics.
@@ -544,7 +798,16 @@ curl -H "Authorization: Bearer $TOKEN" /api/v1/agents
 
 ## Changelog
 
-### v2.0.0 (Current)
+### v2.1.0 (Current)
+- ✅ Added real-time monitoring endpoints (`/api/v1/monitoring/*`)
+- ✅ Added performance metrics endpoints (`/api/v1/metrics/*`)
+- ✅ Added batch operations for agents (`/api/v1/agents/batch/*`)
+- ✅ Added batch operations for tasks (`/api/v1/tasks/batch/*`)
+- ✅ Added batch operations for system (`/api/v1/system/batch/*`)
+- ✅ Enhanced WebSocket streaming for live monitoring
+- ✅ Added advanced filtering and analytics capabilities
+
+### v2.0.0
 - Added JWT authentication system
 - Implemented role-based permissions
 - Added WebSocket real-time events

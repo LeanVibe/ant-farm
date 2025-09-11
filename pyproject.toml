@@ -158,3 +158,9 @@ module = [
     "redis.*",
 ]
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.7",
+]
