@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from unittest.mock import Mock
 
-from . import ModelType, ModelResponse, TaskRequirements
+from . import ModelType, ModelResponse, TaskRequirements, AIModelInterface
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +139,7 @@ class ModelOrchestrator:
             ModelResponse("solution B", "claude", 90, 0.015, 0.80),
             ModelResponse("solution C", "gemini", 110, 0.018, 0.90)
         ]
+
+
+# Global instance
+model_orchestrator = ModelOrchestrator()

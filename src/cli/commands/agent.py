@@ -5,8 +5,10 @@ Agent management commands for the Hive CLI
 import asyncio
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
+from typing import Optional, Union
 
 import httpx
 import typer
@@ -19,6 +21,7 @@ from ..utils import (
     error_handler,
     info_message,
     success_message,
+    warning_message,
 )
 
 app = typer.Typer(help="Agent management commands")
@@ -279,7 +282,7 @@ def spawn(
     asyncio.run(_spawn_agent(agent_type, name))
 
 
-async def _spawn_agent(agent_type: str, name: str = None):
+async def _spawn_agent(agent_type: str, name: Optional[str] = None):
     """Internal async agent spawning"""
     try:
         from ..utils import get_api_headers
@@ -663,7 +666,7 @@ def monitor(
     asyncio.run(_monitor_agents(refresh_interval, agent_filter))
 
 
-async def _monitor_agents(refresh_interval: int, agent_filter: str = None):
+async def _monitor_agents(refresh_interval: int, agent_filter: Optional[str] = None):
     """Internal async agent monitoring"""
     try:
         from rich import box
@@ -907,13 +910,13 @@ async def _start_agents_batch(
 
         for agent_type in types_to_start:
             for i in range(count):
-                try:
-                    agent_name = (
-                        f"{prefix}-{agent_type}-{i + 1}"
-                        if count > 1
-                        else f"{prefix}-{agent_type}"
-                    )
+                agent_name = (
+                    f"{prefix}-{agent_type}-{i + 1}"
+                    if count > 1
+                    else f"{prefix}-{agent_type}"
+                )
 
+                try:
                     console.print(f"🤖 Starting {agent_type} agent: {agent_name}")
 
                     # Use the existing spawn logic
@@ -1050,7 +1053,7 @@ def stop_all(
     asyncio.run(_stop_agents_batch(agent_type_filter, force))
 
 
-async def _stop_agents_batch(agent_type_filter: str = None, force: bool = False):
+async def _stop_agents_batch(agent_type_filter: Optional[str] = None, force: bool = False):
     """Internal async batch agent stopping"""
     try:
         # Get current agents
@@ -1165,7 +1168,7 @@ async def _stop_agents_batch(agent_type_filter: str = None, force: bool = False)
         error_handler(e)
 
 
-async def _batch_stop_agents(filter_expr: str = None, force: bool = False, dry_run: bool = False):
+async def _batch_stop_agents(filter_expr: Optional[str] = None, force: bool = False, dry_run: bool = False):
     """Internal async batch agent stopping with advanced filtering"""
     try:
         # Get current agents
@@ -1464,7 +1467,7 @@ async def _batch_spawn_agents(file: str, dry_run: bool):
         valid_agents = []
         for i, agent_def in enumerate(agent_definitions):
             if not isinstance(agent_def, dict):
-                warning_message(f"Agent {i + 1}: Not a valid agent object, skipping")
+                console.print(f"[bold yellow]⚠️  Agent {i + 1}: Not a valid agent object, skipping[/bold yellow]")
                 continue
 
             # Ensure required fields

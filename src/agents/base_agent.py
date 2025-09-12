@@ -290,26 +290,30 @@ class CLIToolManager:
             try:
                 tool_config = self.available_tools[fallback_tool]
                 result = await tool_config["execute_pattern"](prompt)
-                result.tool_used = fallback_tool.value
+                # Handle both enum and string keys
+                tool_name = fallback_tool.value if hasattr(fallback_tool, 'value') else str(fallback_tool)
+                result.tool_used = tool_name
                 result.execution_time = time.time() - start_time
 
                 if result.success:
                     logger.info(
                         "Fallback CLI tool execution successful",
-                        tool=fallback_tool.value,
+                        tool=tool_name,
                         execution_time=result.execution_time,
                     )
-                    self._increment_counters(fallback_tool.value, success=True)
+                    self._increment_counters(tool_name, success=True)
                     return result
 
             except Exception as e:
+                # Handle both enum and string keys
+                tool_name = fallback_tool.value if hasattr(fallback_tool, 'value') else str(fallback_tool)
                 logger.error(
                     "Fallback CLI tool execution error",
-                    tool=fallback_tool.value,
+                    tool=tool_name,
                     error=str(e),
                 )
                 self._increment_counters(
-                    fallback_tool.value,
+                    tool_name,
                     success=False,
                     category=ErrorCategory.OTHER.value,
                 )
