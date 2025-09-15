@@ -617,8 +617,19 @@ class BaseAgent(ABC):
         self._rate_limit_window = 60.0  # 1 minute
         self._max_calls_per_window = 30
 
+        # Performance optimizations
+        self.response_cache: dict[str, dict] = {}  # Cache for task responses
+        self.cache_ttl = 1800  # 30 minutes cache TTL
+        self.task_priority_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self.context_cache: dict[str, Any] = {}  # Lazy loading cache for context
+        self.resource_cache: dict[str, Any] = {}  # Cache for expensive resources
+
         # Setup message handlers
         self._setup_message_handlers()
+
+        # Start background task processor
+        self._task_processor_task = None
+        self._start_task_processor()
 
         logger.info(
             "Base agent initialized",
@@ -626,6 +637,86 @@ class BaseAgent(ABC):
             type=self.agent_type,
             available_cli_tools=list(self.cli_tools.available_tools.keys()),
         )
+
+    # Performance optimization methods
+    def _start_task_processor(self) -> None:
+        """Start background task processor with prioritization."""
+        if self._task_processor_task is None:
+            self._task_processor_task = asyncio.create_task(self._process_priority_queue())
+
+    async def _process_priority_queue(self) -> None:
+        """Process tasks from priority queue."""
+        while True:
+            try:
+                # Get highest priority task
+                priority, task_data = await self.task_priority_queue.get()
+
+                # Process the task
+                task = task_data['task']
+                callback = task_data['callback']
+
+                # Execute with timeout based on priority
+                timeout = 30 if priority <= 3 else 60  # Higher priority = shorter timeout
+
+                try:
+                    result = await asyncio.wait_for(callback(task), timeout=timeout)
+                    logger.debug("Priority task completed", task_id=task.id, priority=priority)
+                except asyncio.TimeoutError:
+                    logger.warning("Priority task timed out", task_id=task.id, priority=priority)
+                except Exception as e:
+                    logger.error("Priority task failed", task_id=task.id, priority=priority, error=str(e))
+
+                self.task_priority_queue.task_done()
+
+            except Exception as e:
+                logger.error("Priority queue processor error", error=str(e))
+                await asyncio.sleep(1)  # Prevent tight loop on errors
+
+    def _generate_cache_key(self, task: Task) -> str:
+        """Generate cache key for task response."""
+        import hashlib
+        key_data = f"{task.task_type}:{task.title}:{task.description}"
+        return hashlib.md5(key_data.encode()).hexdigest()
+
+    async def _get_cached_response(self, cache_key: str) -> dict | None:
+        """Get cached response if available and not expired."""
+        if cache_key in self.response_cache:
+            cached = self.response_cache[cache_key]
+            if time.time() - cached['timestamp'] < self.cache_ttl:
+                logger.debug("Cache hit", cache_key=cache_key)
+                return cached['response']
+            else:
+                # Expired, remove from cache
+                del self.response_cache[cache_key]
+        return None
+
+    async def _cache_response(self, cache_key: str, response: dict) -> None:
+        """Cache task response."""
+        self.response_cache[cache_key] = {
+            'response': response,
+            'timestamp': time.time()
+        }
+        logger.debug("Response cached", cache_key=cache_key)
+
+    async def _lazy_load_context(self, query: str, limit: int = 5) -> list:
+        """Lazy load context with caching."""
+        cache_key = f"context:{query}:{limit}"
+
+        if cache_key in self.context_cache:
+            logger.debug("Context cache hit", query=query)
+            return self.context_cache[cache_key]
+
+        # Load context from engine
+        if self.context_engine and self.agent_uuid:
+            try:
+                context_results = await self.retrieve_context(query, limit=limit)
+                self.context_cache[cache_key] = context_results
+                logger.debug("Context cached", query=query, results=len(context_results))
+                return context_results
+            except Exception as e:
+                logger.warning("Failed to load context", query=query, error=str(e))
+
+        return []
 
     def _setup_message_handlers(self):
         """Setup message handlers for common topics."""
@@ -1030,18 +1121,24 @@ class BaseAgent(ABC):
             self.current_task_id = None
 
     async def _process_task_implementation(self, task: Task) -> TaskResult:
-        """Default task processing implementation."""
+        """Default task processing implementation with performance optimizations."""
         # This is a basic implementation - subclasses should override
 
-        # Retrieve relevant context
-        context_results = []
-        if self.context_engine and self.agent_uuid:
-            try:
-                context_results = await self.retrieve_context(
-                    f"task {task.task_type} {task.title}", limit=5
-                )
-            except Exception as e:
-                logger.warning("Failed to retrieve context", error=str(e))
+        # Check response cache first
+        cache_key = self._generate_cache_key(task)
+        cached_response = await self._get_cached_response(cache_key)
+        if cached_response:
+            logger.info("Using cached response", task_id=task.id, cache_key=cache_key)
+            return TaskResult(
+                success=True,
+                data=cached_response,
+                metrics={"cached": True, "execution_time": 0.0}
+            )
+
+        # Lazy load relevant context with caching
+        context_results = await self._lazy_load_context(
+            f"task {task.task_type} {task.title}", limit=5
+        )
 
         # Build prompt with context
         context_text = "\n".join(
@@ -1064,23 +1161,29 @@ class BaseAgent(ABC):
         result = await self.execute_with_cli_tool(prompt)
 
         if result.success:
+            response_data = {
+                "output": result.output,
+                "tool_used": result.tool_used,
+                "execution_time": result.execution_time,
+            }
+
+            # Cache successful response
+            await self._cache_response(cache_key, response_data)
+
             return TaskResult(
                 success=True,
-                data={
-                    "output": result.output,
-                    "tool_used": result.tool_used,
-                    "execution_time": result.execution_time,
-                },
+                data=response_data,
                 metrics={
                     "execution_time": result.execution_time,
                     "output_length": len(result.output),
+                    "cached": False,
                 },
             )
         else:
             return TaskResult(
                 success=False,
                 error=result.error,
-                metrics={"execution_time": result.execution_time},
+                metrics={"execution_time": result.execution_time, "cached": False},
             )
 
     async def send_message(
