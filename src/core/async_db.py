@@ -8,6 +8,14 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+# Redis for caching
+try:
+    import redis.asyncio as redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    redis = None
+    REDIS_AVAILABLE = False
+
 # Handle both module and direct execution imports
 try:
     from .config import settings
@@ -48,10 +56,11 @@ class AsyncDatabaseManager:
             self.engine = create_async_engine(
                 self.database_url,
                 echo=settings.debug,
-                pool_size=getattr(settings, "database_pool_size", 5),
-                max_overflow=getattr(settings, "database_max_overflow", 10),
+                pool_size=getattr(settings, "database_pool_size", 10),  # Increased from 5
+                max_overflow=getattr(settings, "database_max_overflow", 20),  # Increased from 10
                 pool_pre_ping=True,  # Validate connections before use
-                pool_recycle=3600,  # Recycle connections every hour
+                pool_recycle=1800,  # Recycle connections every 30 minutes (reduced from 3600)
+                pool_timeout=30,  # Connection timeout
             )
             self.async_session_maker = async_sessionmaker(
                 self.engine,
@@ -62,6 +71,16 @@ class AsyncDatabaseManager:
             logger.error("Failed to initialize database engine", error=str(e))
             raise DatabaseConnectionError(f"Failed to initialize database: {e}")
 
+        # Initialize Redis cache if available
+        self.redis_client = None
+        if REDIS_AVAILABLE:
+            try:
+                redis_url = getattr(settings, "redis_url", "redis://localhost:6379")
+                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+                logger.info("Redis cache initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize Redis cache", error=str(e))
+
     async def health_check(self) -> bool:
         """Check database health."""
         try:
@@ -71,6 +90,32 @@ class AsyncDatabaseManager:
         except Exception as e:
             logger.error("Database health check failed", error=str(e))
             return False
+
+    # Caching methods for performance optimization
+    async def _get_cache(self, key: str) -> str | None:
+        """Get value from Redis cache."""
+        if self.redis_client:
+            try:
+                return await self.redis_client.get(key)
+            except Exception as e:
+                logger.debug("Cache get failed", key=key, error=str(e))
+        return None
+
+    async def _set_cache(self, key: str, value: str, ttl: int = 300) -> None:
+        """Set value in Redis cache with TTL."""
+        if self.redis_client:
+            try:
+                await self.redis_client.setex(key, ttl, value)
+            except Exception as e:
+                logger.debug("Cache set failed", key=key, error=str(e))
+
+    async def _delete_cache(self, key: str) -> None:
+        """Delete value from Redis cache."""
+        if self.redis_client:
+            try:
+                await self.redis_client.delete(key)
+            except Exception as e:
+                logger.debug("Cache delete failed", key=key, error=str(e))
 
     async def ensure_connection(self) -> bool:
         """Ensure database connection is available."""
@@ -199,14 +244,53 @@ class AsyncDatabaseManager:
                 return False
 
     async def get_agent_by_name(self, name: str) -> AgentModel | None:
-        """Get agent by name."""
+        """Get agent by name with caching."""
+        # Try cache first
+        cache_key = f"agent:name:{name}"
+        cached_data = await self._get_cache(cache_key)
+        if cached_data:
+            try:
+                import json
+                agent_data = json.loads(cached_data)
+                # Create agent instance from cached data (simplified)
+                agent = AgentModel(
+                    id=agent_data.get("id"),
+                    name=agent_data.get("name"),
+                    type=agent_data.get("type"),
+                    role=agent_data.get("role"),
+                    status=agent_data.get("status"),
+                    capabilities=agent_data.get("capabilities", {}),
+                )
+                return agent
+            except Exception as e:
+                logger.debug("Cache deserialization failed", agent=name, error=str(e))
+
+        # Cache miss - query database
         async with self.async_session_maker() as session:
             try:
                 from sqlalchemy import select
 
                 stmt = select(AgentModel).where(AgentModel.name == name)
                 result = await session.execute(stmt)
-                return result.scalar_one_or_none()
+                agent = result.scalar_one_or_none()
+
+                # Cache the result if found
+                if agent:
+                    try:
+                        import json
+                        agent_data = {
+                            "id": str(agent.id),
+                            "name": agent.name,
+                            "type": agent.type,
+                            "role": agent.role,
+                            "status": agent.status,
+                            "capabilities": agent.capabilities,
+                        }
+                        await self._set_cache(cache_key, json.dumps(agent_data), 600)  # 10 min TTL
+                    except Exception as e:
+                        logger.debug("Cache serialization failed", agent=name, error=str(e))
+
+                return agent
 
             except Exception as e:
                 logger.error("Failed to get agent", agent=name, error=str(e))
