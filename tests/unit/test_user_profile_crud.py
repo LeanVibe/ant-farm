@@ -1,9 +1,11 @@
 """Unit tests for user profile CRUD operations."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException
 from pydantic import ValidationError
+import json
+from datetime import datetime, timezone
 
 from src.api.main import (
     UserProfile,
@@ -13,6 +15,7 @@ from src.api.main import (
     update_user_profile,
     get_user_profile_by_id,
     delete_user_profile,
+    APIResponse,
 )
 from src.core.security import User
 
@@ -79,6 +82,8 @@ class TestUserProfileSchemas:
                 username="u",  # Too short
                 email="test@example.com",
                 password="password123",
+                first_name="Test",
+                last_name="User",
             )
 
         # Invalid password (too short)
@@ -225,6 +230,207 @@ class TestUserProfileSecurity:
         assert valid_url.startswith("https://")
 
         # Invalid URLs would be caught by additional validation if needed
+
+    def test_sql_injection_prevention(self):
+        """Test protection against SQL injection in profile fields."""
+        malicious_inputs = [
+            "'; DROP TABLE users; --",
+            "' OR '1'='1",
+            "'; UPDATE users SET is_admin=true; --",
+            "' UNION SELECT * FROM users; --"
+        ]
+
+        for payload in malicious_inputs:
+            # Test that malicious input in username field is rejected
+            with pytest.raises(ValidationError):
+                UserProfileCreate(
+                    username=payload,
+                    email="test@example.com",
+                    password="securepassword123",
+                    first_name="Test",
+                    last_name="User",
+                )
+
+            # Test that malicious input in bio field is rejected
+            with pytest.raises(ValidationError):
+                UserProfileUpdate(bio=payload)
+
+    def test_xss_prevention(self):
+        """Test protection against XSS attacks."""
+        xss_payloads = [
+            "<script>alert('xss')</script>",
+            "<img src='x' onerror='alert(1)'>",
+            "javascript:alert('xss')",
+            "<svg onload='alert(1)'>",
+        ]
+
+        for payload in xss_payloads:
+            # Test XSS in bio field
+            with pytest.raises(ValidationError):
+                UserProfileUpdate(bio=payload)
+
+            # Test XSS in first_name field
+            with pytest.raises(ValidationError):
+                UserProfileUpdate(first_name=payload)
+
+    def test_email_format_validation(self):
+        """Test email format validation security."""
+        invalid_emails = [
+            "plaintext",
+            "@domain.com",
+            "user@",
+            "user..double.dot@domain.com",
+            "user@domain..com",
+            " user@domain.com ",  # Leading/trailing spaces
+        ]
+
+        for email in invalid_emails:
+            with pytest.raises(ValidationError):
+                UserProfileCreate(
+                    username="testuser",
+                    email=email,
+                    password="securepassword123",
+                    first_name="Test",
+                    last_name="User",
+                )
+
+    def test_password_complexity_requirements(self):
+        """Test password complexity validation."""
+        weak_passwords = [
+            "123456", "password", "abc123", "qwerty",
+            "admin", "test", "12345678"
+        ]
+
+        for password in weak_passwords:
+            with pytest.raises(ValidationError):
+                UserProfileCreate(
+                    username="testuser",
+                    email="test@example.com",
+                    password=password,
+                    first_name="Test",
+                    last_name="User",
+                )
+
+    def test_unicode_character_handling(self):
+        """Test Unicode character handling in profile fields."""
+        # Test Unicode in first_name
+        update1 = UserProfileUpdate(first_name="José María ñoño")
+        assert update1.first_name == "José María ñoño"
+
+        # Test Unicode in last_name
+        update2 = UserProfileUpdate(last_name="Müller-Schmidt")
+        assert update2.last_name == "Müller-Schmidt"
+
+        # Test Unicode in bio
+        update3 = UserProfileUpdate(bio="Hello 世界 🌍 Привет 🚀")
+        assert update3.bio == "Hello 世界 🌍 Привет 🚀"
+
+    def test_null_empty_value_handling(self):
+        """Test null and empty value handling."""
+        # Test optional fields can be None
+        update = UserProfileUpdate(
+            first_name=None,
+            last_name="",
+            bio=None,
+        )
+        assert update.first_name is None
+        assert update.last_name == ""
+        assert update.bio is None
+
+    def test_field_length_boundaries(self):
+        """Test field length boundary conditions."""
+        # Test maximum lengths
+        max_username = "a" * 100
+        max_email = "a" * 243 + "@example.com"  # 255 total
+        max_bio = "a" * 5000  # Assuming reasonable bio limit
+
+        # Should accept maximum lengths
+        create = UserProfileCreate(
+            username=max_username,
+            email=max_email,
+            password="securepassword123",
+            first_name="Test",
+            last_name="User",
+            bio=max_bio,
+        )
+        assert len(create.username) == 100
+        assert len(create.email) == 255
+
+        # Should reject over-limit lengths
+        with pytest.raises(ValidationError):
+            UserProfileCreate(
+                username="a" * 101,  # Over limit
+                email="test@example.com",
+                password="securepassword123",
+                first_name="Test",
+                last_name="User",
+            )
+
+    def test_timezone_validation(self):
+        """Test timezone string validation."""
+        valid_timezones = ["UTC", "America/New_York", "Europe/London", "Asia/Tokyo"]
+        invalid_timezones = ["NotATimezone", "../../etc/passwd", "<script>alert(1)</script>"]
+
+        for tz in valid_timezones:
+            update = UserProfileUpdate(timezone=tz)
+            assert update.timezone == tz
+
+        for tz in invalid_timezones:
+            with pytest.raises(ValidationError):
+                UserProfileUpdate(timezone=tz)
+
+    def test_language_code_validation(self):
+        """Test language code validation."""
+        valid_languages = ["en", "es", "fr", "de", "zh", "ja"]
+        invalid_languages = ["english", "123", "<script>", "en-US-long"]
+
+        for lang in valid_languages:
+            update = UserProfileUpdate(language=lang)
+            assert update.language == lang
+
+        for lang in invalid_languages:
+            with pytest.raises(ValidationError):
+                UserProfileUpdate(language=lang)
+
+    def test_preferences_json_validation(self):
+        """Test preferences JSON structure validation."""
+        valid_prefs = {
+            "theme": "dark",
+            "notifications": True,
+            "language": "en",
+            "timezone": "UTC",
+            "dashboard_layout": {"widgets": ["tasks", "metrics"]},
+        }
+
+        update = UserProfileUpdate(preferences=valid_prefs)
+        assert update.preferences == valid_prefs
+
+        # Test invalid preferences structure
+        with pytest.raises(ValidationError):
+            UserProfileUpdate(preferences="not_a_dict")  # type: ignore
+
+    def test_avatar_url_validation(self):
+        """Test avatar URL validation."""
+        valid_urls = [
+            "https://example.com/avatar.jpg",
+            "https://cdn.example.com/images/user_123.png",
+            "http://localhost:3000/avatar.gif",  # For development
+        ]
+
+        for url in valid_urls:
+            update = UserProfileUpdate(avatar_url=url)
+            assert update.avatar_url == url
+
+        invalid_urls = [
+            "not_a_url",
+            "ftp://example.com/file.jpg",
+            "javascript:alert('xss')",
+            "data:text/html,<script>alert(1)</script>",
+        ]
+
+        for url in invalid_urls:
+            with pytest.raises(ValidationError):
+                UserProfileUpdate(avatar_url=url)
 
 
 if __name__ == "__main__":

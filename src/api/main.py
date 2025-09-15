@@ -1122,30 +1122,46 @@ async def health_check():
 )
 async def detailed_health_check():
     """Detailed health check for CLI tools."""
+    health_status = {
+        "status": "healthy",
+        "service": "agent-hive-api",
+        "uptime": time.time() - startup_time,
+        "components": {}
+    }
+
+    # Test Redis connection
     try:
-        # Test database connection
-        from pathlib import Path
-
-        orchestrator = await get_orchestrator(settings.database_url, Path("."))
-
-        # Test Redis connection
         await get_message_broker().redis_client.ping()
-
-        return APIResponse(
-            success=True,
-            data={
-                "status": "healthy",
-                "service": "agent-hive-api",
-                "database": "connected",
-                "redis": "connected",
-                "uptime": time.time() - startup_time,
-            },
-        )
+        health_status["components"]["redis"] = "connected"
     except Exception as e:
-        return APIResponse(
-            success=False,
-            data={"status": "unhealthy", "service": "agent-hive-api", "error": str(e)},
-        )
+        health_status["components"]["redis"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    # Test database connection (optional for basic health)
+    try:
+        from pathlib import Path
+        orchestrator = await get_orchestrator(settings.database_url, Path("."))
+        health_status["components"]["database"] = "connected"
+        health_status["components"]["orchestrator"] = "initialized"
+    except Exception as e:
+        health_status["components"]["database"] = f"error: {str(e)}"
+        health_status["components"]["orchestrator"] = "unavailable"
+        # Don't mark as unhealthy if database is down - system can still function
+
+    # Test basic agent creation capability
+    try:
+        from src.agents.agent_factory import AgentFactory
+        # Just test that we can import and check available types
+        types = AgentFactory.get_available_types()
+        health_status["components"]["agent_factory"] = f"available ({len(types)} types)"
+    except Exception as e:
+        health_status["components"]["agent_factory"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    return APIResponse(
+        success=health_status["status"] == "healthy",
+        data=health_status,
+    )
 
 
 @app.get("/api/v1/status", response_model=APIResponse)

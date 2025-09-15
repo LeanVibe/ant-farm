@@ -232,7 +232,7 @@ class Task(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
     started_at = Column(DateTime(timezone=True), index=True)
     completed_at = Column(DateTime(timezone=True), index=True)
-    deadline = Column(DateTime(timezone=True))
+    deadline = Column(DateTime(timezone=True), index=True)
 
     # Relationships
     agent = relationship("Agent", back_populates="tasks")
