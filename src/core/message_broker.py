@@ -154,12 +154,92 @@ class MessageBroker:
         # Circuit breaker for Redis operations
         self.redis_breaker = get_message_broker_breaker()
 
+        # Performance optimizations
+        self.message_batch_size = 10  # Batch size for bulk operations
+        self.message_batch_timeout = 0.1  # Max wait time for batching (100ms)
+        self.pending_batch: list[dict] = []
+        self.batch_timer: asyncio.Task | None = None
+        self.compression_threshold = 1024  # Compress messages > 1KB
+
+        # Connection pooling optimization
+        self.connection_pool_size = 20  # Increased from default
+        self.connection_pool_max_idle_time = 300  # 5 minutes
+
     async def initialize(self) -> None:
         """Initialize the message broker."""
         await self.redis_client.ping()
         if self.pubsub is None:
             self.pubsub = self.redis_client.pubsub()
         logger.info("Message broker initialized")
+
+    # Performance optimization methods
+    async def _compress_message(self, data: str) -> tuple[str, bool]:
+        """Compress message if it exceeds threshold."""
+        import gzip
+        import base64
+
+        if len(data) > self.compression_threshold:
+            compressed = gzip.compress(data.encode('utf-8'))
+            encoded = base64.b64encode(compressed).decode('utf-8')
+            return encoded, True
+        return data, False
+
+    async def _decompress_message(self, data: str, compressed: bool) -> str:
+        """Decompress message if it was compressed."""
+        if compressed:
+            import gzip
+            import base64
+
+            decoded = base64.b64decode(data.encode('utf-8'))
+            decompressed = gzip.decompress(decoded).decode('utf-8')
+            return decompressed
+        return data
+
+    async def _batch_publish_messages(self, messages: list[dict]) -> None:
+        """Publish multiple messages in batch for better performance."""
+        if not messages:
+            return
+
+        try:
+            # Use Redis pipeline for atomic batch operations
+            async with self.redis_client.pipeline() as pipe:
+                for msg_data in messages:
+                    channel = msg_data['channel']
+                    message_json = msg_data['message']
+                    await pipe.publish(channel, message_json)
+
+                # Execute all commands in pipeline
+                await self.redis_breaker.call(pipe.execute)
+
+            logger.debug("Batch published messages", count=len(messages))
+
+        except Exception as e:
+            logger.error("Batch publish failed", error=str(e), count=len(messages))
+            # Fallback to individual publishing
+            for msg_data in messages:
+                try:
+                    await self.redis_breaker.call(
+                        self.redis_client.publish,
+                        msg_data['channel'], msg_data['message']
+                    )
+                except Exception as fallback_error:
+                    logger.error("Individual publish fallback failed", error=str(fallback_error))
+
+    async def _schedule_batch_publish(self) -> None:
+        """Schedule batch publishing after timeout."""
+        if self.pending_batch and self.batch_timer is None:
+            self.batch_timer = asyncio.create_task(self._execute_batch_publish())
+
+    async def _execute_batch_publish(self) -> None:
+        """Execute pending batch publish."""
+        await asyncio.sleep(self.message_batch_timeout)
+
+        if self.pending_batch:
+            batch = self.pending_batch.copy()
+            self.pending_batch.clear()
+            await self._batch_publish_messages(batch)
+
+        self.batch_timer = None
 
     async def start_listening(self, agent_name: str, handler: MessageHandler) -> None:
         """Start listening for messages for a specific agent."""
@@ -256,7 +336,7 @@ class MessageBroker:
             else:
                 channel = f"agent:{to_agent}"
 
-            # Publish message
+            # Prepare message for publishing
             message_dict = {
                 "id": message.id,
                 "from_agent": message.from_agent,
@@ -274,11 +354,30 @@ class MessageBroker:
                 "idempotency_key": message.idempotency_key,
             }
 
-            # Protect Redis publish with circuit breaker
-            await self.redis_breaker.call(
-                self.redis_client.publish,
-                channel, json.dumps(message_dict, default=str)
-            )
+            message_json = json.dumps(message_dict, default=str)
+
+            # Compress large messages
+            compressed_json, was_compressed = await self._compress_message(message_json)
+            if was_compressed:
+                message_dict["compressed"] = True
+                message_dict["original_size"] = len(message_json)
+                compressed_json = json.dumps(message_dict, default=str)
+
+            # Use batching for better performance
+            if len(self.pending_batch) < self.message_batch_size:
+                # Add to batch
+                self.pending_batch.append({
+                    'channel': channel,
+                    'message': compressed_json
+                })
+                # Schedule batch execution
+                await self._schedule_batch_publish()
+            else:
+                # Batch is full, publish immediately
+                await self.redis_breaker.call(
+                    self.redis_client.publish,
+                    channel, compressed_json
+                )
 
             # Store in history
             await self._store_message_history(message)
