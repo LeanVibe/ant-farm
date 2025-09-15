@@ -1,6 +1,7 @@
 """FastAPI server for LeanVibe Agent Hive 2.0 - Agent management and coordination."""
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -55,6 +56,7 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -62,6 +64,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from fastapi.security import OAuth2PasswordRequestForm
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 # WebSocket connection manager
@@ -140,6 +143,132 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+# API Response Caching Middleware
+class APICacheMiddleware(BaseHTTPMiddleware):
+    """Middleware for caching API responses using Redis."""
+
+    def __init__(self, app, cache_ttl: int = 300):
+        super().__init__(app)
+        self.cache_ttl = cache_ttl
+        self.redis_client = None
+
+    async def dispatch(self, request: Request, call_next):
+        # Only cache GET requests
+        if request.method != "GET":
+            return await call_next(request)
+
+        # Skip caching for certain endpoints
+        skip_cache_paths = [
+            "/api/v1/auth/",
+            "/api/v1/ws/",
+            "/health",
+            "/api/v1/health",
+            "/api/docs",
+            "/api/redoc",
+        ]
+
+        if any(path in request.url.path for path in skip_cache_paths):
+            return await call_next(request)
+
+        # Generate cache key
+        cache_key = self._generate_cache_key(request)
+
+        # Try to get from cache
+        try:
+            if not self.redis_client:
+                from ..core.message_broker import get_message_broker
+                broker = await get_message_broker()
+                self.redis_client = broker.redis_client
+
+            cached_response = await self.redis_client.get(cache_key)
+            if cached_response:
+                # Return cached response
+                cached_data = json.loads(cached_response)
+                response = Response(
+                    content=json.dumps(cached_data["content"]),
+                    status_code=cached_data["status_code"],
+                    headers=cached_data["headers"],
+                    media_type=cached_data.get("media_type", "application/json")
+                )
+                # Add cache headers
+                response.headers["X-Cache-Status"] = "HIT"
+                response.headers["Cache-Control"] = f"max-age={self.cache_ttl}"
+                return response
+
+        except Exception as e:
+            logger.warning("Cache read failed", error=str(e))
+
+        # Get fresh response
+        response = await call_next(request)
+
+        # Cache the response if successful
+        if response.status_code == 200 and hasattr(response, 'body'):
+            try:
+                response_body = response.body.decode('utf-8') if isinstance(response.body, bytes) else str(response.body)
+                cache_data = {
+                    "content": json.loads(response_body) if response_body else {},
+                    "status_code": response.status_code,
+                    "headers": dict(response.headers),
+                    "media_type": response.media_type,
+                    "cached_at": time.time()
+                }
+
+                await self.redis_client.setex(
+                    cache_key,
+                    self.cache_ttl,
+                    json.dumps(cache_data)
+                )
+
+                # Add cache headers to response
+                response.headers["X-Cache-Status"] = "MISS"
+                response.headers["Cache-Control"] = f"max-age={self.cache_ttl}"
+
+            except Exception as e:
+                logger.warning("Cache write failed", error=str(e))
+
+        return response
+
+    def _generate_cache_key(self, request: Request) -> str:
+        """Generate a unique cache key for the request."""
+        # Include path, query params, and user info (if authenticated)
+        key_parts = [request.url.path]
+
+        # Add query parameters (sorted for consistency)
+        if request.query_params:
+            sorted_params = sorted(request.query_params.items())
+            key_parts.append(str(sorted_params))
+
+        # Add user ID if authenticated (for user-specific caching)
+        user_id = getattr(request.state, 'user_id', None) if hasattr(request, 'state') else None
+        if user_id:
+            key_parts.append(f"user:{user_id}")
+
+        # Create hash for consistent key length
+        key_string = "|".join(key_parts)
+        return f"api_cache:{hashlib.md5(key_string.encode()).hexdigest()}"
+
+
+# Cache invalidation helper
+async def invalidate_cache(pattern: str = "*"):
+    """Invalidate cache entries matching the pattern."""
+    try:
+        from ..core.message_broker import get_message_broker
+        broker = await get_message_broker()
+        redis_client = broker.redis_client
+
+        # Find keys matching pattern
+        keys = await redis_client.keys(f"api_cache:{pattern}")
+
+        if keys:
+            await redis_client.delete(*keys)
+            logger.info("Cache invalidated", pattern=pattern, keys_deleted=len(keys))
+        else:
+            logger.info("No cache keys found to invalidate", pattern=pattern)
+
+    except Exception as e:
+        logger.error("Cache invalidation failed", error=str(e))
 
 
 # Background task for broadcasting system events
@@ -308,6 +437,9 @@ app.add_middleware(SecurityMiddleware)
 
 # Add performance monitoring middleware
 app.add_middleware(PerformanceMiddleware)
+
+# Add API response caching middleware
+app.add_middleware(APICacheMiddleware, cache_ttl=300)  # 5 minute cache TTL
 
 # CORS middleware (keep last in chain)
 app.add_middleware(
@@ -1617,6 +1749,9 @@ async def spawn_agent(
             },
         )
 
+        # Invalidate agent list cache
+        await invalidate_cache("api/v1/agents")
+
         return APIResponse(
             success=True,
             data={
@@ -1786,6 +1921,9 @@ async def create_task(
                 },
             },
         )
+
+        # Invalidate task list cache
+        await invalidate_cache("api/v1/tasks")
 
         return APIResponse(
             success=True,
