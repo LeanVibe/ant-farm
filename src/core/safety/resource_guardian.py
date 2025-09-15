@@ -53,6 +53,17 @@ class MemoryOptimizer:
         self.memory_baseline = psutil.virtual_memory().percent
         self.optimization_history: list[dict[str, Any]] = []
 
+        # Performance optimization additions
+        self.object_pools: dict[str, list[Any]] = {}  # Object pooling
+        self.memory_profiling_enabled = True
+        self.gc_optimization_active = False
+        self.large_object_threshold = 1024 * 1024  # 1MB
+        self.pool_sizes = {
+            "task_results": 50,
+            "message_objects": 100,
+            "context_cache": 25,
+        }
+
     async def optimize_memory_usage(self) -> dict[str, Any]:
         """Optimize system memory usage."""
         start_memory = psutil.virtual_memory().percent
@@ -118,6 +129,166 @@ class MemoryOptimizer:
         except Exception as e:
             logger.error("Memory optimization failed", error=str(e))
             return {"error": str(e), "optimizations_applied": optimizations_applied}
+
+    # Performance optimization methods
+    def get_object_from_pool(self, pool_name: str) -> Any | None:
+        """Get object from pool or return None if pool is empty."""
+        if pool_name in self.object_pools and self.object_pools[pool_name]:
+            obj = self.object_pools[pool_name].pop()
+            logger.debug("Object retrieved from pool", pool_name=pool_name)
+            return obj
+        return None
+
+    def return_object_to_pool(self, pool_name: str, obj: Any) -> None:
+        """Return object to pool for reuse."""
+        if pool_name not in self.object_pools:
+            self.object_pools[pool_name] = []
+
+        max_size = self.pool_sizes.get(pool_name, 25)
+        if len(self.object_pools[pool_name]) < max_size:
+            self.object_pools[pool_name].append(obj)
+            logger.debug("Object returned to pool", pool_name=pool_name, pool_size=len(self.object_pools[pool_name]))
+        else:
+            # Pool is full, let garbage collector handle it
+            logger.debug("Pool full, discarding object", pool_name=pool_name)
+
+    async def profile_memory_usage(self) -> dict[str, Any]:
+        """Profile memory usage and identify optimization opportunities."""
+        try:
+            import tracemalloc
+            import gc
+
+            # Start memory tracing if not already active
+            if not tracemalloc.is_tracing():
+                tracemalloc.start()
+
+            # Get current memory snapshot
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.statistics('lineno')
+
+            # Analyze large objects
+            large_objects = []
+            for stat in top_stats[:10]:  # Top 10 memory consumers
+                if stat.size > self.large_object_threshold:
+                    large_objects.append({
+                        'file': stat.traceback[0].filename,
+                        'line': stat.traceback[0].lineno,
+                        'size': stat.size,
+                        'count': stat.count,
+                    })
+
+            # Force garbage collection and measure
+            gc.collect()
+            post_gc_memory = psutil.virtual_memory().percent
+
+            # Get object counts by type
+            object_counts = {}
+            for obj in gc.get_objects():
+                obj_type = type(obj).__name__
+                object_counts[obj_type] = object_counts.get(obj_type, 0) + 1
+
+            # Get top object types by count
+            top_object_types = sorted(object_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+            profile_result = {
+                "current_memory_percent": psutil.virtual_memory().percent,
+                "memory_after_gc": post_gc_memory,
+                "large_objects_count": len(large_objects),
+                "large_objects": large_objects,
+                "top_object_types": top_object_types,
+                "total_objects": len(gc.get_objects()),
+                "pool_status": {name: len(objects) for name, objects in self.object_pools.items()},
+                "timestamp": time.time(),
+            }
+
+            logger.info("Memory profiling completed", **profile_result)
+            return profile_result
+
+        except Exception as e:
+            logger.error("Memory profiling failed", error=str(e))
+            return {"error": str(e)}
+
+    async def optimize_garbage_collection(self) -> dict[str, Any]:
+        """Optimize garbage collection behavior."""
+        try:
+            import gc
+
+            # Get current GC stats
+            initial_stats = gc.get_stats()
+            initial_thresholds = gc.get_threshold()
+
+            # Adjust GC thresholds for better performance
+            # More aggressive collection for generation 0, less for higher generations
+            gc.set_threshold(250, 10, 10)  # Lower thresholds for more frequent collection
+
+            # Enable GC debugging if not in production
+            if os.getenv("DEBUG", "").lower() == "true":
+                gc.set_debug(gc.DEBUG_STATS)
+
+            # Perform generational collection
+            collected_counts = []
+            for generation in range(3):
+                count = gc.collect(generation)
+                collected_counts.append(count)
+
+            # Get final stats
+            final_stats = gc.get_stats()
+            final_thresholds = gc.get_threshold()
+
+            optimization_result = {
+                "initial_thresholds": initial_thresholds,
+                "final_thresholds": final_thresholds,
+                "collected_objects": collected_counts,
+                "gc_stats_improvement": {
+                    "gen0_collections": final_stats[0]['collections'] - initial_stats[0]['collections'],
+                    "gen1_collections": final_stats[1]['collections'] - initial_stats[1]['collections'],
+                    "gen2_collections": final_stats[2]['collections'] - initial_stats[2]['collections'],
+                },
+                "memory_before": psutil.virtual_memory().percent,
+                "memory_after": psutil.virtual_memory().percent,
+                "timestamp": time.time(),
+            }
+
+            self.gc_optimization_active = True
+            logger.info("Garbage collection optimization completed", **optimization_result)
+            return optimization_result
+
+        except Exception as e:
+            logger.error("GC optimization failed", error=str(e))
+            return {"error": str(e)}
+
+    async def handle_large_data_structure(self, data: Any, operation: str) -> Any:
+        """Handle large data structures with memory optimization."""
+        try:
+            data_size = len(str(data)) if hasattr(data, '__len__') else 0
+
+            if data_size > self.large_object_threshold:
+                logger.info("Processing large data structure",
+                          operation=operation,
+                          size=data_size,
+                          type=type(data).__name__)
+
+                # For very large objects, consider streaming or chunking
+                if isinstance(data, (list, dict)) and len(data) > 1000:
+                    # Process in chunks to reduce memory pressure
+                    chunk_size = 100
+                    if isinstance(data, list):
+                        chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+                        logger.debug("Large list chunked", original_size=len(data), chunks=len(chunks))
+                    elif isinstance(data, dict):
+                        # For dicts, process keys in chunks
+                        keys = list(data.keys())
+                        chunks = [dict((k, data[k]) for k in keys[i:i + chunk_size])
+                                for i in range(0, len(keys), chunk_size)]
+                        logger.debug("Large dict chunked", original_size=len(data), chunks=len(chunks))
+
+                    return chunks
+
+            return data
+
+        except Exception as e:
+            logger.warning("Failed to optimize large data structure", error=str(e))
+            return data
 
     async def _safe_remove_directory(self, directory: Path) -> bool:
         """Safely remove a directory."""
