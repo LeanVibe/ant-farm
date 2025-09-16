@@ -619,6 +619,394 @@ Get performance optimization statistics.
 #### POST /api/v1/performance/optimize
 Trigger performance optimization.
 
+### Advanced Monitoring (Batch 6 - Performance Monitoring)
+
+#### GET /api/v1/monitoring/metrics
+Get comprehensive system metrics including CPU, memory, disk, network, database, broker, and agent metrics (requires `system:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "metrics": {
+      "cpu_percent": {"latest": 45.2, "average": 42.1, "min": 12.3, "max": 89.5},
+      "memory_percent": {"latest": 67.8, "average": 65.4, "min": 45.2, "max": 78.9},
+      "db_health_status": {"latest": 1.0, "average": 0.99},
+      "agents_total": {"latest": 5, "average": 5},
+      "agents_active": {"latest": 4, "average": 3.8}
+    },
+    "health_score": 0.87,
+    "timestamp": 1640995200.0
+  }
+}
+```
+
+#### GET /api/v1/monitoring/alerts
+Get active performance alerts and recent alert history (requires `system:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "alerts": [
+      {
+        "id": "alert_1640995200_cpu_high",
+        "title": "High CPU Usage Detected",
+        "description": "CPU usage is 85.2%, exceeding threshold of 80%",
+        "severity": "high",
+        "metric_name": "cpu_percent",
+        "current_value": 85.2,
+        "threshold_value": 80.0,
+        "created_at": 1640995200.0,
+        "status": "active"
+      }
+    ]
+  }
+}
+```
+
+#### GET /api/v1/monitoring/bottlenecks
+Get system bottleneck analysis and recommendations (requires `system:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "bottlenecks": {
+      "cpu_bottleneck": true,
+      "memory_bottleneck": false,
+      "disk_bottleneck": false,
+      "database_bottleneck": false,
+      "broker_bottleneck": true,
+      "agent_bottleneck": false,
+      "recommendations": [
+        "High CPU usage detected - consider scaling compute resources",
+        "Message broker queue depth is high - check message processing rate"
+      ]
+    }
+  }
+}
+```
+
+#### GET /api/v1/monitoring/health
+Get monitoring system health status (requires `system:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "metrics_collector": true,
+    "bottleneck_detector": true,
+    "alert_manager": true,
+    "health_score": 0.92,
+    "timestamp": 1640995200.0
+  }
+}
+```
+
+#### POST /api/v1/monitoring/alerts/{alert_id}/acknowledge
+Acknowledge an active alert to prevent further notifications (requires `system:write`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Alert acknowledged successfully"
+  }
+}
+```
+
+#### GET /api/v1/monitoring/performance
+Get performance optimization statistics and historical performance data (requires `system:read`).
+
+**Query Parameters:**
+- `time_range`: Time range for performance data (default: "1h", options: "1h", "24h", "7d", "30d")
+- `metrics`: Comma-separated list of metrics to include (default: all)
+- `include_trends`: Include performance trend analysis (default: true)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "performance_stats": {
+      "optimization_events": 12,
+      "avg_improvement_percent": 45.2,
+      "total_optimizations_applied": 8,
+      "performance_trends": {
+        "response_time_trend": "improving",
+        "throughput_trend": "stable",
+        "error_rate_trend": "improving"
+      }
+    },
+    "recent_optimizations": [
+      {
+        "id": "opt_1640995200",
+        "type": "database_query_optimization",
+        "description": "Optimized slow queries with new indexes",
+        "improvement_percent": 60.5,
+        "applied_at": 1640995200.0,
+        "status": "successful"
+      }
+    ],
+    "baseline_comparison": {
+      "current_response_time": 45.2,
+      "baseline_response_time": 100.0,
+      "improvement_percent": 54.8
+    }
+  }
+}
+```
+
+#### POST /api/v1/monitoring/performance/optimize
+Trigger performance optimization analysis and apply recommended optimizations (requires `system:write`).
+
+**Request Body:**
+```json
+{
+  "optimization_types": ["database", "cache", "agent_load"],
+  "aggressive_mode": false,
+  "dry_run": true
+}
+```
+
+**Parameters:**
+- `optimization_types`: Array of optimization types to run (optional)
+- `aggressive_mode`: Apply more aggressive optimizations (default: false)
+- `dry_run`: Preview optimizations without applying (default: false)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "optimization_id": "opt_1640995300",
+    "recommendations": [
+      {
+        "type": "database_index",
+        "description": "Add composite index on tasks table",
+        "estimated_improvement": 35.2,
+        "risk_level": "low",
+        "applied": false
+      },
+      {
+        "type": "cache_optimization",
+        "description": "Increase Redis cache size",
+        "estimated_improvement": 25.8,
+        "risk_level": "low",
+        "applied": false
+      }
+    ],
+    "estimated_total_improvement": 61.0,
+    "execution_time_estimate": 45,
+    "dry_run": true
+  }
+}
+```
+
+#### GET /api/v1/monitoring/performance/history
+Get historical performance optimization results and trends (requires `system:read`).
+
+**Query Parameters:**
+- `start_date`: Start date for history (ISO 8601 format)
+- `end_date`: End date for history (ISO 8601 format)
+- `optimization_type`: Filter by optimization type
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "optimization_history": [
+      {
+        "id": "opt_1640995200",
+        "type": "database_optimization",
+        "description": "Query optimization and indexing",
+        "improvement_percent": 45.2,
+        "applied_at": 1640995200.0,
+        "status": "successful",
+        "duration_seconds": 120
+      }
+    ],
+    "performance_trends": {
+      "monthly_improvements": [
+        {"month": "2024-01", "avg_improvement": 42.3},
+        {"month": "2024-02", "avg_improvement": 38.7}
+      ],
+      "optimization_success_rate": 0.92
+    }
+  }
+}
+```
+
+#### GET /api/v1/monitoring/anomalies
+Get detected performance anomalies and unusual patterns (requires `system:read`).
+
+**Query Parameters:**
+- `severity`: Filter by anomaly severity ("low", "medium", "high", "critical")
+- `time_range`: Time range to analyze (default: "1h")
+- `include_resolved`: Include resolved anomalies (default: false)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "anomalies": [
+      {
+        "id": "anom_1640995200",
+        "type": "response_time_spike",
+        "description": "API response time increased by 300% in last 5 minutes",
+        "severity": "high",
+        "detected_at": 1640995200.0,
+        "affected_components": ["api", "database"],
+        "potential_cause": "Database connection pool exhausted",
+        "recommendations": [
+          "Scale database connections",
+          "Review slow queries"
+        ],
+        "status": "active"
+      }
+    ],
+    "anomaly_summary": {
+      "total_anomalies": 3,
+      "by_severity": {
+        "low": 1,
+        "medium": 1,
+        "high": 1,
+        "critical": 0
+      },
+      "detection_accuracy": 0.94
+    }
+  }
+}
+```
+
+#### POST /api/v1/monitoring/thresholds
+Update monitoring thresholds for alerts and performance tracking (requires `system:write`).
+
+**Request Body:**
+```json
+{
+  "thresholds": {
+    "cpu_usage_percent": {
+      "warning": 70,
+      "critical": 85
+    },
+    "memory_usage_percent": {
+      "warning": 75,
+      "critical": 90
+    },
+    "api_response_time_ms": {
+      "warning": 100,
+      "critical": 200
+    },
+    "database_connection_pool_utilization": {
+      "warning": 80,
+      "critical": 95
+    }
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Monitoring thresholds updated successfully",
+    "updated_thresholds": 8,
+    "effective_from": 1640995200.0
+  }
+}
+```
+
+#### GET /api/v1/monitoring/thresholds
+Get current monitoring thresholds and alert configurations (requires `system:read`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "thresholds": {
+      "cpu_usage_percent": {
+        "warning": 70,
+        "critical": 85,
+        "description": "System CPU usage thresholds"
+      },
+      "memory_usage_percent": {
+        "warning": 75,
+        "critical": 90,
+        "description": "System memory usage thresholds"
+      },
+      "api_response_time_ms": {
+        "warning": 100,
+        "critical": 200,
+        "description": "API response time thresholds"
+      },
+      "database_connection_pool_utilization": {
+        "warning": 80,
+        "critical": 95,
+        "description": "Database connection pool utilization thresholds"
+      }
+    },
+    "last_updated": 1640995200.0,
+    "version": "2.0"
+  }
+}
+```
+
+#### GET /api/v1/monitoring/reports
+Generate comprehensive monitoring reports (requires `system:read`).
+
+**Query Parameters:**
+- `report_type`: Type of report ("daily", "weekly", "monthly", "custom")
+- `start_date`: Report start date (ISO 8601 format)
+- `end_date`: Report end date (ISO 8601 format)
+- `format`: Report format ("json", "pdf", "html")
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "report_id": "report_1640995200",
+    "report_type": "weekly",
+    "time_range": {
+      "start": "2024-01-01T00:00:00Z",
+      "end": "2024-01-07T23:59:59Z"
+    },
+    "summary": {
+      "total_uptime_percent": 99.7,
+      "avg_response_time_ms": 45.2,
+      "total_requests": 150000,
+      "error_rate_percent": 0.05
+    },
+    "performance_metrics": {
+      "cpu_usage_avg": 42.1,
+      "memory_usage_avg": 65.4,
+      "database_performance_score": 0.92
+    },
+    "incidents": [
+      {
+        "id": "incident_1640995200",
+        "title": "Database Connection Pool Exhausted",
+        "severity": "high",
+        "duration_minutes": 15,
+        "resolution": "Scaled database connections"
+      }
+    ],
+    "download_url": "/api/v1/downloads/report_1640995200.pdf"
+  }
+}
+```
+
 ### Context and Memory
 
 #### GET /api/v1/context/{agent_id}
@@ -798,7 +1186,15 @@ curl -H "Authorization: Bearer $TOKEN" /api/v1/agents
 
 ## Changelog
 
-### v2.1.0 (Current)
+### v2.2.0 (Current)
+- ✅ **Batch 6: Performance Monitoring System**
+  - Comprehensive metrics collection (system, database, broker, agent metrics)
+  - Intelligent bottleneck detection with configurable thresholds
+  - Multi-channel alerting (email, Slack, webhooks) with escalation
+  - Alert deduplication and correlation
+  - Real-time monitoring dashboard endpoints
+  - Performance optimization validation (40-60% improvement target)
+- ✅ Enhanced monitoring endpoints (`/api/v1/monitoring/*`)
 - ✅ Added real-time monitoring endpoints (`/api/v1/monitoring/*`)
 - ✅ Added performance metrics endpoints (`/api/v1/metrics/*`)
 - ✅ Added batch operations for agents (`/api/v1/agents/batch/*`)
