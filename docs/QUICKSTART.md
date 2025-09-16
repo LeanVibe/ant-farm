@@ -53,6 +53,10 @@ hive system start
 
 # Check system health
 hive system status
+
+# Verify monitoring is working
+curl http://localhost:9001/api/v1/monitoring/health
+curl http://localhost:9001/metrics
 ```
 
 ## First Steps
@@ -98,6 +102,18 @@ hive agent describe meta
 # Check autonomous session status
 hive system status
 
+# Verify monitoring systems
+curl http://localhost:9001/api/v1/monitoring/health
+curl http://localhost:9001/api/v1/monitoring/metrics
+curl http://localhost:9001/metrics
+
+# Check for active alerts
+curl http://localhost:9001/api/v1/monitoring/alerts
+
+# Monitor performance and bottlenecks
+curl http://localhost:9001/api/v1/monitoring/bottlenecks
+curl http://localhost:9001/api/v1/monitoring/performance
+
 # Emergency controls (if needed)
 curl -X POST http://localhost:9001/api/v1/emergency/pause
 curl -X GET http://localhost:9001/api/v1/emergency/status
@@ -105,9 +121,57 @@ curl -X GET http://localhost:9001/api/v1/emergency/status
 # Access live dashboard
 open http://localhost:9001/dashboard
 
-# Access API documentation  
+# Access API documentation
 open http://localhost:9001/api/docs
 ```
+
+#### Monitoring Verification Steps
+
+After starting the system, verify monitoring is working:
+
+1. **Health Check**: `curl http://localhost:9001/api/v1/monitoring/health`
+   - Should return `{"status": "healthy", "score": 0.95+}`
+
+2. **Metrics Endpoint**: `curl http://localhost:9001/metrics`
+   - Should return Prometheus-formatted metrics
+   - Look for `leanvibe_api_requests_total`, `leanvibe_system_cpu_usage_percent`, etc.
+
+3. **System Metrics**: `curl http://localhost:9001/api/v1/monitoring/metrics`
+   - Should return comprehensive system metrics
+   - Check CPU, memory, disk, and API performance metrics
+
+4. **Alert Status**: `curl http://localhost:9001/api/v1/monitoring/alerts`
+   - Should return active alerts (or empty array if no issues)
+   - Verify alerting system is responsive
+
+5. **Performance Analysis**: `curl http://localhost:9001/api/v1/monitoring/bottlenecks`
+   - Should return performance analysis
+   - Check for any detected bottlenecks or recommendations
+
+6. **Dashboard Access**: Open http://localhost:9001/dashboard
+   - Verify real-time metrics are updating
+   - Check agent status and task monitoring
+
+**Expected Monitoring Output:**
+```json
+// Health check response
+{
+  "success": true,
+  "data": {
+    "metrics_collector": true,
+    "alert_manager": true,
+    "bottleneck_detector": true,
+    "health_score": 0.97,
+    "timestamp": 1640995200.0
+  }
+}
+```
+
+If monitoring is not working:
+- Check that `ENABLE_MONITORING=true` in `.env`
+- Verify Docker services are running: `docker compose ps`
+- Check monitoring logs: `docker compose logs monitoring`
+- Restart services: `hive system restart`
 
 ## API Access
 
