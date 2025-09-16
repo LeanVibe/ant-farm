@@ -176,34 +176,158 @@ class MetricsCollector:
 
     async def _collect_application_metrics(self):
         """Collect application-level metrics."""
-        # These will be updated by the application via record_metric calls
-        # For now, just ensure the series exist
-        pass
+        try:
+            # Get recent HTTP request metrics
+            http_requests = self.get_metric_values("http_requests_total", limit=60)  # Last minute
+            if http_requests:
+                # Calculate requests per second
+                if len(http_requests) >= 2:
+                    time_span = http_requests[-1].timestamp - http_requests[0].timestamp
+                    if time_span > 0:
+                        rps = len(http_requests) / time_span
+                        self._record_metric("http_requests_per_second", rps)
+
+            # Get error rate
+            errors = self.get_metric_values("api_errors_total", limit=60)
+            if errors and http_requests:
+                error_rate = len(errors) / max(len(http_requests), 1)
+                self._record_metric("api_error_rate", error_rate)
+
+            # Get average response time
+            response_times = self.get_metric_values("http_request_duration_seconds", limit=100)
+            if response_times:
+                avg_response_time = sum(p.value for p in response_times) / len(response_times)
+                self._record_metric("http_avg_response_time_seconds", avg_response_time)
+
+            # WebSocket connections
+            ws_connections = self.get_metric_values("websocket_connections", limit=10)
+            if ws_connections:
+                current_ws = sum(p.value for p in ws_connections)
+                self._record_metric("websocket_active_connections", max(0, current_ws))
+
+            # Cache hit ratio
+            cache_hits = self.get_metric_values("cache_hits", limit=100)
+            cache_misses = self.get_metric_values("cache_misses", limit=100)
+            if cache_hits or cache_misses:
+                total_cache_requests = len(cache_hits) + len(cache_misses)
+                if total_cache_requests > 0:
+                    hit_ratio = len(cache_hits) / total_cache_requests
+                    self._record_metric("cache_hit_ratio", hit_ratio)
+
+        except Exception as e:
+            logger.error(f"Failed to collect application metrics: {str(e)}")
 
     async def _collect_database_metrics(self):
         """Collect database performance metrics."""
         try:
-            # This will be enhanced when we have database connection monitoring
-            # For now, placeholder for future database metrics
-            pass
+            from .async_db import get_async_database_manager
+
+            db_manager = await get_async_database_manager()
+            if db_manager:
+                # Basic health check
+                health_ok = await db_manager.health_check()
+                self._record_metric("db_health_status", 1.0 if health_ok else 0.0)
+
+                # Database statistics
+                stats = await db_manager.get_database_stats()
+                self._record_metric("db_total_agents", stats.get("total_agents", 0))
+                self._record_metric("db_active_agents", stats.get("active_agents", 0))
+                self._record_metric("db_total_contexts", stats.get("total_contexts", 0))
+                self._record_metric("db_total_tasks", stats.get("total_tasks", 0))
+
+                # Redis cache metrics if available
+                if db_manager.redis_client:
+                    try:
+                        info = await db_manager.redis_client.info()
+                        hits = info.get("keyspace_hits", 0)
+                        misses = info.get("keyspace_misses", 0)
+                        total = hits + misses
+                        if total > 0:
+                            hit_ratio = hits / total
+                            self._record_metric("db_cache_hit_ratio", hit_ratio)
+                    except Exception as e:
+                        logger.error(f"Failed to get Redis cache metrics: {str(e)}")
+
         except Exception as e:
             logger.error(f"Failed to collect database metrics: {str(e)}")
 
     async def _collect_broker_metrics(self):
         """Collect message broker metrics."""
         try:
-            # This will be enhanced when we have broker monitoring
-            # For now, placeholder for future broker metrics
-            pass
+            from .message_broker import get_message_broker
+
+            broker = get_message_broker()
+            if broker and broker.redis_client:
+                # Get Redis info for broker metrics
+                try:
+                    info = await broker.redis_client.info()
+
+                    # Connection metrics
+                    self._record_metric("broker_connections_active", info.get("connected_clients", 0))
+
+                    # Memory usage
+                    self._record_metric("broker_memory_used_bytes", info.get("used_memory", 0))
+
+                    # Keyspace metrics (estimate queue depth)
+                    total_keys = sum(info.get(f"db{i}", {}).get("keys", 0) for i in range(16))
+                    self._record_metric("broker_total_keys", total_keys)
+
+                    # Commands processed (throughput)
+                    self._record_metric("broker_commands_processed", info.get("total_commands_processed", 0))
+
+                except Exception as e:
+                    logger.error(f"Failed to get broker Redis info: {str(e)}")
+
+                # Circuit breaker status
+                if hasattr(broker, 'redis_breaker'):
+                    breaker_status = broker.redis_breaker.get_status()
+                    status_value = 1.0 if breaker_status == "closed" else 0.0
+                    self._record_metric("broker_circuit_breaker_status", status_value)
+
         except Exception as e:
             logger.error(f"Failed to collect broker metrics: {str(e)}")
 
     async def _collect_agent_metrics(self):
         """Collect agent performance metrics."""
         try:
-            # This will be enhanced when we have agent monitoring
-            # For now, placeholder for future agent metrics
-            pass
+            from .agent_health import get_health_monitor_registry
+
+            registry = get_health_monitor_registry()
+            if registry:
+                health_report = await registry.get_system_health_report()
+
+                # Count agents by status
+                total_agents = len(health_report.get("agent_reports", {}))
+                healthy_agents = sum(1 for report in health_report.get("agent_reports", {}).values()
+                                   if report.get("current_status") == "healthy")
+                active_agents = sum(1 for report in health_report.get("agent_reports", {}).values()
+                                  if report.get("current_status") in ["healthy", "busy"])
+
+                self._record_metric("agents_total", total_agents)
+                self._record_metric("agents_active", active_agents)
+                self._record_metric("agents_healthy", healthy_agents)
+
+                # Individual agent metrics
+                for agent_name, report in health_report.get("agent_reports", {}).items():
+                    # Health score
+                    health_score = 1.0 if report.get("current_status") == "healthy" else 0.0
+                    self._record_metric("agent_health_score", health_score, {"agent": agent_name})
+
+                    # Task metrics
+                    metrics = report.get("metrics", {})
+                    self._record_metric("agent_tasks_completed", metrics.get("success_count", 0), {"agent": agent_name})
+                    self._record_metric("agent_tasks_failed", metrics.get("failure_count", 0), {"agent": agent_name})
+
+                    # Performance metrics
+                    self._record_metric("agent_response_time_avg", metrics.get("avg_response_time", 0.0), {"agent": agent_name})
+                    self._record_metric("agent_memory_usage_mb", metrics.get("memory_usage", 0.0), {"agent": agent_name})
+                    self._record_metric("agent_cpu_usage_percent", metrics.get("cpu_usage", 0.0), {"agent": agent_name})
+
+                    # Error rate
+                    total_tasks = metrics.get("success_count", 0) + metrics.get("failure_count", 0)
+                    error_rate = metrics.get("failure_count", 0) / max(total_tasks, 1)
+                    self._record_metric("agent_error_rate", error_rate, {"agent": agent_name})
+
         except Exception as e:
             logger.error(f"Failed to collect agent metrics: {str(e)}")
 

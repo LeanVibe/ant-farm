@@ -29,6 +29,22 @@ class TestEnhancedMessageBrokerContract:
         mock_redis.publish.return_value = 1
         mock_redis.subscribe.return_value = AsyncMock()
 
+        # Mock Redis set method for idempotency - track keys that have been set
+        set_keys = set()
+
+        async def mock_set(key, value, ex=None, nx=False, **kwargs):
+            if nx:  # Only set if key doesn't exist
+                if key in set_keys:
+                    return False  # Key already exists
+                else:
+                    set_keys.add(key)
+                    return True  # Key was set
+            else:
+                set_keys.add(key)
+                return True
+
+        mock_redis.set.side_effect = mock_set
+
         mock_session = AsyncMock()
         mock_session.execute.return_value = AsyncMock()
         mock_session.commit.return_value = None
@@ -143,6 +159,9 @@ class TestEnhancedMessageBrokerContract:
     ):
         """Test error handling contract."""
 
+        # Force immediate publishing by setting batch size to 0
+        enhanced_message_broker.message_batch_size = 0
+
         # Simulate Redis failure
         mock_dependencies["redis"].publish.side_effect = Exception(
             "Redis connection failed"
@@ -237,12 +256,15 @@ class TestEnhancedMessageBrokerContract:
         assert result2.success is True
         assert result2.reason == BrokerSendReason.IDEMPOTENT_DUPLICATE
         assert result2.message_id is None
-        result = await enhanced_message_broker.send_message(
-            "test_agent", "target_agent", "test_topic", {"test": "data"}
-        )
 
-        # Contract: Should return False on failure, not raise exception
-        assert result is False
+        # Test failure case - simulate circuit breaker open
+        with patch.object(enhanced_message_broker.redis_breaker, 'call', side_effect=Exception("Circuit breaker test")):
+            result = await enhanced_message_broker.send_message(
+                "test_agent", "target_agent", "test_topic", {"test": "data"}
+            )
+
+            # Contract: Should return False on failure, not raise exception
+            assert result is False
 
     async def test_message_persistence_contract(
         self, enhanced_message_broker, mock_dependencies

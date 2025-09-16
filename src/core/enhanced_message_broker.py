@@ -206,13 +206,14 @@ class EnhancedMessageBroker(MessageBroker):
     """Enhanced message broker with context sharing and real-time synchronization."""
 
     def __init__(self, redis_url: str = None, context_engine: ContextEngine = None):
-        # Initialize MessageBroker but override redis client creation for test compatibility
+        # Initialize MessageBroker attributes manually to maintain test compatibility
+        # We can't call super().__init__() because it immediately creates Redis client
         if redis_url is None:
             from .config import get_settings
 
             redis_url = get_settings().redis_url
 
-        # Don't call super().__init__ immediately - set up attributes first
+        # Initialize base MessageBroker attributes (copied from parent class)
         self.redis_client = None  # Will be set in initialize()
         self.pubsub = None
         self.message_handlers: dict[str, Any] = {}  # Use Any for MessageHandler type
@@ -220,22 +221,36 @@ class EnhancedMessageBroker(MessageBroker):
         self.subscriptions: set[str] = set()
         self.running = False
 
-        # MessageBroker key prefixes
+        # Key prefixes from base class
         self.message_prefix = "hive:messages"
         self.queue_prefix = "hive:msgqueue"
         self.dlq_prefix = "hive:dlq"
         self.history_prefix = "hive:history"
 
-        # DLQ metrics tracking
+        # DLQ metrics tracking from base class
         self._dlq_reasons: dict[str, int] = {}
         self._last_dlq_flush = 0.0
         self._dlq_flush_interval = 60.0
 
-        # Initialize circuit breaker for Redis operations
+        # Circuit breaker from base class
         self.redis_breaker = get_message_broker_breaker()
+
+        # Performance optimizations from base class
+        self.message_batch_size = 10
+        self.message_batch_timeout = 0.1
+        self.pending_batch: list[dict] = []
+        self.batch_timer: asyncio.Task | None = None
+        self.compression_threshold = 1024  # Compress messages > 1KB
+
+        # Connection pooling from base class
+        self.connection_pool_size = 20
+        self.connection_pool_max_idle_time = 300
 
         # Store redis_url for later use
         self._redis_url = redis_url
+
+        # Add missing compression_threshold attribute from base MessageBroker
+        self.compression_threshold = 1024  # Compress messages > 1KB
 
         # Enhanced MessageBroker attributes
         self.context_engine = context_engine

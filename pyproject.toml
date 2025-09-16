@@ -69,13 +69,23 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
-    "--strict-config", 
+    "--strict-config",
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-fail-under=50",  # Temporarily lower from 90% to get CI working
 ]
 asyncio_mode = "auto"
+markers = [
+    "unit: mark test as unit test",
+    "integration: mark test as integration test",
+    "e2e: mark test as end-to-end test",
+    "slow: mark test as slow running",
+    "performance: mark test as performance test",
+    "requires_redis: mark test as requiring Redis",
+    "requires_postgres: mark test as requiring PostgreSQL",
+    "requires_cli_tools: mark test as requiring CLI tools",
+]
 
 [tool.black]
 line-length = 88

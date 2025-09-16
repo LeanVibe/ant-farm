@@ -8,6 +8,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: mark test as integration test")
     config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
     config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line("markers", "performance: mark test as performance test")
     config.addinivalue_line("markers", "requires_redis: mark test as requiring Redis")
     config.addinivalue_line(
         "markers", "requires_postgres: mark test as requiring PostgreSQL"

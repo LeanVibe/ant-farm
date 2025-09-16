@@ -27,7 +27,8 @@ class TestBaseAgent:
         """Create a test BaseAgent instance."""
         with patch('src.agents.base_agent.get_persistent_cli_manager'), \
              patch('src.agents.base_agent.get_async_database_manager', return_value=mock_async_db_manager), \
-             patch('src.agents.base_agent.message_broker'):
+             patch('src.agents.base_agent.message_broker'), \
+             patch('asyncio.create_task', return_value=MagicMock()):
 
             # Create a concrete implementation for testing
             class TestAgent(BaseAgent):

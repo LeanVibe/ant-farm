@@ -37,6 +37,9 @@ try:
     from ..core.orchestrator import get_orchestrator
     from ..core.security import User, create_default_admin, security_manager
     from ..core.task_queue import Task, TaskPriority, task_queue
+    from ..core.metrics_collector import metrics_collector, start_metrics_collection
+    from ..core.bottleneck_detector import bottleneck_detector, start_bottleneck_detection
+    from ..core.alert_manager import alert_manager
 except ImportError:  # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
@@ -48,6 +51,9 @@ except ImportError:  # Direct execution - add src to path
     from src.core.orchestrator import get_orchestrator
     from src.core.security import User, create_default_admin, security_manager
     from src.core.task_queue import Task, TaskPriority, task_queue
+    from src.core.metrics_collector import metrics_collector, start_metrics_collection
+    from src.core.bottleneck_detector import bottleneck_detector, start_bottleneck_detection
+    from src.core.alert_manager import alert_manager
 
 from fastapi import (
     BackgroundTasks,

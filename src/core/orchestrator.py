@@ -6,12 +6,14 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional
 
 import structlog
 
 from .async_db import get_async_database_manager
 from .constants import Intervals
 from .enums import AgentStatus
+from .interfaces import IAgentOrchestrator, AgentInfo as InterfaceAgentInfo, SystemHealth, AgentStatus as InterfaceAgentStatus
 from .message_broker import message_broker
 from .models import Agent
 from .short_id import ShortIDGenerator
