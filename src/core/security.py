@@ -109,11 +109,27 @@ class SecurityConfig:
 class SecurityManager:
     """Central security manager for authentication and authorization."""
 
-    def __init__(self, config: SecurityConfig = None):
+    def __init__(self, config: SecurityConfig | None = None):
         self.config = config or SecurityConfig()
         self.users: dict[str, User] = {}
         self.sessions: dict[str, dict] = {}
         self.rate_limits: dict[str, list[float]] = {}
+        self.refresh_tokens: dict[str, dict] = {}  # Store refresh token metadata
+        self.token_blacklist: set[str] = set()  # Blacklist for invalidated tokens
+        self.audit_log: list[dict] = []  # Security audit log
+
+    def _audit_log(self, event: str, details: dict):
+        """Log security event for audit purposes."""
+        audit_entry = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": event,
+            "details": details,
+        }
+        self.audit_log.append(audit_entry)
+
+        # Keep only last 1000 entries to prevent memory issues
+        if len(self.audit_log) > 1000:
+            self.audit_log.pop(0)
 
     # Password management
     def hash_password(self, password: str) -> str:
@@ -131,7 +147,7 @@ class SecurityManager:
         email: str,
         password: str,
         is_admin: bool = False,
-        permissions: list[str] = None,
+        permissions: list[str] | None = None,
     ) -> User:
         """Create a new user with hashed password."""
         user = User(
@@ -218,28 +234,57 @@ class SecurityManager:
         return token
 
     def create_refresh_token(self, user: User) -> str:
-        """Create JWT refresh token."""
+        """Create JWT refresh token with rotation support."""
         expire = datetime.now(UTC) + timedelta(
             days=self.config.REFRESH_TOKEN_EXPIRE_DAYS
         )
+
+        # Generate unique token ID for tracking
+        token_id = str(uuid.uuid4())
 
         payload = {
             "sub": user.id,
             "exp": expire,
             "iat": datetime.now(UTC),
             "type": "refresh",
+            "jti": token_id,  # JWT ID for token tracking
         }
 
-        return jwt.encode(
+        token = jwt.encode(
             payload, self.config.SECRET_KEY, algorithm=self.config.ALGORITHM
         )
 
+        # Store refresh token metadata for rotation
+        self.refresh_tokens[token_id] = {
+            "user_id": user.id,
+            "created_at": datetime.now(UTC),
+            "expires_at": expire,
+            "used": False,
+        }
+
+        # Audit log token creation
+        self._audit_log("refresh_token_created", {
+            "user_id": user.id,
+            "token_id": token_id,
+            "expires_at": expire.isoformat(),
+        })
+
+        logger.info("Refresh token created", user_id=user.id, token_id=token_id)
+        return token
+
     def verify_token(self, token: str) -> dict[str, Any] | None:
-        """Verify and decode JWT token."""
+        """Verify and decode JWT token with blacklist checking."""
         try:
             payload = jwt.decode(
                 token, self.config.SECRET_KEY, algorithms=[self.config.ALGORITHM]
             )
+
+            # Check if token is blacklisted
+            token_id = payload.get("jti")
+            if token_id and token_id in self.token_blacklist:
+                logger.warning("Token has been blacklisted", token_id=token_id)
+                return None
+
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("Token expired")
@@ -247,6 +292,100 @@ class SecurityManager:
         except Exception as e:
             logger.warning("Invalid token", error=str(e))
             return None
+
+    def rotate_refresh_token(self, old_token: str) -> str | None:
+        """Rotate refresh token - invalidate old one and create new one."""
+        try:
+            payload = jwt.decode(
+                old_token, self.config.SECRET_KEY, algorithms=[self.config.ALGORITHM]
+            )
+
+            if payload.get("type") != "refresh":
+                logger.warning("Attempted to rotate non-refresh token")
+                return None
+
+            token_id = payload.get("jti")
+            user_id = payload.get("sub")
+
+            if not token_id or not user_id:
+                logger.warning("Invalid token payload for rotation")
+                return None
+
+            # Check if token was already used
+            if token_id in self.refresh_tokens:
+                token_data = self.refresh_tokens[token_id]
+                if token_data.get("used", False):
+                    logger.warning("Refresh token already used", token_id=token_id)
+                    return None
+
+                # Mark old token as used
+                token_data["used"] = True
+                token_data["used_at"] = datetime.now(UTC)
+
+            # Blacklist the old token
+            self.token_blacklist.add(token_id)
+
+            # Get user
+            if user_id not in self.users:
+                logger.warning("User not found for token rotation", user_id=user_id)
+                return None
+
+            user = self.users[user_id]
+
+            # Create new refresh token
+            new_token = self.create_refresh_token(user)
+
+            logger.info("Refresh token rotated", user_id=user_id, old_token_id=token_id)
+            return new_token
+
+        except Exception as e:
+            logger.error("Token rotation failed", error=str(e))
+            return None
+
+    def invalidate_user_tokens(self, user_id: str):
+        """Invalidate all tokens for a user."""
+        # Blacklist all refresh tokens for this user
+        tokens_to_blacklist = []
+        for token_id, token_data in self.refresh_tokens.items():
+            if token_data.get("user_id") == user_id:
+                tokens_to_blacklist.append(token_id)
+
+        for token_id in tokens_to_blacklist:
+            self.token_blacklist.add(token_id)
+            if token_id in self.refresh_tokens:
+                self.refresh_tokens[token_id]["used"] = True
+                self.refresh_tokens[token_id]["invalidated_at"] = datetime.now(UTC)
+
+        logger.info("All tokens invalidated for user", user_id=user_id, tokens_blacklisted=len(tokens_to_blacklist))
+
+    def cleanup_expired_tokens(self):
+        """Clean up expired refresh tokens and old blacklist entries."""
+        now = datetime.now(UTC)
+
+        # Remove expired refresh tokens
+        expired_tokens = []
+        for token_id, token_data in self.refresh_tokens.items():
+            if token_data.get("expires_at", now) < now:
+                expired_tokens.append(token_id)
+
+        for token_id in expired_tokens:
+            del self.refresh_tokens[token_id]
+
+        # Clean up old blacklist entries (older than 30 days)
+        old_blacklist_cutoff = now - timedelta(days=30)
+        old_blacklist = []
+        for token_id, token_data in self.refresh_tokens.items():
+            invalidated_at = token_data.get("invalidated_at")
+            if invalidated_at and invalidated_at < old_blacklist_cutoff:
+                old_blacklist.append(token_id)
+
+        for token_id in old_blacklist:
+            self.token_blacklist.discard(token_id)
+
+        if expired_tokens or old_blacklist:
+            logger.info("Cleaned up expired tokens",
+                       expired_refresh_tokens=len(expired_tokens),
+                       cleaned_blacklist_entries=len(old_blacklist))
 
     # Authorization
     def check_permission(self, user: User, permission: str) -> bool:
@@ -291,7 +430,7 @@ class SecurityManager:
         return True
 
     # API key management
-    def generate_api_key(self, user: User, name: str = None) -> str:
+    def generate_api_key(self, user: User, name: str | None = None) -> str:
         """Generate API key for a user."""
         key_id = str(uuid.uuid4())
         key_secret = secrets.token_urlsafe(32)

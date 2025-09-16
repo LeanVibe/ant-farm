@@ -994,14 +994,18 @@ async def oauth2_token(
 @app.post("/api/v1/auth/refresh", response_model=APIResponse)
 @rate_limit(20)
 async def refresh_token(request: Request, refresh_token: str):
-    """Refresh access token using refresh token."""
+    """Refresh access token using refresh token with rotation."""
     try:
-        # Verify refresh token
-        payload = security_manager.verify_token(refresh_token)
-        if not payload or payload.get("type") != "refresh":
-            raise AuthenticationError("Invalid refresh token")
+        # Rotate refresh token (invalidates old one, creates new one)
+        new_refresh_token = security_manager.rotate_refresh_token(refresh_token)
+        if not new_refresh_token:
+            raise AuthenticationError("Invalid or expired refresh token")
 
-        # Get user
+        # Get user from the rotated token
+        payload = security_manager.verify_token(new_refresh_token)
+        if not payload:
+            raise AuthenticationError("Token rotation failed")
+
         user_id = payload.get("sub")
         if not user_id or user_id not in security_manager.users:
             raise AuthenticationError("User not found")
@@ -1013,10 +1017,16 @@ async def refresh_token(request: Request, refresh_token: str):
         # Generate new access token
         access_token = security_manager.create_access_token(user)
 
+        # Audit log token refresh
+        logger.info("Token refreshed with rotation",
+                   user_id=user.id,
+                   client_ip=get_client_ip(request))
+
         return APIResponse(
             success=True,
             data={
                 "access_token": access_token,
+                "refresh_token": new_refresh_token,  # Return rotated refresh token
                 "token_type": "bearer",
                 "expires_in": security_manager.config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             },
