@@ -412,6 +412,33 @@ from .middleware import (
     SecurityHeadersMiddleware,
 )
 
+# Import monitoring components
+try:
+    from ..core.metrics_collector import (
+        metrics_collector,
+        start_metrics_collection,
+        stop_metrics_collection,
+    )
+    from ..core.bottleneck_detector import (
+        bottleneck_detector,
+        start_bottleneck_detection,
+        stop_bottleneck_detection,
+    )
+    from ..core.alert_manager import (
+        alert_manager,
+        process_alert_notification,
+    )
+except ImportError:
+    # Handle missing monitoring components gracefully
+    metrics_collector = None
+    bottleneck_detector = None
+    alert_manager = None
+    start_metrics_collection = None
+    stop_metrics_collection = None
+    start_bottleneck_detection = None
+    stop_bottleneck_detection = None
+    process_alert_notification = None
+
 # Add comprehensive error handlers
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
@@ -629,6 +656,12 @@ async def startup_event():
 
         # Start performance monitoring
         await start_performance_monitoring()
+
+        # Start metrics collection and monitoring
+        if start_metrics_collection:
+            await start_metrics_collection()
+        if start_bottleneck_detection:
+            await start_bottleneck_detection()
 
         # Create default admin user if none exists
         if not security_manager.users:
@@ -3768,6 +3801,118 @@ async def get_system_diagnostics(current_user: User = Depends(get_current_user))
 
     except Exception as e:
         logger.error("Failed to get diagnostics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# Monitoring endpoints
+@app.get("/api/v1/monitoring/metrics", response_model=APIResponse)
+@Permissions.system_read()
+async def get_system_metrics(current_user: User = Depends(get_current_user)):
+    """Get current system metrics."""
+    try:
+        if not metrics_collector:
+            return APIResponse(success=True, data={"message": "Metrics collection not available"})
+
+        summary = metrics_collector.get_all_metrics_summary()
+        health_score = metrics_collector.get_system_health_score()
+
+        return APIResponse(success=True, data={
+            "metrics": summary,
+            "health_score": health_score,
+            "timestamp": time.time()
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get system metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/monitoring/alerts", response_model=APIResponse)
+@Permissions.system_read()
+async def get_active_alerts(current_user: User = Depends(get_current_user)):
+    """Get active alerts."""
+    try:
+        if not bottleneck_detector:
+            return APIResponse(success=True, data={"alerts": []})
+
+        alerts = bottleneck_detector.get_active_alerts()
+        alert_data = [
+            {
+                "id": alert.id,
+                "title": alert.title,
+                "description": alert.description,
+                "severity": alert.severity.value,
+                "metric_name": alert.metric_name,
+                "current_value": alert.current_value,
+                "threshold_value": alert.threshold_value,
+                "created_at": alert.created_at,
+                "status": alert.status.value
+            }
+            for alert in alerts
+        ]
+
+        return APIResponse(success=True, data={"alerts": alert_data})
+
+    except Exception as e:
+        logger.error(f"Failed to get active alerts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/monitoring/bottlenecks", response_model=APIResponse)
+@Permissions.system_read()
+async def get_system_bottlenecks(current_user: User = Depends(get_current_user)):
+    """Get system bottleneck analysis."""
+    try:
+        if not bottleneck_detector:
+            return APIResponse(success=True, data={"bottlenecks": {}})
+
+        bottlenecks = bottleneck_detector.get_system_bottlenecks()
+
+        return APIResponse(success=True, data={"bottlenecks": bottlenecks})
+
+    except Exception as e:
+        logger.error(f"Failed to get system bottlenecks: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/monitoring/health", response_model=APIResponse)
+async def get_monitoring_health():
+    """Get monitoring system health."""
+    try:
+        health_data = {
+            "metrics_collector": metrics_collector is not None,
+            "bottleneck_detector": bottleneck_detector is not None,
+            "alert_manager": alert_manager is not None,
+            "timestamp": time.time()
+        }
+
+        if metrics_collector:
+            health_data["health_score"] = metrics_collector.get_system_health_score()
+
+        return APIResponse(success=True, data=health_data)
+
+    except Exception as e:
+        logger.error(f"Failed to get monitoring health: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/monitoring/alerts/{alert_id}/acknowledge", response_model=APIResponse)
+@Permissions.system_write()
+async def acknowledge_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Acknowledge an alert."""
+    try:
+        if not bottleneck_detector:
+            raise HTTPException(status_code=404, detail="Alert system not available")
+
+        bottleneck_detector.acknowledge_alert(alert_id)
+
+        return APIResponse(success=True, data={"message": f"Alert {alert_id} acknowledged"})
+
+    except Exception as e:
+        logger.error(f"Failed to acknowledge alert: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
