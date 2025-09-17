@@ -4,6 +4,7 @@ Adds OAuth2 password flow with scopes while maintaining existing
 HTTP Bearer support for backward compatibility.
 """
 
+import inspect
 import structlog
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import (
@@ -12,6 +13,7 @@ from fastapi.security import (
     OAuth2PasswordBearer,
     SecurityScopes,
 )
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .security import Permission, User, security_manager
 
@@ -305,34 +307,25 @@ def rate_limit(limit: int = 100):
             return await func(*args, **kwargs)
 
         # Ensure FastAPI sees the original signature
-        wrapper.__signature__ = inspect.signature(func)
+        # wrapper.__signature__ = inspect.signature(func)
         return wrapper
 
     return decorator
 
 
-class SecurityMiddleware:
+class SecurityMiddleware(BaseHTTPMiddleware):
     """Security middleware for FastAPI application."""
 
-    def __init__(self, app):
-        self.app = app
+    async def dispatch(self, request, call_next):
+        # Process the request
+        response = await call_next(request)
 
-    async def __call__(self, scope, receive, send):
-        if scope["type"] == "http":
-            # Add security headers to response
-            async def send_wrapper(message):
-                if message["type"] == "http.response.start":
-                    headers = security_manager.get_security_headers()
-                    message["headers"] = message.get("headers", [])
+        # Add security headers to response
+        headers = security_manager.get_security_headers()
+        for name, value in headers.items():
+            response.headers[name] = value
 
-                    for name, value in headers.items():
-                        message["headers"].append([name.encode(), value.encode()])
-
-                await send(message)
-
-            await self.app(scope, receive, send_wrapper)
-        else:
-            await self.app(scope, receive, send)
+        return response
 
 
 # Permission shortcuts for common operations

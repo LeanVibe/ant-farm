@@ -2,12 +2,27 @@
 
 import argparse
 import asyncio
+import os
 import signal
 import sys
 import time
 from pathlib import Path
 
 import structlog
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Try to find .env file in the project root
+    project_root = Path(__file__).parent.parent.parent  # Go up one more level to project root
+    env_file = project_root / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+        print(f"Loaded environment from {env_file}")
+    else:
+        print(f".env file not found at {env_file}")
+except ImportError:
+    print("python-dotenv not available, using system environment variables")
 
 # Handle both module and direct execution imports
 try:

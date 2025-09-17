@@ -10,6 +10,7 @@ from typing import Any
 
 import psutil
 import structlog
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = structlog.get_logger()
 
@@ -616,39 +617,29 @@ class PerformanceCollector:
 performance_collector = PerformanceCollector()
 
 
-class PerformanceMiddleware:
+class PerformanceMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for automatic performance monitoring."""
 
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
+    async def dispatch(self, request, call_next):
         start_time = time.time()
         status_code = 500
         error = None
 
-        async def send_wrapper(message):
-            nonlocal status_code
-            if message["type"] == "http.response.start":
-                status_code = message["status"]
-            await send(message)
-
         try:
-            await self.app(scope, receive, send_wrapper)
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
         except Exception as e:
             error = str(e)
+            status_code = 500
             raise
         finally:
             # Record the request
             end_time = time.time()
             response_time = (end_time - start_time) * 1000  # Convert to milliseconds
 
-            endpoint = scope.get("path", "unknown")
-            method = scope.get("method", "unknown")
+            endpoint = str(request.url.path)
+            method = request.method
 
             performance_collector.record_api_request(
                 endpoint=endpoint,

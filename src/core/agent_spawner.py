@@ -172,12 +172,27 @@ class AgentSpawner:
 
     def _build_agent_command(self, agent_type: str, agent_name: str) -> str:
         """Build the command to run the agent."""
-        # Use uv to run the agent
-        return f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}"
+        # Get environment variables for database and redis
+        import os
+        env_vars = []
+        if os.getenv("DATABASE_URL"):
+            env_vars.append(f"DATABASE_URL={os.getenv('DATABASE_URL')}")
+        if os.getenv("REDIS_URL"):
+            env_vars.append(f"REDIS_URL={os.getenv('REDIS_URL')}")
+
+        # Build environment variable export commands
+        env_exports = "; ".join([f"export {env_var}" for env_var in env_vars]) + "; " if env_vars else ""
+
+        command = f"cd {self.project_root} && {env_exports}uv run python -m src.agents.runner --type {agent_type} --name {agent_name}"
+        logger.info("Built agent command", command=command, env_vars=env_vars)
+
+        # Use uv to run the agent with environment variables
+        return command
 
     async def _create_tmux_session(self, session_name: str, command: str) -> bool:
         """Create a new tmux session with the given command."""
         try:
+            logger.info("Creating tmux session", session_name=session_name, command=command)
             # Create detached tmux session
             result = await asyncio.create_subprocess_exec(
                 "tmux", "new-session", "-d", "-s", session_name, command,
@@ -186,7 +201,9 @@ class AgentSpawner:
             )
             await result.wait()
 
-            return result.returncode == 0
+            success = result.returncode == 0
+            logger.info("Tmux session creation result", session_name=session_name, success=success, returncode=result.returncode)
+            return success
 
         except Exception as e:
             logger.error("Failed to create tmux session", session_name=session_name, error=str(e))

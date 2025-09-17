@@ -17,7 +17,7 @@ from sqlalchemy import text
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "optimize_indexes"
+revision = "optimize_database_indexes"
 down_revision = "7b71b9a0ac9e"
 branch_labels = None
 depends_on = None

@@ -311,8 +311,17 @@ class AgentSpawner:
         )
 
         try:
-            # Build command to run in tmux session
-            command = f"cd {self.project_root} && uv run python -m src.agents.runner --type {agent_type} --name {agent_name}"
+            # Build command to run in tmux session with environment variables
+            import os
+            env_exports = []
+            if os.getenv("DATABASE_URL"):
+                env_exports.append(f"export DATABASE_URL='{os.getenv('DATABASE_URL')}'")
+            if os.getenv("REDIS_URL"):
+                env_exports.append(f"export REDIS_URL='{os.getenv('REDIS_URL')}'")
+
+            # Create a bash command that sets environment variables and runs the agent
+            env_setup = "; ".join(env_exports) + "; " if env_exports else ""
+            command = f"bash -c '{env_setup}uv run python -m src.agents.runner --type {agent_type} --name {agent_name}'"
 
             # Use injected backend
             created = await self.backend.create_session(

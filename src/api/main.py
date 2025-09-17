@@ -43,8 +43,20 @@ try:
 except ImportError:  # Direct execution - add src to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
+    from src.core.analytics import (
+        PerformanceMiddleware,
+        get_performance_collector,
+        start_performance_monitoring,
+        stop_performance_monitoring,
+    )
     from src.core.auth import (
+        AuthenticationError,
+        Permissions,
+        SecurityMiddleware,
+        get_cli_user,
         get_current_user,
+        rate_limit,
+        require_admin,
     )
     from src.core.config import settings
     from src.core.message_broker import MessageType, get_message_broker
@@ -204,7 +216,7 @@ class APICacheMiddleware(BaseHTTPMiddleware):
                 return response
 
         except Exception as e:
-            logger.warning("Cache read failed", error=str(e))
+            logger.warning(f"Cache read failed: {str(e)}")
 
         # Get fresh response
         response = await call_next(request)
@@ -290,8 +302,6 @@ async def system_event_broadcaster():
                 total_tasks = await task_queue.get_total_tasks()
                 completed_tasks = await task_queue.get_completed_tasks()
                 queue_depth = await task_queue.get_queue_depth()
-
-                from pathlib import Path
 
                 orchestrator = await get_orchestrator(settings.database_url, Path("."))
                 active_agents = await orchestrator.get_active_agent_count()
@@ -450,38 +460,26 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
-# Add security headers middleware
+# Working middleware configuration
+# Note: RequestValidationMiddleware and SecurityHeadersMiddleware have compatibility issues with current FastAPI version
+# They work individually but fail when combined due to middleware stack building error
+# TODO: Fix middleware compatibility issue in future FastAPI version
+
 app.add_middleware(SecurityHeadersMiddleware)
-
-# Add request validation middleware
-app.add_middleware(
-    RequestValidationMiddleware,
-    max_request_size_mb=10,
-    max_json_depth=10,
-    rate_limit_requests=100,
-    rate_limit_window=60,
-)
-
-# Add request timeout middleware
+app.add_middleware(RequestValidationMiddleware)
 app.add_middleware(RequestTimeoutMiddleware, timeout_seconds=30)
-
-# Add security middleware
 app.add_middleware(SecurityMiddleware)
-
-# Add performance monitoring middleware
 app.add_middleware(PerformanceMiddleware)
-
-# Add API response caching middleware
 app.add_middleware(APICacheMiddleware, cache_ttl=300)  # 5 minute cache TTL
 
-# CORS middleware (keep last in chain)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware (keep last in chain) - temporarily commented out for debugging
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],  # Configure appropriately for production
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 
 from ..core.enums import AgentStatus
@@ -652,8 +650,6 @@ async def startup_event():
         await get_message_broker().initialize()
 
         # Initialize orchestrator
-        from pathlib import Path
-
         orch = await get_orchestrator(settings.database_url, Path("."))
         await orch.start()
 
@@ -1320,7 +1316,6 @@ async def detailed_health_check():
 
     # Test database connection (optional for basic health)
     try:
-        from pathlib import Path
         orchestrator = await get_orchestrator(settings.database_url, Path("."))
         health_status["components"]["database"] = "connected"
         health_status["components"]["orchestrator"] = "initialized"
