@@ -1,0 +1,44 @@
+{
+  "session_tests": [
+    {
+      "session_id": "test_session_001",
+      "status": "initialized",
+      "duration_seconds": 0.1,
+      "phases_completed": [
+        "planning"
+      ],
+      "success": true,
+      "timestamp": "2026-01-20T02:51:46.210861"
+    }
+  ],
+  "safety_controls": {
+    "safety_directory_exists": true,
+    "emergency_intervention": true,
+    "rollback_manager": false,
+    "levels_implemented": 0
+  },
+  "cognitive_load": {
+    "cognitive_load_manager_exists": true,
+    "load_tracking": true,
+    "threshold_management": true,
+    "automatic_consolidation": false,
+    "features_implemented": 2
+  },
+  "multi_cli_support": {
+    "opencode_detected": true,
+    "claude_cli_detected": true,
+    "gemini_cli_detected": true,
+    "cli_detection_code": true,
+    "fallback_mechanism": true,
+    "tools_available": 3
+  },
+  "issues": [],
+  "recommendations": [],
+  "adw_sessions": {
+    "adw_directory_exists": true,
+    "session_manager": true,
+    "cognitive_load_manager": true,
+    "memory_manager": false,
+    "total_adw_files": 8
+  }
+}
